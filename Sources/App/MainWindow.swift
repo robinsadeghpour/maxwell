@@ -718,14 +718,26 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         dismissOverlays()
         let state = store.state
         var folders: [String] = []
-        for s in state.sessions.values.sorted(by: { $0.lastEventAt > $1.lastEventAt }) where !s.cwd.isEmpty && !folders.contains(s.cwd) {
-            folders.append(s.cwd)
+        for s in state.sessions.values.sorted(by: { $0.lastEventAt > $1.lastEventAt }) {
+            if let f = startFolder(s.cwd), !folders.contains(f) { folders.append(f) }
         }
-        if let c = current.flatMap({ state.sessions[$0]?.cwd }) { folders.removeAll { $0 == c }; folders.insert(c, at: 0) }
+        if let c = current.flatMap({ state.sessions[$0]?.cwd }).flatMap(startFolder) { folders.removeAll { $0 == c }; folders.insert(c, at: 0) }
         newPanel.present(.init(accounts: state.accounts, defaultAccount: state.roomiest(now: Date())?.id, folders: Array(folders.prefix(5))), in: root)
     }
 
+    /// Where a new session for a session's folder starts: the project's main checkout, never a
+    /// worktree. Sessions make and remove their own worktrees, so those folders come and go;
+    /// nil when nothing on disk is left to start in.
+    private func startFolder(_ cwd: String) -> String? {
+        guard !cwd.isEmpty else { return nil }
+        let f = repoRoot(cwd) ?? cwd
+        return FileManager.default.fileExists(atPath: f) ? f : nil
+    }
+
     func startSession(account: Account, folder: String, name: String, model: String? = nil) {
+        guard FileManager.default.fileExists(atPath: folder) else {
+            return newPanel.show(error: "\((folder as NSString).abbreviatingWithTildeInPath) is gone. Pick another folder.")
+        }
         newPanel.show(error: "Starting \(name) on \(account.name)…")
         store.newSession(account: account, cwd: folder, name: name, model: model) { [weak self] r in
             guard let self else { return }
@@ -1024,10 +1036,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// else that project's most recent folder of its own. Nil when the project has none.
     private func folderHere(_ state: AppState) -> String? {
         let inScope = { (s: Session) in !s.cwd.isEmpty && (self.scope == nil || state.project(s, in: self.projects) == self.scope) }
-        if let s = current.flatMap({ state.sessions[$0] }), inScope(s) { return s.cwd }
+        if let s = current.flatMap({ state.sessions[$0] }), inScope(s), let f = startFolder(s.cwd) { return f }
         let own = state.sessions.values.filter { inScope($0) && (self.scope == nil || self.projects.name(for: $0.cwd) == self.scope) }
-        guard let recent = own.max(by: { $0.lastEventAt < $1.lastEventAt }) else { return nil }
-        return scope == nil ? recent.cwd : (repoRoot(recent.cwd) ?? recent.cwd)
+        return own.sorted { $0.lastEventAt > $1.lastEventAt }.lazy.compactMap { self.startFolder($0.cwd) }.first
     }
 
     private var updateStatus: String?
