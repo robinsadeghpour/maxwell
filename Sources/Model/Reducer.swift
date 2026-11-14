@@ -9,6 +9,7 @@ func reduce(_ state: AppState, _ event: Event) -> AppState {
 
 /// `reduce` in place. Folds use this: the by-value form copies every dictionary per event.
 func reduce(into s: inout AppState, _ event: Event) {
+    defer { syncNamed(&s, event) }
     switch event {
     case .hook(let h):
         guard let acct = s.accountId(forConfigDir: h.configDir) else { return }
@@ -32,7 +33,7 @@ func reduce(into s: inout AppState, _ event: Event) {
             session.phase = .working
             session.doneCheck = nil
             if let title, !title.isEmpty { session.hookTitle = title }
-            if session.promptTitle == nil, !prompt.isEmpty { session.promptTitle = Titles.fromPrompt(prompt) }
+            if session.firstPrompt == nil, !prompt.isEmpty { session.firstPrompt = prompt }
         case .stopped(let message):
             session.prompted = true
             session.lastMessage = message ?? session.lastMessage
@@ -86,7 +87,7 @@ func reduce(into s: inout AppState, _ event: Event) {
             if let t = e.title { session.tabTitle = t }
             if e.used { session.prompted = true }
             if let m = e.lastMessage { session.lastMessage = m }
-            if session.promptTitle == nil, let p = e.firstPrompt { session.promptTitle = Titles.fromPrompt(p) }
+            if session.firstPrompt == nil, let p = e.firstPrompt { session.firstPrompt = String(p.prefix(400)) }
             // The transcript is written on every prompt and reply, including ones typed in another terminal.
             if let active = e.lastActiveAt { session.lastEventAt = max(session.lastEventAt, active) }
             switch e.status {
@@ -147,6 +148,11 @@ func reduce(into s: inout AppState, _ event: Event) {
     case .suggestionDismissed(let id, let project):
         s.dismissed[id, default: []].insert(project)
 
+    case .titled(let id, let title):
+        // Yours is never replaced by a model's.
+        if s.named[id]?.byYou == true, !title.byYou { break }
+        s.named[id] = title.text.isEmpty ? nil : title
+
     case .started(let id, let acct, let name, let cwd, let shortId, let at):
         s.startedByMaxwell.insert(id)
         var session = s.sessions[id] ?? Session(id: id, name: name, accountId: acct, cwd: cwd, at: at, origin: .maxwell,
@@ -154,6 +160,19 @@ func reduce(into s: inout AppState, _ event: Event) {
         session.origin = .maxwell
         s.sessions[id] = session
     }
+}
+
+/// Copies Maxwell's titles onto the sessions an event may have created or touched.
+private func syncNamed(_ s: inout AppState, _ event: Event) {
+    let ids: [SessionID]
+    switch event {
+    case .hook(let h): ids = [h.sessionId]
+    case .agents(let snap): ids = snap.entries.map(\.sessionId)
+    case .started(let id, _, _, _, _, _), .reopened(let id, _), .titled(let id, _): ids = [id]
+    case .closed(let c): ids = [c.session.id]
+    default: return
+    }
+    for id in ids where s.sessions[id] != nil && s.sessions[id]?.named != s.named[id] { s.sessions[id]?.named = s.named[id] }
 }
 
 /// What a stopped session's last reply leaves for you.
@@ -244,5 +263,34 @@ enum Titles {
     static func fromPrompt(_ prompt: String) -> String {
         let words = prompt.split(whereSeparator: { $0.isWhitespace }).prefix(6).joined(separator: " ")
         return words.count > 48 ? String(words.prefix(47)) + "…" : words
+    }
+
+    /// A generated name: one lowercase token like "acme-75" or "mx-slack".
+    static func isSlug(_ t: String) -> Bool { !t.contains(" ") && t == t.lowercased() }
+
+    private static let generic: Set<String> = ["continue", "continued", "previous", "task", "tasks", "session", "help", "question",
+                                                "questions", "work", "chat", "new", "conversation", "request", "resume", "follow", "up", "general", "misc"]
+    /// Only words that fit any session ("Continue Previous Task").
+    static func isGeneric(_ t: String) -> Bool {
+        let words = t.lowercased().split(whereSeparator: { !$0.isLetter })
+        return !words.isEmpty && words.allSatisfy { generic.contains(String($0)) }
+    }
+
+    /// True when `title` is just the opening words of `prompt` ("hi, do I need to do").
+    static func isFragment(_ title: String, of prompt: String) -> Bool {
+        func norm(_ x: String) -> String {
+            x.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(String.init).joined()
+        }
+        let t = norm(title.replacingOccurrences(of: "…", with: "")), p = norm(prompt)
+        return !t.isEmpty && p.hasPrefix(t)
+    }
+
+    /// A model's answer as a title: one line, no quotes or closing period, at most 60 characters.
+    static func clean(_ raw: String) -> String? {
+        let line = raw.split(separator: "\n").first.map(String.init) ?? ""
+        var t = line.trimmingCharacters(in: CharacterSet(charactersIn: " \t\"'`*#.“”‘’"))
+        if t.lowercased().hasPrefix("title:") { t = String(t.dropFirst(6)).trimmingCharacters(in: .whitespaces) }
+        guard !t.isEmpty, t.count <= 60 else { return nil }
+        return t
     }
 }
