@@ -100,7 +100,7 @@ Every key can be changed with a `keybind` line in the config.
 
 You need a Mac with Apple silicon, macOS 14 or later, and Claude Code.
 
-1. Download `Maxwell-v<version>.zip` from the [latest release](https://github.com/robinsadeghpour/maxwell/releases/latest), unzip it and move Maxwell to Applications.
+1. [Download Maxwell](https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.zip) (or pick a version from [Releases](https://github.com/robinsadeghpour/maxwell/releases)), unzip it and move Maxwell to Applications.
 2. Maxwell isn't notarized by Apple yet, so macOS blocks it the first time. Open **System Settings › Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Maxwell.app` once.
 3. Choose **Maxwell › Install Hooks**. That's how Maxwell learns what your sessions are doing.
 

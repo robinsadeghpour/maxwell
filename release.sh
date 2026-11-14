@@ -15,4 +15,6 @@ ZIP=build/release/Maxwell-v$V.zip
 rm -f "$ZIP"
 ditto -c -k --keepParent build/release/Maxwell.app "$ZIP"
 git push -q origin v1 v1:main
-gh release create "v$V" "$ZIP" --target main --title "v$V" --notes "$NOTES"
+# Maxwell.zip is the same file under a fixed name, so releases/latest/download/Maxwell.zip always works.
+cp "$ZIP" build/release/Maxwell.zip
+gh release create "v$V" "$ZIP" build/release/Maxwell.zip --target main --title "v$V" --notes "$NOTES"
