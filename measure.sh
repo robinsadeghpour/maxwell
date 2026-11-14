@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Performance budgets for build/Maxwell.app. Exits 1 if any budget is exceeded.
 #   window on screen < 300 ms · idle < 150 MB · launch peak < 200 MB · 20 visited sessions < 400 MB
+#   · artifacts on up to 3 accounts < 400 MB (claude.ai's sign-in page on each account's data store in turn)
 # Memory is phys_footprint (what Activity Monitor shows) of Maxwell plus the WebKit
 # helpers it started. The `claude attach` children are reported separately: they are
 # Claude Code's processes, not Maxwell's.
@@ -57,4 +58,6 @@ launch_peak() {
 launch_peak
 measure "idle" 8 150
 measure "20 visited sessions" 18 400 --visit-all 20
+accts=$(grep -E '^account *=' "${MAXWELL_CONFIG:-$HOME/.config/maxwell/config}" 2>/dev/null | awk '{print $3}' | head -3 | paste -sd, -)
+[[ -n $accts ]] && measure "artifacts on $accts" 30 400 --artifact-accounts $accts
 exit $fail

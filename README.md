@@ -56,6 +56,7 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 - **Projects stay separate.** A rail on the left, like the macOS Dock, switches between projects. Pin the ones you work on, and the others only appear when something there needs you. Each project shows its own logo, redrawn in Maxwell's style.
 - **The real session, in place.** The middle pane is the actual Claude session, attached in a Ghostty terminal. Closing Maxwell doesn't stop it.
 - **Files open beside the session.** When a session writes or mentions a Markdown file, it opens on the right, rendered. ⌘-click any path in the terminal to open it.
+- **Artifacts too, in the right account.** When a session publishes a claude.ai artifact, it opens on the right, signed in to that session's account; a republish reloads it in place. Each account signs in once, on claude.ai's own page, and keeps its own login. ⌘-click an artifact link to open it the same way, or ⇧⌘O for the account's browser profile or container.
 - **Usage for every account.** 5-hour and weekly use with reset times, next to CPU and memory for your Claude processes.
 - **Panels go where you want them.** Sessions, viewer, usage and system can sit left, right or bottom, collapse to a stripe, and remember their place on each screen, like tool windows in JetBrains IDEs.
 - **Names you can read at a glance.** A session keeps Claude's title when it says something. When it's only a slug ("acme-75"), generic ("Continue Previous Task") or the first words of the prompt ("hi, do I need to do"), Haiku names the task once, for about $0.0003. Right-click a session to rename it yourself. Your name always wins. `Maxwell titles` lists every title and where it came from.
@@ -92,7 +93,8 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⇧⌘X | Close all safe (asks first) |
 | ⌘Z | Undo the last close |
 | ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |
-| ⌥⌘P | Pin the current file |
+| ⌥⌘P | Pin the current file or artifact |
+| ⌥⌘R, ⇧⌘O | Reload the artifact, open it in the account's browser |
 | ⇧⌘I | Show or hide Idle |
 | ⇧⌘L | Switch light and dark (View › Appearance: Light, Dark, Follow System) |
 | ⌘, | Settings: General, Appearance, Accounts, Projects, Keys, Advanced (⌘1–6 inside) |
@@ -122,6 +124,7 @@ Everything stays on your machine. Maxwell sends nothing anywhere, apart from the
 | The hook program (C, ~2 ms, always exits 0) | `~/.local/share/maxwell/` | delete the folder |
 | Event log | `~/.local/state/maxwell/events.jsonl` | delete the folder |
 | Config | `~/.config/maxwell/config` | delete the file |
+| claude.ai logins, one per account | Maxwell's own WebKit storage | Settings › Accounts › Sign out |
 
 ## Configure
 
@@ -140,6 +143,7 @@ idle-after = 24h              # quiet time before a stopped session folds into I
 judge = on                    # off skips the model read, so nothing is ever safe
 notify = true
 auto-open = true
+artifacts = viewer            # viewer (beside the session, signed in) | browser
 ```
 
 The full list of keys, with defaults, is in [`docs/config.md`](docs/config.md). Themes are small token files in `Resources/themes`. Put your own in `~/.config/maxwell/themes/`.
@@ -193,7 +197,6 @@ Early. v1 covers the core: what needs you, projects, accounts, safe closing. Nex
 - Slack: who is waiting on a reply from you
 - Linear status kept in sync with sessions
 - A supervisor that handles the obvious "go on" for you, and suggests improvements you accept or reject
-- Claude artifacts opened in place, logged into the right account
 - A phone app
 
 ## Licence

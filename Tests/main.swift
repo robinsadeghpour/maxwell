@@ -386,6 +386,7 @@ if let (st, sess, now, r) = FalseSafe.decode((try? JSONSerialization.jsonObject(
 } else { check(false, "false-safe fixture encodes and decodes") }
 
 logoTests()
+artifactTests()
 
 print(failures == 0 ? "reducer tests: all passed" : "reducer tests: \(failures) failed")
 exit(failures == 0 ? 0 : 1)

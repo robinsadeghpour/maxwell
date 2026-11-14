@@ -1,7 +1,7 @@
 import AppKit
 
-/// Per-session viewer state: the file shown, and whether it is pinned.
-struct ViewerState { var url: URL?; var pinned = false; var scanned = false }
+/// Per-session viewer state: the file or artifact shown, and whether it is pinned.
+struct ViewerState { var item: ViewerItem?; var pinned = false; var scanned = false }
 
 final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWindowDelegate {
     let store: Store
@@ -114,7 +114,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
         root.viewerPane.onTreeSelect = { [weak self] url in self?.showFile(url, for: self?.current) }
         store.onChange = { [weak self] in self?.render($0) }
-        store.onMarkdown = { [weak self] id, url in self?.markdownWritten(id, url) }
+        store.onViewerItem = { [weak self] id, item, reload in self?.itemSeen(id, item, reload: reload) }
+        root.viewerPane.reload.action = { [weak self] in self?.reloadArtifact() }
+        root.viewerPane.external.action = { [weak self] in self?.openInBrowser() }
+        root.viewerPane.viewer.artifact.onOpenExternal = { [weak self] url, a in self?.openExternally(url, account: a) }
+        root.viewerPane.viewer.onLink = { [weak self] url in
+            guard let self else { return }
+            self.openWebLink(url, session: self.current)
+        }
         store.onBrought = { [weak self] s, why in
             guard let self else { return }
             if let why { return self.toast("“\(s.title)” didn't move: \(why)") }
@@ -683,13 +690,18 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: viewer
 
-    /// The viewer shows the current session's file and is open exactly when there is one,
+    /// The viewer shows the current session's file or artifact and is open exactly when there is one,
     /// unless ⌘\\ overrode that for this session.
-    private func syncViewer() {
+    private func syncViewer(reload: Bool = false) {
         let v = current.flatMap { viewers[$0] } ?? ViewerState()
-        root.viewerPane.show(v.url, pinned: v.pinned)
-        root.setViewer(open: viewerForced ?? (v.url != nil), animated: window?.isVisible == true)
+        root.viewerPane.show(v.item, account: current.flatMap(account(of:)), pinned: v.pinned, reload: reload)
+        root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
         updateDim()
+    }
+
+    /// The account a session runs on: its artifacts open signed in to it.
+    private func account(of id: SessionID) -> Account? {
+        store.state.sessions[id].flatMap { store.state.account($0.accountId) }
     }
 
     func toggleViewer() {
@@ -705,32 +717,71 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewers[id] = v
         guard store.config.autoOpen, let path = Transcripts.path(s, account: store.state.account(s.accountId)) else { return }
         DispatchQueue.global().async { [weak self] in
-            let url = Transcripts.lastMarkdown(transcript: path, cwd: s.cwd)
-            DispatchQueue.main.async { if let url { self?.markdownWritten(id, url) } }
+            let item = Transcripts.lastItem(transcript: path, cwd: s.cwd)
+            DispatchQueue.main.async { if let item { self?.itemSeen(id, item, reload: false) } }
         }
     }
 
-    private func markdownWritten(_ id: SessionID, _ url: URL) {
-        guard store.config.autoOpen else { return }
+    /// A session wrote or named a file, or published, opened or named an artifact.
+    /// A republish of what the viewer shows reloads it in place, pinned or not.
+    private func itemSeen(_ id: SessionID, _ item: ViewerItem, reload: Bool) {
         var v = viewers[id] ?? ViewerState()
-        guard !v.pinned else { return }
-        v.url = url
+        if item.same(as: v.item) {
+            // Keep the title the page gave; take the transcript's when there was none.
+            if case .artifact(let l, let t?) = item, case .artifact(_, nil)? = v.item { v.item = .artifact(l, title: t) }
+            viewers[id] = v
+            if reload, id == current { syncViewer(reload: true) }
+            return
+        }
+        guard store.config.autoOpen, !v.pinned else { return }
+        if item.artifact != nil, store.config.artifacts != "viewer" { return }
+        v.item = item
         viewers[id] = v
         if id == current { viewerForced = nil; syncViewer() }
     }
 
-    func showFile(_ url: URL, for id: SessionID?) {
+    func showFile(_ url: URL, for id: SessionID?) { show(.file(url), for: id) }
+
+    func show(_ item: ViewerItem, for id: SessionID?) {
         guard let id else { return }
         var v = viewers[id] ?? ViewerState()
-        v.url = url
+        v.item = item
         viewers[id] = v
         if id == current { viewerForced = nil; syncViewer() }
     }
 
-    /// ⌘-click in a terminal: files open in that session's viewer, web links in the browser.
+    /// A web link from a session's terminal or file: an artifact opens beside the session, signed in
+    /// to its account (or in that account's browser, with `artifacts = browser`); the rest goes to the browser.
+    private func openWebLink(_ url: URL, session id: SessionID?) {
+        let a = id.flatMap(account(of:))
+        if let link = ArtifactLink.parse(url.absoluteString) {
+            mark("artifact link \(link.id) -> \(store.config.artifacts) as \(a?.name ?? "none")")
+            if store.config.artifacts == "viewer", a != nil { return show(.artifact(link, title: nil), for: id) }
+        }
+        if let a { openExternally(url, account: a) } else { NSWorkspace.shared.open(url) }
+    }
+
+    /// In the browser this account's links go to (Settings › Accounts).
+    func openExternally(_ url: URL, account a: Account) {
+        let choice = store.config.browser(for: a.name)
+        if let why = Browsers.open(url, with: choice) { toast(why) }
+        else if choice != .systemDefault { toast("Opened in \(choice.title()) for \(a.name).") }
+    }
+
+    func openInBrowser() {
+        guard let id = current, let link = viewers[id]?.item?.artifact, let a = account(of: id) else { return toast("No artifact open.") }
+        openExternally(link.url, account: a)
+    }
+
+    func reloadArtifact() {
+        guard let id = current, viewers[id]?.item?.artifact != nil else { return toast("No artifact open.") }
+        root.viewerPane.viewer.artifact.reload()
+    }
+
+    /// ⌘-click in a terminal: files open in that session's viewer, web links as above.
     private func openURL(_ raw: String, cwd: String?, session id: SessionID) {
         if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
-            if let u = URL(string: raw) { NSWorkspace.shared.open(u) }
+            if let u = URL(string: raw) { openWebLink(u, session: id) }
             return
         }
         var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
@@ -747,16 +798,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func togglePin() {
-        guard let id = current, var v = viewers[id], v.url != nil else { return }
+        guard let id = current, var v = viewers[id], v.item != nil else { return }
         v.pinned.toggle()
         viewers[id] = v
-        root.viewerPane.show(v.url, pinned: v.pinned)
-        toast(v.pinned ? "Pinned. New files from this session wait until you unpin." : "Unpinned.")
+        syncViewer()
+        let what = v.item?.artifact != nil ? "artifacts" : "files"
+        toast(v.pinned ? "Pinned. New \(what) from this session wait until you unpin." : "Unpinned.")
     }
 
     func clearViewer() {
         guard let id = current else { return }
-        viewers[id] = ViewerState(url: nil, pinned: false, scanned: true)
+        viewers[id] = ViewerState(item: nil, pinned: false, scanned: true)
         viewerForced = nil
         syncViewer()
     }
@@ -825,6 +877,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         v.onInstallHooks = { [weak self] in self?.installHooks() }
         v.onUninstallHooks = { [weak self] in self?.uninstallHooks() }
         v.onAddAccount = { [weak self] in self?.addAccount() }
+        v.onBrowser = { [weak self] account, choice in self?.onConfigEdit?("browser:\(account)", choice?.line ?? "") }
         v.onRunAction = { [weak self] id in self?.actions.first { $0.id == id }?.run() }
         settings.show(settingsModel, section: section)
     }
@@ -946,7 +999,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         switch pane {
         case 1: window?.makeFirstResponder(root.sidebar.list)
         case 2: focusMain()
-        default: if root.viewerPane.viewer.current != nil { window?.makeFirstResponder(root.viewerPane.viewer.container.subviews.first { !$0.isHidden }) }
+        default: if root.viewerPane.viewer.current != nil || root.viewerPane.viewer.currentArtifact != nil { window?.makeFirstResponder(root.viewerPane.viewer.container.subviews.first { !$0.isHidden }) }
         }
     }
 
@@ -1043,6 +1096,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     private func makeActions() -> [Action] {
         let hasCurrent: () -> Bool = { [weak self] in self?.current != nil }
+        let hasArtifact: () -> Bool = { [weak self] in
+            guard let self, let id = self.current else { return false }
+            return self.viewers[id]?.item?.artifact != nil
+        }
         let limited: () -> Bool = { [weak self] in
             guard let self, let id = self.current, case .limited = self.store.state.sessions[id]?.phase else { return false }
             return true
@@ -1088,6 +1145,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
             Action(id: "toggle-viewer", title: "Show or Hide Viewer", menu: "View", shortcut: Shortcut("cmd+\\")) { [weak self] in self?.toggleViewer() },
             Action(id: "pin", title: "Pin or Unpin File", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
+            Action(id: "reload-artifact", title: "Reload Artifact", menu: "View", shortcut: Shortcut("cmd+alt+r"), isEnabled: hasArtifact) { [weak self] in self?.reloadArtifact() },
+            Action(id: "open-in-browser", title: "Open Artifact in Browser", menu: "View", shortcut: Shortcut("cmd+shift+o"), isEnabled: hasArtifact) { [weak self] in self?.openInBrowser() },
             Action(id: "toggle-tree", title: "Show or Hide File Tree", menu: "View", shortcut: Shortcut("cmd+shift+t")) { [weak self] in self?.toggleTree() },
             Action(id: "font-bigger", title: "Bigger Terminal Text", menu: "View", shortcut: Shortcut("cmd+=")) { [weak self] in
                 guard let self else { return }; self.onConfigEdit?("terminal-font-size", "\(Int(min(28, self.store.config.terminalFontSize + 1)))")

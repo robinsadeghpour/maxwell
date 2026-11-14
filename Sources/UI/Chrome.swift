@@ -1,16 +1,21 @@
 import AppKit
 
-/// Right pane: the selected session's file. Header with name, pin, tree toggle.
+/// Right pane: the selected session's file or artifact. Header with name, pin, tree toggle;
+/// an artifact adds reload and open-in-browser.
 final class ViewerPane: MXView {
     let viewer = ViewerController()
     private let name = Label(color: { $0.fg2 })
     let pin = IconButton(.pin, tip: Tip("Pin this file", action: "pin"))
     let treeButton = IconButton(.tree, tip: Tip("Show the folder", action: "toggle-tree"))
     let clear = IconButton(.close, tip: Tip("Close this file"))
+    let reload = IconButton(.reload, tip: Tip("Reload the artifact", action: "reload-artifact"))
+    let external = IconButton(.external, tip: Tip("Open in browser", action: "open-in-browser"))
     private let headerLine = Fill { $0.hair2 }
     private let treeLine = Fill { $0.hair2 }
     private let empty = EmptyState(frame: .zero)
     private var tree: FileTreeController?
+    private(set) var item: ViewerItem?
+    private var account: Account?
     var showTree = false {
         didSet { needsLayout = true; treeButton.isOn = showTree; treeButton.tip.text = showTree ? "Hide the folder" : "Show the folder" }
     }
@@ -19,28 +24,63 @@ final class ViewerPane: MXView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         name.font = Fonts.mono(Metrics.fontSize)
-        [viewer.container, empty, name, pin, treeButton, clear, headerLine, treeLine].forEach(addSubview)
-        empty.lines = ["Files open here by themselves.", "", "When the session writes or names a .md file,", "it shows up here. ⌘-click a path in the", "terminal to open anything else."]
-        show(nil, pinned: false)
+        [viewer.container, empty, name, pin, treeButton, reload, external, clear, headerLine, treeLine].forEach(addSubview)
+        empty.lines = ["Files and artifacts open here by themselves.", "", "When the session writes or names a .md file,", "or publishes a claude.ai artifact, it shows up",
+                       "here. ⌘-click a path or an artifact link in the", "terminal to open it."]
+        viewer.artifact.onTitle = { [weak self] title in
+            guard let self, case .artifact(let l, let old)? = self.item, old == nil else { return }
+            self.item = .artifact(l, title: title)
+            self.setName()
+        }
+        show(nil, account: nil, pinned: false)
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    func show(_ url: URL?, pinned: Bool) {
-        if let url {
+    /// `reload`: the session published the artifact on show again.
+    func show(_ item: ViewerItem?, account: Account?, pinned: Bool, reload: Bool = false) {
+        let changed = !(item?.same(as: self.item) ?? (self.item == nil)) || account?.name != self.account?.name
+        self.item = item
+        self.account = account
+        switch item {
+        case .file(let url)?:
             if viewer.current != url { viewer.open(url) }
+        case .artifact(let link, _)?:
+            if let account, changed || reload || viewer.currentArtifact != link { viewer.openArtifact(link, account: account, reload: reload) }
+        case nil:
+            viewer.clear()
+        }
+        setName()
+        viewer.container.isHidden = item == nil
+        empty.isHidden = item != nil
+        let what = item?.artifact != nil ? "artifact" : "file"
+        pin.isOn = pinned
+        pin.tip.text = pinned ? "Unpin this \(what)\nThe next file or artifact the session makes replaces it" : "Pin this \(what)\nIt stays open when the session makes another"
+        clear.tip.text = "Close this \(what)"
+        pin.isHidden = item == nil
+        clear.isHidden = item == nil
+        self.reload.isHidden = item?.artifact == nil
+        external.isHidden = item?.artifact == nil
+        treeButton.isHidden = item?.artifact != nil
+        needsLayout = true
+        superview?.needsLayout = true
+    }
+
+    /// The header buttons on show (an artifact has more); the panel's own controls sit left of them.
+    var headerButtonsWidth: CGFloat { CGFloat([clear, pin, treeButton, external, reload].filter { !$0.isHidden }.count) * 26 + 8 }
+
+    private func setName() {
+        switch item {
+        case .file(let url)?:
             name.text = url.lastPathComponent
             name.tip = Tip((url.path as NSString).abbreviatingWithTildeInPath)
-        } else {
-            viewer.clear()
+        case .artifact(let link, let title)?:
+            let a = account?.name ?? "?"
+            name.text = "\(title ?? "artifact \(link.id.prefix(8))") · \(a)"
+            name.tip = Tip("\(link.url.absoluteString)\nSigned in to claude.ai as \(a)")
+        case nil:
             name.text = "viewer"
             name.tip = nil
         }
-        viewer.container.isHidden = url == nil
-        empty.isHidden = url != nil
-        pin.isOn = pinned
-        pin.tip.text = pinned ? "Unpin this file\nThe next file the session writes replaces it" : "Pin this file\nIt stays open when the session writes another"
-        pin.isHidden = url == nil
-        clear.isHidden = url == nil
     }
 
     func setRoot(_ cwd: String?) {
@@ -57,10 +97,12 @@ final class ViewerPane: MXView {
     override func layout() {
         super.layout()
         let w = bounds.width, h = Metrics.header
-        clear.frame = NSRect(x: w - 30, y: 3, width: 26, height: Metrics.control)
-        pin.frame = NSRect(x: w - 56, y: 3, width: 26, height: Metrics.control)
-        treeButton.frame = NSRect(x: w - 82, y: 3, width: 26, height: Metrics.control)
-        name.frame = NSRect(x: 12, y: 0, width: w - 100, height: h)
+        var x = w - 4
+        for b in [clear, pin, treeButton, external, reload] where !b.isHidden {
+            x -= 26
+            b.frame = NSRect(x: x, y: 3, width: 26, height: Metrics.control)
+        }
+        name.frame = NSRect(x: 12, y: 0, width: x - 18, height: h)
         headerLine.frame = NSRect(x: 0, y: h - 1, width: w, height: 1)
         var y = h
         if showTree, let tree {

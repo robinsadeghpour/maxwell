@@ -97,7 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let url = Paths.configFile
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let text = (try? String(contentsOf: url, encoding: .utf8)) ?? Config.starter
-        try? Config.setting(key, to: value, in: text).write(to: url, atomically: true, encoding: .utf8)
+        let new = key.hasPrefix("browser:")
+            ? Config.settingBrowser(account: String(key.dropFirst("browser:".count)), to: BrowserChoice.parse(value), in: text)
+            : Config.setting(key, to: value, in: text)
+        try? new.write(to: url, atomically: true, encoding: .utf8)
         reloadConfig()
     }
 
@@ -335,6 +338,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         // After --select (which waits for the first listing), or the viewer has no session to show it in.
         if let f = arg("--open") { after("--open-after", 4) { self.main.showFile(URL(fileURLWithPath: f), for: self.main.current); mark("open \(f) for \(self.main.current ?? "no session")") } }
+        // --open-artifact <url>: as if the selected session published it. --artifact-probe logs what the artifact view shows.
+        if let u = arg("--open-artifact") {
+            after("--open-after", 4) {
+                if let l = ArtifactLink.parse(u) { self.main.show(.artifact(l, title: nil), for: self.main.current) }
+                mark("open artifact \(u) for \(self.main.current ?? "no session")")
+            }
+        }
+        // --artifact-accounts work,work2,private: every 8 s, the viewer shows claude.ai's sign-in page for the next
+        // account (a page load on that account's data store, no session needed). For measure.sh.
+        if let list = arg("--artifact-accounts") {
+            for (i, name) in list.split(separator: ",").map(String.init).enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3 + Double(i) * 8) {
+                    guard let a = self.store.state.accounts.first(where: { $0.name == name }), let l = ArtifactLink.parse("https://claude.ai/artifact/Dez5d8DPYa2wrqBrR3W2gs") else { return mark("no account \(name)") }
+                    self.main.root.setViewer(open: true, animated: false)
+                    self.main.root.viewerPane.show(.artifact(l, title: nil), account: a, pinned: false)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.main.root.viewerPane.viewer.artifact.signIn() }
+                    mark("artifact page for \(name)")
+                }
+            }
+        }
+        if arg("--artifact-probe") != nil {
+            after("--probe-after", 10) { self.main.root.viewerPane.viewer.artifact.probe { mark("\($0)") } }
+        }
+        if let png = arg("--artifact-snap") {
+            after("--probe-after", 10) {
+                self.main.root.viewerPane.viewer.artifact.snapshot(png: URL(fileURLWithPath: png)) { mark("artifact snapshot: \($0)") }
+            }
+        }
+        if let name = arg("--sign-in-window") {
+            after("--sign-in-after", 3) {
+                if let a = self.store.state.accounts.first(where: { $0.name == name }) { SignInWindow.show(a, near: self.main.window) }
+                mark("sign-in window \(name)")
+            }
+        }
         if let path = arg("--dump") {
             DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--dump-after") ?? "6") ?? 6)) {
                 let text = self.main.current.flatMap { self.mainTerminalText($0) } ?? ""

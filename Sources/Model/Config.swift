@@ -15,6 +15,11 @@ struct Config: Equatable {
     var terminalFontSize: Double = 12
     var notify = true
     var autoOpen = true
+    /// Where claude.ai artifact links from a session open: "viewer" (beside the session, signed in
+    /// to its account) or "browser" (the account's `browser` choice).
+    var artifacts = "viewer"
+    /// `browser = <account> <browser> [profile|container <name>]`: where an account's links open outside Maxwell.
+    var browsers: [String: BrowserChoice] = [:]
     var showTree = false
     var appIcon = "auto"
     /// Glass: overrides the theme's background-opacity (0.3 very glassy … 1 opaque).
@@ -55,6 +60,9 @@ struct Config: Equatable {
     static let themes = lightThemes + darkThemes
 
     /// The theme to show: the fixed override, else the side of the pair the appearance asks for.
+    /// The browser an account's links open in; the system default when none is set.
+    func browser(for account: String) -> BrowserChoice { browsers[account] ?? .systemDefault }
+
     func theme(systemDark: Bool) -> String {
         if let themeOverride { return themeOverride }
         switch appearance {
@@ -85,6 +93,10 @@ struct Config: Equatable {
             case "terminal-font-size": if let v = Double(value), (8...28).contains(v) { c.terminalFontSize = v }
             case "notify": c.notify = value != "false"
             case "auto-open": c.autoOpen = value != "false"
+            case "artifacts": if ["viewer", "browser"].contains(value) { c.artifacts = value }
+            case "browser":
+                let parts = value.split(separator: " ", maxSplits: 1).map(String.init)
+                if parts.count == 2, let b = BrowserChoice.parse(parts[1]) { c.browsers[parts[0]] = b }
             case "file-tree": c.showTree = value == "true"
             case "app-icon": c.appIcon = value
             case "background-opacity": if let v = Double(value), (0.3...1).contains(v) { c.backgroundOpacity = v }
@@ -193,6 +205,7 @@ struct Config: Equatable {
     terminal-font-size = 12                  # ⌘− and ⌘= change this one
     notify = true
     auto-open = true
+    # artifacts = viewer | browser     claude.ai artifact links: beside the session, or in the account's browser
     file-tree = false
     # app-icon = auto | light | dark | paper | graphite | light-eyes | dark-eyes
     app-icon = auto
@@ -219,6 +232,30 @@ struct Config: Equatable {
 
     # account = <name> <CLAUDE_CONFIG_DIR>. The first one is the default for new sessions
     # when usage is equal.
+    # browser = <account> <browser> [profile|container <name>]: where that account's links open
+    # outside Maxwell. Settings › Accounts lists what is installed.
+    # browser = work2 zen container Claude Tinkers 2
 
     """
+}
+
+extension Config {
+    /// Sets (or with nil removes) the one `browser = <account> …` line for an account, keeping the others.
+    static func settingBrowser(account: String, to choice: BrowserChoice?, in text: String) -> String {
+        var lines = text.components(separatedBy: "\n")
+        let mine = { (l: String) -> Bool in
+            let t = l.trimmingCharacters(in: .whitespaces)
+            guard !t.hasPrefix("#"), let eq = t.firstIndex(of: "="), t[..<eq].trimmingCharacters(in: .whitespaces) == "browser" else { return false }
+            return t[t.index(after: eq)...].trimmingCharacters(in: .whitespaces).split(separator: " ").first.map(String.init) == account
+        }
+        let at = lines.firstIndex(where: mine)
+        lines.removeAll(where: mine)
+        guard let choice, choice != .systemDefault else { return lines.joined(separator: "\n") }
+        let line = "browser = \(account) \(choice.line)"
+        if let at { lines.insert(line, at: min(at, lines.count)) } else {
+            if lines.last == "" { lines.removeLast() }
+            lines += [line, ""]
+        }
+        return lines.joined(separator: "\n")
+    }
 }

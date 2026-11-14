@@ -290,8 +290,8 @@ final class SystemSampler {
 }
 
 extension ViewerPane: PanelContent {
-    var gripRect: NSRect { NSRect(x: 0, y: 0, width: max(0, bounds.width - 92), height: Metrics.header) }
-    var controlsInset: CGFloat { 86 }
+    var gripRect: NSRect { NSRect(x: 0, y: 0, width: max(0, bounds.width - headerButtonsWidth - 6), height: Metrics.header) }
+    var controlsInset: CGFloat { headerButtonsWidth }
     func preferredExtent(along d: Dock) -> CGFloat? { nil }
 }
 

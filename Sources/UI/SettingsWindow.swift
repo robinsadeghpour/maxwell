@@ -213,6 +213,9 @@ final class FormView: MXView {
         row(label, [(l, bounds.width - Self.x0 * 2 - Self.labelW)], note: note)
     }
 
+    /// Extra space between groups of rows.
+    func gap(_ h: CGFloat) { cursor += h }
+
     func finish() {
         setFrameSize(NSSize(width: frame.width, height: max(cursor + 20, superview?.bounds.height ?? 0)))
         needsDisplay = true
@@ -319,6 +322,9 @@ final class SettingsView: MXView {
     var onAppearance: ((String) -> Void)?
     var onAddAccount: (() -> Void)?
     var onRunAction: ((String) -> Void)?
+    /// Sets (nil: removes) an account's `browser` line.
+    var onBrowser: ((String, BrowserChoice?) -> Void)?
+    private var installedBrowsers: [Browsers.Installed]?
     private let sections = SectionList(frame: .zero)
     private let scroll = NSScrollView()
     private let form = FormView(frame: .zero)
@@ -331,6 +337,9 @@ final class SettingsView: MXView {
         scroll.documentView = form
         [sections, title, scroll].forEach(addSubview)
         sections.onSelect = { [weak self] in self?.section = $0 }
+        NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: nil, queue: .main) { [weak self] _ in
+            if self?.section == .accounts { self?.rebuild() }
+        }
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -450,14 +459,86 @@ final class SettingsView: MXView {
     private func accounts() {
         form.header("Claude accounts")
         let now = Date()
-        for a in model.accounts {
+        let browsers = installedBrowsers ?? Browsers.installed()
+        installedBrowsers = browsers
+        for (i, a) in model.accounts.enumerated() {
+            if i > 0 { form.gap(10) }
             let usage = UsageRow(account: a, now: now)
             form.row(a.name, [(usage, max(200, form.bounds.width - FormView.x0 * 2 - FormView.labelW))], note: (a.configDir.path as NSString).abbreviatingWithTildeInPath)
+            claudeRow(a)
+            let choice = c.browser(for: a.name)
+            let pick = MXButton(choice.title(profileName: { _ in Browsers.profileName(choice, in: browsers) }) + "  ▾")
+            pick.tip = Tip("Where this account's links open outside Maxwell")
+            pick.action = { [weak self, weak pick] in if let pick { self?.browserMenu(for: a, browsers: browsers, under: pick) } }
+            form.row("  browser", [(pick, max(160, pick.intrinsicContentSize.width))],
+                     note: choice.kind == .container ? "Needs the “Open external links in a container” add-on in \(choice.title())." : nil)
         }
         let add = MXButton("Add account…") { [weak self] in self?.onAddAccount?() }
         form.row("", [(add, add.intrinsicContentSize.width)], note: "Choose its config folder. New sessions go where usage is left.")
+        form.header("Artifacts")
+        form.choice("Open artifacts", [("viewer", "Beside the session"), ("browser", "In the account's browser")], current: c.artifacts,
+                    note: "claude.ai artifact links a session makes or you ⌘-click.") { [weak self] in self?.set("artifacts", $0) }
         form.header("Usage source")
         form.text("Status line", "Claude Code's status line, every 30 s per account", note: "Set up together with the hooks in Advanced.")
+    }
+
+    /// Whether the account is signed in to claude.ai inside Maxwell, with Sign in or Sign out.
+    private func claudeRow(_ a: Account) {
+        let status = ClaudeWeb.shared.status[a.name] ?? .unknown
+        if status == .unknown { ClaudeWeb.shared.refresh(a) }
+        let email = ClaudeWeb.expectedEmail(a)
+        let text: String, button: MXButton
+        switch status {
+        case .signedIn:
+            text = "Signed in"
+            button = MXButton("Sign out", small: true) { [weak self] in ClaudeWeb.shared.signOut(a) { self?.rebuild() } }
+            button.tip = Tip("Removes this account's claude.ai login and data from Maxwell")
+        case .signedOut:
+            text = "Not signed in"
+            button = MXButton("Sign in…", small: true) { [weak self] in SignInWindow.show(a, near: self?.window) }
+            button.tip = Tip("Opens claude.ai's own sign-in page for \(a.name)\(email.map { " (\($0))" } ?? "")")
+        case .unknown:
+            text = "Checking…"
+            button = MXButton("Sign in…", small: true) { [weak self] in SignInWindow.show(a, near: self?.window) }
+        }
+        let label = Label(text, font: Fonts.mono(Metrics.fontSize - 1), color: { status == .signedIn ? $0.fg : $0.fg2 })
+        form.row("  claude.ai", [(label, Text.width(text, font: Fonts.mono(Metrics.fontSize - 1)) + 12), (button, button.intrinsicContentSize.width)],
+                 note: status == .signedIn ? "Artifacts from \(a.name) sessions open signed in." : email.map { "Sign in as \($0) to see this account's artifacts." })
+    }
+
+    private func browserMenu(for a: Account, browsers: [Browsers.Installed], under v: NSView) {
+        let current = c.browser(for: a.name)
+        let m = NSMenu()
+        m.autoenablesItems = false
+        func item(_ title: String, _ choice: BrowserChoice, indent: Int = 0, enabled: Bool = true) -> NSMenuItem {
+            let i = MenuAction(title) { [weak self] in self?.onBrowser?(a.name, choice == .systemDefault ? nil : choice) }
+            i.state = choice == current ? .on : .off
+            i.indentationLevel = indent
+            i.isEnabled = enabled
+            return i
+        }
+        m.addItem(item("Default browser", .systemDefault))
+        for b in browsers {
+            m.addItem(.separator())
+            m.addItem(item(b.browser.title, BrowserChoice(browser: b.browser.id)))
+            if b.profiles.count > 1 {
+                let h = NSMenuItem(title: "Profiles", action: nil, keyEquivalent: ""); h.isEnabled = false; h.indentationLevel = 1
+                m.addItem(h)
+                for p in b.profiles { m.addItem(item(p.name, BrowserChoice(browser: b.browser.id, kind: .profile, name: p.id), indent: 2)) }
+            }
+            if !b.containers.isEmpty {
+                let h = NSMenuItem(title: b.containerAddon ? "Containers" : "Containers (need the “Open external links in a container” add-on)", action: nil, keyEquivalent: "")
+                h.isEnabled = false; h.indentationLevel = 1
+                m.addItem(h)
+                for n in b.containers { m.addItem(item(n, BrowserChoice(browser: b.browser.id, kind: .container, name: n), indent: 2, enabled: b.containerAddon || current.name == n)) }
+                if !b.containerAddon {
+                    let get = MenuAction("Get the add-on…") { Browsers.open(Browsers.containerAddonPage, with: BrowserChoice(browser: b.browser.id)) }
+                    get.indentationLevel = 2
+                    m.addItem(get)
+                }
+            }
+        }
+        m.popUp(positioning: nil, at: NSPoint(x: 0, y: v.bounds.height + 2), in: v)
     }
 
     private func projects() {

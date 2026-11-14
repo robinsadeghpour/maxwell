@@ -16,7 +16,7 @@ final class Store {
     private(set) var scheduledResumes: [SessionID: Date] = [:]
     private var notifyAfter: Date?
     var onChange: ((AppState) -> Void)?
-    var onMarkdown: ((SessionID, URL) -> Void)?
+    var onViewerItem: ((SessionID, ViewerItem, Bool) -> Void)?
     var onToast: ((String) -> Void)?
 
     init(config: Config) {
@@ -32,7 +32,7 @@ final class Store {
         agents = AgentsProbe(accounts: config.accounts) { [weak self] in self?.apply([$0]) }
         let tw = TranscriptWatcher(accounts: config.accounts)
         tw.cwdFor = { [weak self] id in self?.state.sessions[id]?.cwd }
-        tw.onMarkdown = { [weak self] id, url in self?.onMarkdown?(id, url) }
+        tw.onItem = { [weak self] id, item, reload in self?.onViewerItem?(id, item, reload) }
         transcripts = tw
         checkTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in self?.recheckAll() }
         recheckAll()

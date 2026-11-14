@@ -47,8 +47,13 @@ final class ViewerController: NSObject, WKNavigationDelegate {
     private var ql: QLPreviewView?
     private var watcher: FileWatcher?
     private(set) var current: URL?
+    /// The artifact on show, when the viewer shows one instead of a file.
+    private(set) var currentArtifact: ArtifactLink?
+    let artifact = ArtifactView(frame: .zero)
     var onRendered: ((String) -> Void)?
     private var themeJS: String?
+    /// A web link clicked in a rendered file: artifacts open beside it, the rest in the browser.
+    var onLink: ((URL) -> Void)?
 
     override init() {
         super.init()
@@ -85,8 +90,20 @@ final class ViewerController: NSObject, WKNavigationDelegate {
 
     func clear() {
         current = nil
+        currentArtifact = nil
         watcher = nil
+        artifact.hide()
         for s in body.subviews { s.isHidden = true }
+    }
+
+    /// A claude.ai artifact, signed in to `account`. `reload` re-fetches it when it already shows (a republish).
+    func openArtifact(_ link: ArtifactLink, account: Account, reload: Bool = false) {
+        current = nil
+        watcher = nil
+        currentArtifact = link
+        show(artifact)
+        artifact.show(link, account: account, reload: reload)
+        onRendered?("artifact")
     }
 
     /// Markdown and code take their colours and font size from the theme tokens.
@@ -102,6 +119,8 @@ final class ViewerController: NSObject, WKNavigationDelegate {
 
     func open(_ url: URL) {
         current = url
+        currentArtifact = nil
+        artifact.hide()
         watcher = nil
         let ext = url.pathExtension.lowercased()
         switch ext {
@@ -185,6 +204,6 @@ final class ViewerController: NSObject, WKNavigationDelegate {
     func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard a.navigationType == .linkActivated, let u = a.request.url else { return decisionHandler(.allow) }
         decisionHandler(.cancel)
-        if u.isFileURL { open(URL(fileURLWithPath: u.path)) } else { NSWorkspace.shared.open(u) }
+        if u.isFileURL { open(URL(fileURLWithPath: u.path)) } else { onLink?(u) }
     }
 }

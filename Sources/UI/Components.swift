@@ -236,7 +236,7 @@ final class MXButton: MXView, TipSource {
 
 /// Square icon button for the title bar (plus, palette, gear), drawn as line art.
 final class IconButton: MXView, TipSource {
-    enum Icon { case plus, gear, palette, pin, tree, close, search, more, minimize, maximize, restore }
+    enum Icon { case plus, gear, palette, pin, tree, close, search, more, minimize, maximize, restore, reload, external }
     let icon: Icon
     var tip: Tip
     var action: (() -> Void)?
@@ -315,6 +315,17 @@ final class IconButton: MXView, TipSource {
             p.move(to: NSPoint(x: c.x - 4.5, y: c.y + 2.5)); p.line(to: NSPoint(x: c.x, y: c.y - 2)); p.line(to: NSPoint(x: c.x + 4.5, y: c.y + 2.5))
         case .restore:
             p.move(to: NSPoint(x: c.x - 4.5, y: c.y - 2)); p.line(to: NSPoint(x: c.x, y: c.y + 2.5)); p.line(to: NSPoint(x: c.x + 4.5, y: c.y - 2))
+        case .reload:
+            // An open loop, most of the way round, with the arrowhead at its end (flipped view: y grows down).
+            p.move(to: NSPoint(x: c.x + 5 * cos(.pi / 9), y: c.y + 5 * sin(.pi / 9)))
+            p.appendArc(withCenter: c, radius: 5, startAngle: 20, endAngle: 290)
+            let tip = NSPoint(x: c.x + 1.7, y: c.y - 4.7)
+            p.move(to: NSPoint(x: c.x - 0.6, y: c.y - 7.4)); p.line(to: tip); p.line(to: NSPoint(x: c.x - 0.9, y: c.y - 2.6))
+        case .external:
+            p.move(to: NSPoint(x: c.x - 1, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y + 5))
+            p.line(to: NSPoint(x: c.x + 5, y: c.y + 5)); p.line(to: NSPoint(x: c.x + 5, y: c.y + 1))
+            p.move(to: NSPoint(x: c.x - 1, y: c.y + 1)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5))
+            p.move(to: NSPoint(x: c.x + 1.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 1.5))
         case .close:
             p.move(to: NSPoint(x: c.x - 4, y: c.y - 4)); p.line(to: NSPoint(x: c.x + 4, y: c.y + 4))
             p.move(to: NSPoint(x: c.x + 4, y: c.y - 4)); p.line(to: NSPoint(x: c.x - 4, y: c.y + 4))

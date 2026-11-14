@@ -309,6 +309,29 @@ enum Transcripts {
         return account.configDir.appendingPathComponent("projects/\(slug)/\(sessionId).jsonl").path
     }
 
+    /// What the viewer should show from one transcript line: a Markdown file the session wrote or
+    /// named, or an artifact it published, opened or named. `reload` marks a republish.
+    static func viewerItem(inLine s: String, cwd: String) -> (item: ViewerItem, reload: Bool)? {
+        if s.contains("claude.ai/"), let a = ArtifactTranscript.sighting(inLine: s) { return (.artifact(a.link, title: a.title), a.republished) }
+        if s.contains(".md"), let u = markdown(inLine: s, cwd: cwd) { return (.file(u), false) }
+        return nil
+    }
+
+    /// The last file or artifact the session made or named in the last `window` bytes.
+    static func lastItem(transcript: String, cwd: String, window: Int = 512 * 1024) -> ViewerItem? {
+        guard let h = FileHandle(forReadingAtPath: transcript) else { return nil }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        try? h.seek(toOffset: size > UInt64(window) ? size - UInt64(window) : 0)
+        let data = (try? h.readToEnd()) ?? Data()
+        var found: ViewerItem?
+        for line in data.split(separator: 0x0A) where line.count < 4_000_000 {
+            guard let s = String(data: line, encoding: .utf8), s.contains(".md") || s.contains("claude.ai/") else { continue }
+            if let hit = viewerItem(inLine: s, cwd: cwd) { found = hit.item }
+        }
+        return found
+    }
+
     /// The last Markdown file the session wrote or named in the last `window` bytes.
     static func lastMarkdown(transcript: String, cwd: String, window: Int = 512 * 1024) -> URL? {
         guard let h = FileHandle(forReadingAtPath: transcript) else { return nil }
@@ -358,13 +381,13 @@ enum Transcripts {
 }
 
 /// Live: FSEvents on each account's projects/ folder; new transcript bytes are scanned
-/// for Markdown writes and mentions, per session.
+/// for Markdown writes and mentions and artifact publishes, per session.
 final class TranscriptWatcher {
     private var watchers: [DirWatcher] = []
     private var offsets: [String: UInt64] = [:]
     private let queue = DispatchQueue(label: "maxwell.transcripts")
     private let startedAt = Date()
-    var onMarkdown: ((SessionID, URL) -> Void)?
+    var onItem: ((SessionID, ViewerItem, Bool) -> Void)?
     var cwdFor: ((SessionID) -> String?)?
 
     init(accounts: [Account]) {
@@ -390,12 +413,17 @@ final class TranscriptWatcher {
                 guard size > start else { return }
                 try? h.seek(toOffset: start)
                 let data = (try? h.readToEnd()) ?? Data()
-                var found: URL?
+                // The last item wins; a republish of it anywhere in this chunk still asks for a reload.
+                var found: ViewerItem?, reload = false
                 for line in data.split(separator: 0x0A) {
-                    guard let s = String(data: line, encoding: .utf8), s.contains(".md") else { continue }
-                    if let u = Transcripts.markdown(inLine: s, cwd: cwd) { found = u }
+                    guard let s = String(data: line, encoding: .utf8), s.contains(".md") || s.contains("claude.ai/") else { continue }
+                    if let hit = Transcripts.viewerItem(inLine: s, cwd: cwd) {
+                        if !hit.item.same(as: found) { reload = false }
+                        found = hit.item
+                        reload = reload || hit.reload
+                    }
                 }
-                if let found { DispatchQueue.main.async { self.onMarkdown?(sid, found) } }
+                if let found { DispatchQueue.main.async { self.onItem?(sid, found, reload) } }
             }
         }
     }
