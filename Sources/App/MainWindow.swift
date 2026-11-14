@@ -115,6 +115,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.onTreeSelect = { [weak self] url in self?.showFile(url, for: self?.current) }
         store.onChange = { [weak self] in self?.render($0) }
         store.onMarkdown = { [weak self] id, url in self?.markdownWritten(id, url) }
+        store.onBrought = { [weak self] s, why in
+            guard let self else { return }
+            if let why { return self.toast("“\(s.title)” didn't move: \(why)") }
+            self.toast("“\(s.title)” now runs in Maxwell.")
+            if self.current == s.id { self.open(s.id) }
+        }
         search.onClose = { [weak self] in self?.focusMain() }
         doubleShift = DoubleShift { [weak self] in
             guard let self, self.window?.isKeyWindow == true || quietTest, self.search.superview == nil else { return }
@@ -441,6 +447,55 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func scheduledResume(_ id: SessionID) -> Date? { store.scheduledResumes[id] }
+
+    // MARK: bringing terminal sessions in
+
+    func bringInQueued(_ id: SessionID) -> Bool { store.bringQueue.contains(id) }
+
+    func bringIn(_ id: SessionID, force: Bool) {
+        guard let s = store.state.sessions[id] else { return }
+        if !force, !store.canBringInNow(s) {
+            toast("“\(s.title)” moves into Maxwell when this turn ends.")
+        } else {
+            toast("Moving “\(s.title)” into Maxwell…")
+        }
+        store.bringIn(s, force: force)
+        render(store.state)
+    }
+
+    /// Every session with a live process in another terminal: idle ones move now, working ones
+    /// as soon as their turn ends. The terminal tabs are left at a shell prompt.
+    func bringAllIn() {
+        let state = store.state
+        let candidates = state.sessions.values.filter { if case .elsewhere = $0.reach { return true }; return false }
+        toast("Looking for sessions in other terminals…")
+        DispatchQueue.global().async { [weak self] in
+            let live = candidates.filter { s in state.account(s.accountId).flatMap { ClaudeCLI.terminalProcess(sessionId: s.id, account: $0) } != nil }
+            DispatchQueue.main.async { self?.confirmBringIn(live) }
+        }
+    }
+
+    private func confirmBringIn(_ live: [Session]) {
+        guard !live.isEmpty else { return toast("No sessions are running in other terminals.") }
+        let busy = live.filter { !store.canBringInNow($0) }
+        let a = NSAlert()
+        a.messageText = "Bring \(live.count) terminal session\(live.count == 1 ? "" : "s") into Maxwell?"
+        a.informativeText = """
+        Each one keeps its conversation, account, folder and permission mode. \(live.count - busy.count) move now.         \(busy.isEmpty ? "" : "\(busy.count) are in the middle of a turn and move as soon as it ends. ")        Their terminal tabs are left at a shell prompt, so you can close the terminal afterwards.
+        """
+        a.addButton(withTitle: "Bring Them In")
+        a.addButton(withTitle: "Cancel")
+        guard let w = window else { return }
+        a.beginSheetModal(for: w) { [weak self] r in
+            guard r == .alertFirstButtonReturn, let self else { return }
+            // One at a time, a moment apart, so thirty sessions don't all start at once.
+            for (i, s) in live.sorted(by: { $0.lastEventAt > $1.lastEventAt }).enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 2) { self.store.bringIn(s) }
+            }
+            self.toast("Moving \(live.count - busy.count) now; \(busy.count) after their turn.")
+            self.render(self.store.state)
+        }
+    }
 
     func resume(_ id: SessionID) {
         guard let s = store.state.sessions[id] else { return }
@@ -995,6 +1050,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                    isChecked: { [weak self] in self?.store.config.rail == "shown" }) { [weak self] in
                 guard let self else { return }; self.onConfigEdit?("rail", self.store.config.rail == "shown" ? "auto" : "shown")
             },
+            Action(id: "bring-all-in", title: "Bring Terminal Sessions into Maxwell…", menu: "Session") { [weak self] in self?.bringAllIn() },
             Action(id: "check-updates", title: "Check for Updates…", menu: "Maxwell") { [weak self] in self?.checkForUpdates() },
             Action(id: "install-update", title: "Restart to Update", menu: "Maxwell", isEnabled: { [weak self] in self?.updater.ready != nil }) { [weak self] in self?.updater.install() },
             Action(id: "install-hooks", title: "Install Hooks", menu: "Maxwell", shortcut: Shortcut("cmd+shift+h")) { [weak self] in self?.installHooks() },

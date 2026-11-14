@@ -92,6 +92,38 @@ enum ClaudeCLI {
         return .success(parts[1].trimmingCharacters(in: .whitespaces))
     }
 
+    /// The interactive process running `sessionId` in a terminal on this account, from Claude
+    /// Code's own pid files (`<config>/sessions/<pid>.json`), with whether it skips permissions.
+    static func terminalProcess(sessionId: String, account: Account) -> (pid: pid_t, skipsPermissions: Bool)? {
+        let dir = account.configDir.appendingPathComponent("sessions")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        for f in files where f.hasSuffix(".json") {
+            guard let data = FileManager.default.contents(atPath: dir.appendingPathComponent(f).path),
+                  let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  j["sessionId"] as? String == sessionId, j["kind"] as? String == "interactive",
+                  let pid = (j["pid"] as? NSNumber)?.int32Value, kill(pid, 0) == 0 else { continue }
+            let args = run("/bin/ps", ["-o", "args=", "-p", "\(pid)"]).out
+            return (pid, args.contains("--dangerously-skip-permissions") || args.contains("bypassPermissions"))
+        }
+        return nil
+    }
+
+    /// `claude --bg --resume <id>`: the same conversation, under the same id, as a background
+    /// session. Claude starts a copy instead while it still sees the old process; that is reported.
+    static func resumeBackground(account: Account, cwd: String, sessionId: String, name: String, skipPermissions: Bool) -> Swift.Result<(short: String, copy: Bool), StartError> {
+        var args = ["--bg", "--resume", sessionId, "--name", name]
+        if skipPermissions { args.append("--dangerously-skip-permissions") }
+        let r = run(claudePath, args, cwd: cwd, env: env(for: account), timeout: 30)
+        let text = r.out + r.err
+        if text.contains("Workspace not trusted") { return .failure(.untrusted(cwd)) }
+        guard r.status == 0, let line = text.components(separatedBy: "\n").first(where: { $0.contains("backgrounded") }) else {
+            return .failure(.failed(text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        let parts = line.components(separatedBy: " · ")
+        guard parts.count >= 2 else { return .failure(.failed(line)) }
+        return .success((parts[1].trimmingCharacters(in: .whitespaces), text.contains("started a copy")))
+    }
+
     /// `claude stop <id>`: ends the process and keeps the conversation; `claude attach <id>`
     /// starts it again. Maxwell never deletes a session (no `claude rm`).
     static func stop(account: Account, shortId: String) -> Result {
