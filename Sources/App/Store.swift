@@ -54,7 +54,74 @@ final class Store {
                 notify(s, question: q)
             }
         }
+        bringInQueued()
         onChange?(state)
+    }
+
+    // MARK: bringing terminal sessions in
+
+    /// Sessions waiting to move in once they finish their turn.
+    private(set) var bringQueue: Set<SessionID> = []
+    private var bringing: Set<SessionID> = []
+    /// Reports each move: the session, and nil or why it didn't move.
+    var onBrought: ((Session, String?) -> Void)?
+
+    /// A session running in a terminal can move now unless it is mid-turn.
+    func canBringInNow(_ s: Session) -> Bool { s.phase != .working }
+
+    /// Moves now, or once the current turn ends.
+    func bringIn(_ s: Session, force: Bool = false) {
+        guard case .elsewhere = s.reach, !bringing.contains(s.id) else { return }
+        if force || canBringInNow(s) { bringQueue.remove(s.id); start(s) } else { bringQueue.insert(s.id); onChange?(state) }
+    }
+
+    private func bringInQueued() {
+        for id in bringQueue {
+            guard let s = state.sessions[id] else { bringQueue.remove(id); continue }
+            if case .elsewhere = s.reach {} else { bringQueue.remove(id); continue }
+            if canBringInNow(s) { bringQueue.remove(id); start(s) }
+        }
+    }
+
+    /// Ends the terminal's process (SIGTERM; Claude Code saves as it goes and exits cleanly),
+    /// waits until it is gone, then resumes the conversation in the background under the same id.
+    private func start(_ s: Session) {
+        guard let account = state.account(s.accountId) else { onBrought?(s, "no account \(s.accountId)"); return }
+        bringing.insert(s.id)
+        let name = String((s.name.isEmpty ? s.title : s.name).prefix(40))
+        DispatchQueue.global().async { [weak self] in
+            let why = Self.move(s, account: account, name: name)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.bringing.remove(s.id)
+                self.agents?.refresh(account.id) {
+                    self.onBrought?(self.state.sessions[s.id] ?? s, why)
+                    self.onChange?(self.state)
+                }
+            }
+        }
+    }
+
+    private static func move(_ s: Session, account: Account, name: String) -> String? {
+        var skip = true
+        if let p = ClaudeCLI.terminalProcess(sessionId: s.id, account: account) {
+            skip = p.skipsPermissions
+            kill(p.pid, SIGTERM)
+            let until = Date().addingTimeInterval(15)
+            while kill(p.pid, 0) == 0, Date() < until { usleep(200_000) }
+            if kill(p.pid, 0) == 0 { return "its terminal process didn't exit" }
+        }
+        for attempt in 0..<3 {
+            usleep(useconds_t(1_500_000 * (attempt + 1)))
+            switch ClaudeCLI.resumeBackground(account: account, cwd: s.cwd, sessionId: s.id, name: name, skipPermissions: skip) {
+            case .failure(let e): return "\(e)"
+            case .success(let r) where r.copy:
+                // Claude still saw the old process: drop the copy and try again.
+                _ = ClaudeCLI.stop(account: account, shortId: r.short)
+            case .success: return nil
+            }
+        }
+        return "Claude kept starting a copy. The conversation is safe: claude --resume \(s.id)"
     }
 
     func recheckAll() {

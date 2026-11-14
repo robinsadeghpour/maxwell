@@ -10,6 +10,8 @@ protocol SessionPaneDelegate: AnyObject {
     func reopen(_ id: SessionID)
     func roomiest(for id: SessionID) -> Account?
     func scheduledResume(_ id: SessionID) -> Date?
+    func bringIn(_ id: SessionID, force: Bool)
+    func bringInQueued(_ id: SessionID) -> Bool
 }
 
 /// The middle pane: header with pills, a state banner, and the session's terminal.
@@ -69,11 +71,16 @@ final class SessionPane: MXView {
         if let ctx = s.contextTokens { p.append("[ctx \(ctx / 1000)k]") }
         pills.text = p.joined(separator: " ")
         updateBanner(s, group: group ?? .idle, blockers: blockers)
-        if case .elsewhere(let pid) = s.reach {
+        if case .elsewhere = s.reach {
             empty.isHidden = true
             message.scroll.isHidden = false
-            message.show(note: "Runs in another terminal\(pid.map { " (pid \($0))" } ?? "") · read-only here · sessions you start with ⌘N open in this pane",
+            message.show(note: "Runs in another terminal, read-only here. Bring it into Maxwell to work with it in this pane.",
                          text: s.lastMessage ?? "No reply yet.")
+            if delegate?.bringInQueued(s.id) == true {
+                banner.add(MXButton("Moves in when this turn ends · Move now") { [weak self] in self?.delegate?.bringIn(s.id, force: true) })
+            } else {
+                banner.add(MXButton("Bring into Maxwell", primary: true) { [weak self] in self?.delegate?.bringIn(s.id, force: false) })
+            }
         } else {
             empty.isHidden = terminal != nil
             empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R reattaches."]

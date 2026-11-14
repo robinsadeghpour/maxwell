@@ -168,6 +168,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             }
         }
+        if let id = arg("--bring-in") {
+            // --bring-in <session id prefix>: the "Bring into Maxwell" button for that session.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                if let s = self.store.state.sessions.values.first(where: { $0.id.hasPrefix(id) }) { self.main.bringIn(s.id, force: false) }
+                mark("bring-in \(id)")
+            }
+        }
         if let spec = arg("--keys") {
             // --keys "2:shift shift;3.5:esc": at each time, these keys, as if pressed in this window.
             for step in spec.split(separator: ";") {
@@ -179,8 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             }
         }
-        if let spec = arg("--move") {
-            // --move "2:5,400;3:-5,400": the pointer at window point x,y (top left) at each time,
+        if let spec = arg("--pointer") {
+            // --pointer "2:5,400;3:-5,400": the pointer at window point x,y (top left) at each time,
             // as the hover tracking sees it. A negative x leaves the window through the left edge.
             for step in spec.split(separator: ";") {
                 let parts = step.split(separator: ":").map(String.init)
