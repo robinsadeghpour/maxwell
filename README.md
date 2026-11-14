@@ -1,0 +1,198 @@
+<p align="center">
+  <img src="docs/readme/flow.gif" width="800" alt="Session events flow in from the left, pass through Maxwell, and leave sorted into four lines: needs you, your turn, working, safe to close">
+</p>
+
+<h1 align="center">Maxwell</h1>
+
+<p align="center">
+  <b>The session manager for Claude Code.</b><br>
+  See every Claude Code session across your projects and accounts: which ones need you, which are still working, and which you can close.
+</p>
+
+<p align="center">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-native-111?style=flat-square&logo=apple&logoColor=white">
+  <img alt="For Claude Code" src="https://img.shields.io/badge/for-Claude%20Code-d97757?style=flat-square">
+  <img alt="Built on Ghostty" src="https://img.shields.io/badge/terminal-libghostty-555?style=flat-square">
+  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-2f8a4c?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#what-you-see">What you see</a> ·
+  <a href="#safe-to-close-means-safe">Safe to close</a> ·
+  <a href="#keys">Keys</a> ·
+  <a href="#configure">Configure</a>
+</p>
+
+<p align="center">
+  <img src="docs/readme/tour.gif" width="880" alt="Animated tour of the Maxwell window: a session asks for permission and jumps to Needs you, search finds a session by a file it touched, a finished session passes six checks and closes, a session hits its usage limit and moves to another account, and a plan opens rendered beside the session">
+</p>
+
+---
+
+## Why
+
+Running ten or twenty Claude Code sessions across projects and accounts turns your head into the scheduler. Which session was working on which feature? Who is waiting for an answer? Which account still has usage left? Can I close this one, or is it still doing something?
+
+Maxwell keeps track so you don't have to. It reads what every session is doing, groups them by what they need from you, and only calls a session safe to close when it can prove it.
+
+The name comes from Maxwell's demon, the thought-experiment creature that sits at a gate and sorts what passes through.
+
+<p align="center">
+  <img src="docs/readme/hero.svg" width="880" alt="Session names drift in, pass through the pixel demon, and come out sorted into Needs you, Your turn, Working and Safe to close">
+</p>
+
+## What you see
+
+| Group | Meaning |
+|---|---|
+| **Needs you** | The session asked you something or needs a permission. You get a notification. |
+| **Your turn** | It answered and is waiting, or it offered a next step. |
+| **Working** | It's running. Leave it alone. |
+| **Limited** | It hit a usage limit. Resume when the window resets, or move it to the account with the most room. |
+| **Safe to close** | Every check passed. Expand the row to see each one. |
+| **Idle** | Stopped and quiet for a day. Folded away. |
+
+- **Projects stay separate.** A rail on the left, like the macOS Dock, switches between projects. Pin the ones you work on, and the others only appear when something there needs you. Each project shows its own logo, redrawn in Maxwell's style.
+- **The real session, in place.** The middle pane is the actual Claude session, attached in a Ghostty terminal. Closing Maxwell doesn't stop it.
+- **Files open beside the session.** When a session writes or mentions a Markdown file, it opens on the right, rendered. ⌘-click any path in the terminal to open it.
+- **Usage for every account.** 5-hour and weekly use with reset times, next to CPU and memory for your Claude processes.
+- **Panels go where you want them.** Sessions, viewer, usage and system can sit left, right or bottom, collapse to a stripe, and remember their place on each screen, like tool windows in JetBrains IDEs.
+- **Search everything.** ⌘P, or Shift twice, finds a session by title, project, branch, account, last message or a file it touched.
+
+## Safe to close means safe
+
+Closing a session that's still working, or that's waiting on you, costs you work. So Maxwell is strict:
+
+1. **Unknown is never safe.** If Maxwell can't check something, the session isn't safe.
+2. **It needs proof of a finished task.** Nothing is running, including background tasks and subagents. The session has been quiet for 2 hours. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.
+3. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
+4. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" asks you to confirm and shows the list first.
+5. **Checked again at the moment of closing.** If anything changed, that session is skipped.
+6. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days.
+7. **"Not safe" teaches it.** Mark a wrong call and it becomes a test case, so the mistake can't repeat.
+
+Run `Maxwell state` to audit every session and see which check holds each one back.
+
+## Keys
+
+| Key | Action |
+|---|---|
+| ⌘P or ⇧⇧ | Search sessions, projects and actions |
+| ⌘K | Actions only |
+| J / K, ⏎ | Move through sessions, open one |
+| ⌘J | Next session that needs you |
+| ⌘0 / ⌘1–9 | All projects / one project |
+| ⌘T | New session in the current folder, on the account with the most room |
+| ⌘N | New session, choosing folder and account |
+| Esc or click outside | Close search, the palette or a panel |
+| ⇧⌘X | Close all safe (asks first) |
+| ⌘Z | Undo the last close |
+| ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |
+| ⌥⌘P | Pin the current file |
+| ⇧⌘I | Show or hide Idle |
+| ⇧⌘L | Switch light and dark (View › Appearance: Light, Dark, Follow System) |
+| ⌘, | Settings: General, Appearance, Accounts, Projects, Keys, Advanced (⌘1–6 inside) |
+
+Every key can be changed with a `keybind` line in the config.
+
+## Install
+
+You need a Mac with Apple silicon, macOS 14 or later, and Claude Code.
+
+1. Download `Maxwell-v<version>.zip` from the [latest release](https://github.com/robinsadeghpour/maxwell/releases/latest), unzip it and move Maxwell to Applications.
+2. Maxwell isn't notarized by Apple yet, so macOS blocks it the first time. Open **System Settings › Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Maxwell.app` once.
+3. Choose **Maxwell › Install Hooks**. That's how Maxwell learns what your sessions are doing.
+
+### Updates
+
+Maxwell checks GitHub for a new release every few hours. When one is ready, the bottom bar shows **v0.1.7 ready · Restart to update**. Nothing changes until you click it. Then Maxwell quits, swaps in the new version and opens again. Your Claude sessions keep running the whole time, because they are background sessions. **Maxwell › Check for Updates…** checks right away.
+
+## What it touches on your Mac
+
+Everything stays on your machine. Maxwell sends nothing anywhere, apart from the Haiku reads above, which go through your own Claude account.
+
+| What | Where | Undo |
+|---|---|---|
+| Hook entries for 6 events | each account's `settings.json`, backed up next to it first | `Maxwell uninstall-hooks` restores them exactly |
+| One line that samples usage | your status-line script, backed up first | same |
+| The hook program (C, ~2 ms, always exits 0) | `~/.local/share/maxwell/` | delete the folder |
+| Event log | `~/.local/state/maxwell/events.jsonl` | delete the folder |
+| Config | `~/.config/maxwell/config` | delete the file |
+
+## Configure
+
+`~/.config/maxwell/config` reloads the moment you save it. The Settings window writes the same file.
+
+```
+theme = graphite              # graphite | silver | paper | your own theme file
+font-size = 13                # lists, panels and the viewer
+terminal-font-size = 12       # ⌘− and ⌘= change this one
+account = work ~/.claude      # <name> <CLAUDE_CONFIG_DIR>, one line per account
+project-pin = Acme            # projects kept on the rail, in order
+rail = auto                   # auto slides in at the left edge, shown keeps it visible
+project-logo-style = engraved # engraved | pixel | monogram
+safe-after = 2h               # quiet time before a session can be safe to close
+idle-after = 24h              # quiet time before a stopped session folds into Idle
+judge = on                    # off skips the model read, so nothing is ever safe
+notify = true
+auto-open = true
+```
+
+The full list of keys, with defaults, is in [`docs/config.md`](docs/config.md). Themes are small token files in `Resources/themes`. Put your own in `~/.config/maxwell/themes/`.
+
+## How it works
+
+```
+Claude Code hooks ─┐
+status line tap ───┼─▶ events.jsonl ─▶ reduce(State, Event) ─▶ the window
+claude agents ─────┘
+```
+
+- **Hooks** append each session event to one log file, from every account, whether Maxwell is open or not.
+- **One pure reducer** turns that log into the state of every session. The app folds it at launch and follows it live. Nothing else changes session state.
+- **Sessions you start in Maxwell** are Claude Code background sessions (`claude --bg`), so they survive the app closing or crashing. Sessions running in another terminal are shown read-only.
+- **The terminal** is [libghostty](https://ghostty.org), pinned to one commit and upgraded on purpose.
+
+Speed and memory are checked on every build by `./measure.sh`: window on screen under 300 ms, under 150 MB idle and at launch peak, and 20 open sessions under 400 MB.
+
+## Develop
+
+You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) and Zig 0.17 (`brew install zig`).
+
+```sh
+./build.sh          # builds Maxwell Dev (first run also builds Ghostty, ~3 min)
+./build.sh test     # reducer and verdict tests, from recorded real hook payloads
+./measure.sh        # performance budgets, fails loudly
+./release.sh 0.1.7 "What changed"   # tests, builds the release, publishes it on GitHub
+```
+
+**Maxwell Dev** is a separate app with its own ID, name and a "dev" badge on its Dock icon. It works on your real sessions and config, but quitting, crashing or relaunching it never touches the Maxwell you work in. The released Maxwell changes only when you click **Restart to update**.
+
+Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the window stays behind yours and never takes focus, and keys and clicks are injected inside the app with `--keys "2:shift shift;3:esc"` and `--click "4:700,600"`. Screenshots come from `--snap`.
+
+| Folder | What's in it |
+|---|---|
+| `Sources/Model` | Data shape, event parsing, reducer, safe-to-close verdict, config. No AppKit. |
+| `Sources/App` | App delegate, window, store, probes (agents, git, transcripts), CLI |
+| `Sources/UI` | The component set, rail, panels, search, viewer, libghostty embed, themes, motion |
+| `Sources/Install` | Hook installer that edits settings without reordering them |
+| `hook/` | The hook and status-line tap, in C |
+| `docs/` | Config reference and the images in this README |
+| `site/` | The website, [runmaxwell.com](https://www.runmaxwell.com) |
+
+Ghostty is pinned to `8046a2360340ec9788e0089da5a9ed0378adf0ea`. To upgrade, change the commit in `build.sh`, rebuild and re-run both commands above.
+
+## Status
+
+Early. v1 covers the core: what needs you, projects, accounts, safe closing. Next, roughly in order:
+
+- Slack: who is waiting on a reply from you
+- Linear status kept in sync with sessions
+- A supervisor that handles the obvious "go on" for you, and suggests improvements you accept or reject
+- Claude artifacts opened in place, logged into the right account
+- A phone app
+
+## Licence
+
+MIT. Ghostty is MIT, JetBrains Mono is OFL 1.1, marked is MIT, highlight.js is BSD-3-Clause.

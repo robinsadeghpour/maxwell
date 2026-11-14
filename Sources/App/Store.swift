@@ -1,0 +1,300 @@
+import AppKit
+import UserNotifications
+
+/// Owns AppState. Every change goes through `apply(_:)`, which runs the reducer and
+/// tells the UI. Probes (event log, agents, done check) only produce events.
+final class Store {
+    private(set) var state: AppState
+    private(set) var config: Config
+    private let log: EventLog
+    private var agents: AgentsProbe?
+    private lazy var doneChecker = DoneChecker { [weak self] in self?.apply([$0]) }
+    private var transcripts: TranscriptWatcher?
+    private lazy var hints = ProjectHintScanner { [weak self] in self?.apply($0) }
+    private var checkTimer: Timer?
+    private var resumeTimers: [SessionID: Timer] = [:]
+    private(set) var scheduledResumes: [SessionID: Date] = [:]
+    private var notifyAfter: Date?
+    var onChange: ((AppState) -> Void)?
+    var onMarkdown: ((SessionID, URL) -> Void)?
+    var onToast: ((String) -> Void)?
+
+    init(config: Config) {
+        self.config = config
+        log = EventLog(url: Paths.eventLog)
+        state = log.readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
+    }
+
+    /// Starts the live sources. Called once the window is on screen.
+    func start() {
+        notifyAfter = Date().addingTimeInterval(8)
+        log.tail { [weak self] in self?.apply($0) }
+        agents = AgentsProbe(accounts: config.accounts) { [weak self] in self?.apply([$0]) }
+        let tw = TranscriptWatcher(accounts: config.accounts)
+        tw.cwdFor = { [weak self] id in self?.state.sessions[id]?.cwd }
+        tw.onMarkdown = { [weak self] id, url in self?.onMarkdown?(id, url) }
+        transcripts = tw
+        checkTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in self?.recheckAll() }
+        recheckAll()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            mark("notifications \(granted ? "allowed" : "not allowed")\(error.map { " (\($0.localizedDescription))" } ?? "")")
+        }
+    }
+
+    func apply(_ events: [Event]) {
+        let before = state
+        state = events.reduce(into: state) { reduce(into: &$0, $1) }
+        guard state != before else { return }
+        judgeCandidates()
+        for (id, s) in state.sessions {
+            let old = before.sessions[id]?.phase
+            // A repo check older than the last activity is unknown; take a new one.
+            if s.phase == .yourTurn, old != .yourTurn || (s.doneCheck.map { $0.at < s.lastEventAt } ?? true) { doneChecker.check(s) }
+            if case .needsYou(let q) = s.phase, !(old.map { if case .needsYou = $0 { return true }; return false } ?? false) {
+                notify(s, question: q)
+            }
+        }
+        onChange?(state)
+    }
+
+    func recheckAll() {
+        for s in state.sessions.values where s.phase == .yourTurn { doneChecker.check(s) }
+        scanHints()
+    }
+
+    /// Looks again (in the background) at where each live session's work goes.
+    func scanHints() {
+        let live = state.sessions.values.filter { $0.phase != .ended }.compactMap { s in
+            Transcripts.path(s, account: state.account(s.accountId)).map { (id: s.id, cwd: s.cwd, transcript: $0) }
+        }
+        hints.scan(live, rules: config.projects)
+    }
+
+    func reloadConfig(_ c: Config) {
+        let accountsChanged = c.accounts.map(\.configDir) != config.accounts.map(\.configDir)
+        config = c
+        if accountsChanged {
+            state = log.readNew().reduce(into: AppState(accounts: c.accounts)) { reduce(into: &$0, $1) }
+            agents = AgentsProbe(accounts: c.accounts) { [weak self] in self?.apply([$0]) }
+        }
+        onChange?(state)
+    }
+
+    private func notify(_ s: Session, question: String) {
+        // The first listings after launch would re-announce every waiting session.
+        guard config.notify, let quiet = notifyAfter, Date() > quiet else { return }
+        let title = s.title, subtitle = "Needs you · \(state.account(s.accountId)?.name ?? s.accountId)"
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+                // Until Maxwell is allowed in System Settings › Notifications, post through osascript.
+                let esc = { (x: String) in x.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+                let script = "display notification \"\(esc(question))\" with title \"\(esc(title))\" subtitle \"\(esc(subtitle))\" sound name \"Funk\""
+                DispatchQueue.global().async { ClaudeCLI.run("/usr/bin/osascript", ["-e", script], timeout: 5) }
+                mark("notified \(s.name) (osascript)")
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.subtitle = subtitle
+            content.body = question
+            content.sound = .default
+            content.userInfo = ["session": s.id]
+            let req = UNNotificationRequest(identifier: "needs-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(req) { error in mark("notified \(s.name)\(error.map { ": \($0.localizedDescription)" } ?? "")") }
+        }
+    }
+
+    // MARK: actions
+
+    /// Starts a background session and resolves its full id from the next listing.
+    func newSession(account: Account, cwd: String, name: String, model: String? = nil, prompt: String? = nil,
+                    done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
+        DispatchQueue.global().async { [weak self] in
+            let r = ClaudeCLI.startBackground(account: account, cwd: cwd, name: name, model: model, prompt: prompt)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch r {
+                case .failure(let e): done(.failure(e))
+                case .success(let short):
+                    self.agents?.refresh(account.id) {
+                        let id = self.state.sessions.values.first { $0.reach == .background(shortId: short) }?.id ?? short
+                        self.apply([.started(id, account.id, name: name, cwd: cwd, shortId: short, at: Date())])
+                        done(.success(id))
+                    }
+                }
+            }
+        }
+    }
+
+    func checks(_ s: Session, now: Date = Date()) -> [Check] { state.checks(s, now: now, rules: config.rules) }
+
+    /// Sessions safe to close right now (the same verdict the sidebar shows).
+    func safeToClose(now: Date = Date()) -> [Session] {
+        state.sessions.values.filter { state.group($0, now: now, rules: config.rules) == .safeToClose }
+    }
+
+    // MARK: model reads
+
+    private let judgeQueue = DispatchQueue(label: "maxwell.judge")
+    private var judging = Set<String>()
+    private var judgeFailedAt: [String: Date] = [:]
+
+    /// One model read per candidate reply, in the background, one at a time. The verdict comes
+    /// back through the event log like every other record, so it is cached across launches.
+    private func judgeCandidates() {
+        let now = Date()
+        for (s, hash) in state.judgeCandidates(now: now, rules: config.rules) where !judging.contains(hash) {
+            if let failed = judgeFailedAt[hash], now.timeIntervalSince(failed) < 600 { continue }
+            judging.insert(hash)
+            let snapshot = state
+            judgeQueue.async { [weak self] in
+                Judge.judgeAndLog(s, hash: hash, state: snapshot, now: now)
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.judging.remove(hash)
+                    // A failed call is logged but not cached; wait before asking again.
+                    if self.state.judgments[hash] == nil { self.judgeFailedAt[hash] = Date() }
+                }
+            }
+        }
+    }
+
+    // MARK: closing
+
+    /// What happened to one session in a close.
+    enum CloseOutcome { case closed, skipped(String), failed(String) }
+
+    /// Closes the sessions you confirmed, one at a time. Right before each, it lists the
+    /// account and checks the worktree again; anything not passing now, or a reply that changed
+    /// since the sheet showed it, skips that session. Closing is `claude stop` only.
+    func close(_ confirmed: [(id: SessionID, hash: String?)], done: @escaping ([(Session, CloseOutcome)]) -> Void) {
+        var results: [(Session, CloseOutcome)] = []
+        func next(_ rest: ArraySlice<(id: SessionID, hash: String?)>) {
+            guard let item = rest.first else { return done(results) }
+            let more = rest.dropFirst()
+            guard let s = state.sessions[item.id], let a = state.account(s.accountId) else { return next(more) }
+            recheck(s, account: a) { [weak self] fresh in
+                guard let self else { return }
+                let outcome: CloseOutcome? = {
+                    guard let fresh else { return .skipped("gone from the session list") }
+                    if fresh.lastMessage.map(Reply.hash) != item.hash { return .skipped("new reply since you confirmed") }
+                    if let bad = self.checks(fresh).first(where: { $0.outcome != .pass }) {
+                        return .skipped("\(bad.kind.title): \(bad.detail)")
+                    }
+                    guard case .background = fresh.reach else { return .skipped("runs in another terminal; close it there") }
+                    return nil
+                }()
+                if let outcome {
+                    results.append((fresh ?? s, outcome))
+                    return next(more)
+                }
+                self.stop(fresh!, account: a) { r in
+                    results.append((fresh!, r))
+                    next(more)
+                }
+            }
+        }
+        next(confirmed[...])
+    }
+
+    /// A fresh listing of the session's account and a fresh repo check, folded in.
+    private func recheck(_ s: Session, account: Account, then: @escaping (Session?) -> Void) {
+        agents?.snapshotNow(account) { [weak self] snap in
+            guard let self else { return }
+            guard let snap else { return then(nil) }
+            self.apply([.agents(snap)])
+            self.doneChecker.evaluateNow(cwd: s.cwd) { check in
+                self.apply([.doneCheck(s.id, check)])
+                let fresh = self.state.sessions[s.id]
+                then(fresh?.phase == .ended ? nil : fresh)
+            }
+        }
+    }
+
+    private func stop(_ s: Session, account a: Account, then: @escaping (CloseOutcome) -> Void) {
+        guard case .background(let short) = s.reach else { return then(.skipped("runs in another terminal")) }
+        let checks = self.checks(s)
+        DispatchQueue.global().async { [weak self] in
+            let r = ClaudeCLI.stop(account: a, shortId: short)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard r.status == 0 else { return then(.failed((r.err + r.out).trimmingCharacters(in: .whitespacesAndNewlines))) }
+                self.record(MaxwellRecord.closed(s, checks: checks))
+                self.agents?.refresh(a.id)
+                then(.closed)
+            }
+        }
+    }
+
+    /// Logs one of Maxwell's own records and folds it in now (the log tail folds it again, harmlessly).
+    private func record(_ fields: [String: Any]) {
+        let at = Date()
+        MaxwellRecord.append(fields, at: at)
+        let line = (try? JSONSerialization.data(withJSONObject: ["ts": (at.timeIntervalSince1970 * 1000).rounded(), "maxwell": fields]))
+            .flatMap { String(data: $0, encoding: .utf8) }
+        if let e = line.flatMap({ EventParser.parse(line: Substring($0)) }) { apply([e]) }
+    }
+
+    /// Shows a session under another project (nil: back under its folder's), for good: a log line.
+    func moveProject(_ id: SessionID, to project: String?) { record(MaxwellRecord.moved(id, to: project)) }
+
+    func dismissSuggestion(_ id: SessionID, _ project: String) { record(MaxwellRecord.dismissed(id, suggestion: project)) }
+
+    /// Undo and Recently closed: the record goes; `claude attach` (the caller's terminal) starts it again.
+    func reopened(_ id: SessionID) { record(MaxwellRecord.reopened(id)) }
+
+    /// "Not safe": out of Safe to close until new activity; the evidence goes to the event log and,
+    /// as a replayable fixture, to Tests/fixtures/false-safe/. Returns the fixture path.
+    @discardableResult
+    func markNotSafe(_ id: SessionID) -> URL? {
+        guard let s = state.sessions[id] else { return nil }
+        let now = Date()
+        let fixture = FalseSafe.encode(s, in: state, now: now, rules: config.rules)
+        record(MaxwellRecord.notSafe(s, checks: checks(s, now: now)))
+        let dir = Self.falseSafeDir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("\(s.id.prefix(8))-\(Int(now.timeIntervalSince1970)).json")
+        guard let data = try? JSONSerialization.data(withJSONObject: fixture, options: [.prettyPrinted, .sortedKeys]),
+              (try? data.write(to: url)) != nil else { return nil }
+        return url
+    }
+
+    /// The repo's Tests/fixtures/false-safe when Maxwell runs from its build folder, else the state dir.
+    static var falseSafeDir: URL {
+        var dir = Bundle.main.bundleURL
+        for _ in 0..<4 {
+            dir.deleteLastPathComponent()
+            if FileManager.default.fileExists(atPath: dir.appendingPathComponent("Tests/main.swift").path) {
+                return dir.appendingPathComponent("Tests/fixtures/false-safe")
+            }
+        }
+        return Paths.stateDir.appendingPathComponent("false-safe")
+    }
+
+    /// Moves limited work to another account: a new background session there with a short
+    /// handover prompt that points at the old transcript.
+    func move(_ s: Session, to account: Account, done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
+        let transcript = Transcripts.path(s, account: state.account(s.accountId)) ?? "(unknown)"
+        let prompt = """
+        Continue the work of session "\(s.title)" (\(s.id)), which stopped at a usage limit on another account. \
+        Its transcript is \(transcript). Read the end of it to see what was asked and where it stopped, then carry on. \
+        Same folder, same branch.
+        """
+        newSession(account: account, cwd: s.cwd, name: String((s.name + "-moved").prefix(40)), prompt: prompt, done: done)
+    }
+
+    /// Sends "continue" when the limit resets (now, if it already has).
+    func scheduleResume(_ s: Session, at date: Date, send: @escaping (Session) -> Void) {
+        resumeTimers[s.id]?.invalidate()
+        scheduledResumes[s.id] = date
+        let fire = max(date.timeIntervalSinceNow + 5, 0.1)
+        resumeTimers[s.id] = Timer.scheduledTimer(withTimeInterval: fire, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.scheduledResumes[s.id] = nil
+            self.resumeTimers[s.id] = nil
+            if let current = self.state.sessions[s.id] { send(current) }
+            self.onChange?(self.state)
+        }
+        onChange?(state)
+    }
+}

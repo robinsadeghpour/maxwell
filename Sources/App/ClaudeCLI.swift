@@ -1,0 +1,100 @@
+import Foundation
+
+/// Runs the `claude`, `git` and `gh` processes Maxwell needs. Children get a clean
+/// environment: no CLAUDE_CODE_* markers (they turn off transcript saving) and the
+/// account's CLAUDE_CONFIG_DIR only when it is not the default account.
+enum ClaudeCLI {
+    static let claudePath: String = {
+        let candidates = [Paths.home.appendingPathComponent(".local/bin/claude").path, "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "claude"
+    }()
+
+    static let ghPath: String = [Paths.home.appendingPathComponent(".local/bin/gh").path, "/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
+        .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/false"
+
+    /// Removes Claude Code session markers from Maxwell's own environment once at
+    /// launch, so every child (terminal surfaces included) starts clean.
+    static func scrubOwnEnvironment() {
+        for key in ProcessInfo.processInfo.environment.keys where isSessionMarker(key) { unsetenv(key) }
+        // Finder launches get a minimal PATH; claude, git and gh live in these.
+        let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        let extra = [Paths.home.appendingPathComponent(".local/bin").path, "/opt/homebrew/bin", "/usr/local/bin"]
+        setenv("PATH", (extra.filter { !path.contains($0) } + [path]).joined(separator: ":"), 1)
+    }
+
+    static func isSessionMarker(_ key: String) -> Bool {
+        key == "CLAUDECODE" || key.hasPrefix("CLAUDE_CODE_") || key == "CLAUDE_PID" || key == "CLAUDE_EFFORT"
+            || key == "ANTHROPIC_PROFILE" || key == "ANTHROPIC_CONFIG_DIR" || key == "CLAUDE_CONFIG_DIR"
+    }
+
+    static func env(for account: Account) -> [String: String] {
+        var e = ProcessInfo.processInfo.environment.filter { !isSessionMarker($0.key) }
+        if let dir = account.configDirEnv { e["CLAUDE_CONFIG_DIR"] = dir }
+        return e
+    }
+
+    struct Result { var status: Int32; var out: String; var err: String }
+
+    /// Runs a process to completion off the main thread's critical path (call from a background queue).
+    @discardableResult
+    static func run(_ exe: String, _ args: [String], cwd: String? = nil, env: [String: String]? = nil, timeout: TimeInterval = 20) -> Result {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: exe)
+        p.arguments = args
+        if let cwd { p.currentDirectoryURL = URL(fileURLWithPath: cwd) }
+        p.environment = env ?? ProcessInfo.processInfo.environment.filter { !isSessionMarker($0.key) }
+        let out = Pipe(), err = Pipe()
+        p.standardOutput = out
+        p.standardError = err
+        p.standardInput = FileHandle.nullDevice
+        do { try p.run() } catch { return Result(status: -1, out: "", err: "\(error)") }
+        let deadline = DispatchTime.now() + timeout
+        let group = DispatchGroup()
+        var outData = Data(), errData = Data()
+        group.enter(); DispatchQueue.global().async { outData = out.fileHandleForReading.readDataToEndOfFile(); group.leave() }
+        group.enter(); DispatchQueue.global().async { errData = err.fileHandleForReading.readDataToEndOfFile(); group.leave() }
+        if group.wait(timeout: deadline) == .timedOut { p.terminate() }
+        p.waitUntilExit()
+        return Result(status: p.terminationStatus, out: String(decoding: outData, as: UTF8.self), err: String(decoding: errData, as: UTF8.self))
+    }
+
+    static func agents(_ account: Account) -> Data? {
+        let r = run(claudePath, ["agents", "--json"], env: env(for: account), timeout: 10)
+        return r.status == 0 ? Data(r.out.utf8) : nil
+    }
+
+    enum StartError: Error, CustomStringConvertible {
+        case untrusted(String)
+        case failed(String)
+        var description: String {
+            switch self {
+            case .untrusted(let dir): return "\((dir as NSString).abbreviatingWithTildeInPath) is not trusted on this account yet."
+            case .failed(let msg): return msg
+            }
+        }
+    }
+
+    /// `claude --bg --name <name> [--model <model>] [prompt]` in `cwd`. Returns the short id it prints.
+    /// `model` is for test runs (haiku); sessions you start keep your default.
+    static func startBackground(account: Account, cwd: String, name: String, model: String? = nil, prompt: String? = nil) -> Swift.Result<String, StartError> {
+        var args = ["--bg", "--name", name]
+        if let model { args += ["--model", model] }
+        if let prompt { args.append(prompt) }
+        let r = run(claudePath, args, cwd: cwd, env: env(for: account), timeout: 30)
+        let text = r.out + r.err
+        if text.contains("Workspace not trusted") { return .failure(.untrusted(cwd)) }
+        // "backgrounded · d2f54676 · name (idle — send a prompt to start)"
+        guard r.status == 0, let line = text.components(separatedBy: "\n").first(where: { $0.contains("backgrounded") }) else {
+            return .failure(.failed(text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        let parts = line.components(separatedBy: " · ")
+        guard parts.count >= 2 else { return .failure(.failed(line)) }
+        return .success(parts[1].trimmingCharacters(in: .whitespaces))
+    }
+
+    /// `claude stop <id>`: ends the process and keeps the conversation; `claude attach <id>`
+    /// starts it again. Maxwell never deletes a session (no `claude rm`).
+    static func stop(account: Account, shortId: String) -> Result {
+        run(claudePath, ["stop", shortId], env: env(for: account))
+    }
+}

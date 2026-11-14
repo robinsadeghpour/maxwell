@@ -1,0 +1,297 @@
+import AppKit
+
+/// What the middle pane can ask the app to do.
+protocol SessionPaneDelegate: AnyObject {
+    func reattach(_ id: SessionID)
+    func resume(_ id: SessionID)
+    func move(_ id: SessionID)
+    func close(_ id: SessionID)
+    func notSafe(_ id: SessionID)
+    func reopen(_ id: SessionID)
+    func roomiest(for id: SessionID) -> Account?
+    func scheduledResume(_ id: SessionID) -> Date?
+}
+
+/// The middle pane: header with pills, a state banner, and the session's terminal.
+final class SessionPane: MXView {
+    weak var delegate: SessionPaneDelegate?
+    private(set) var session: Session?
+    private var account: Account?
+    private let glyph = GlyphView(frame: .zero)
+    private let title = Label(font: Fonts.mono(Metrics.fontSize, .semibold))
+    private let project = Label(color: { $0.fg3 })
+    private let pills = Label(color: { $0.fg3 })
+    private let headerLine = Fill { $0.hair2 }
+    private let banner = Banner(frame: .zero)
+    let content = TerminalWell(frame: .zero)
+    private let empty = EmptyState(frame: .zero)
+    private let message = MessageView()
+    private let overview = Overview(frame: .zero)
+    private var terminal: TerminalView?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        [glyph, title, project, pills, headerLine, banner, content, empty, message.scroll, overview].forEach(addSubview)
+        banner.isHidden = true
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func show(_ s: Session?, group: PhaseGroup?, blockers: [String], project projectName: String?, account: Account?,
+              terminal: TerminalView?, summary: [(PhaseGroup, Int)]) {
+        session = s
+        self.account = account
+        // Every visited terminal stays a subview; only the selected one is visible and rendering.
+        if let terminal, terminal.superview !== content { content.addSubview(terminal) }
+        for case let v as TerminalView in content.subviews {
+            let visible = v === terminal
+            v.isHidden = !visible
+            v.setVisible(visible)
+        }
+        self.terminal = terminal
+        overview.isHidden = s != nil
+        message.scroll.isHidden = true
+        guard let s else {
+            [glyph, title, project, pills, banner, empty, headerLine].forEach { $0.isHidden = true }
+            overview.counts = summary
+            needsLayout = true
+            return
+        }
+        [glyph, title, project, pills, headerLine].forEach { $0.isHidden = false }
+        glyph.group = group ?? .idle
+        title.text = s.title
+        let folder = (s.cwd as NSString).lastPathComponent
+        let branch = s.branch ?? s.doneCheck?.branch
+        project.text = ([projectName ?? folder] + (folder != projectName && !folder.isEmpty && folder.lowercased() != projectName?.lowercased() ? [folder] : []) + (branch.map { [$0] } ?? [])).joined(separator: " › ")
+        var p: [String] = []
+        p.append("[\(account?.name ?? s.accountId)]")
+        if case .open(let n) = s.doneCheck?.pr { p.append("[PR #\(n)]") }
+        if case .merged = s.doneCheck?.pr { p.append("[PR merged]") }
+        if let ctx = s.contextTokens { p.append("[ctx \(ctx / 1000)k]") }
+        pills.text = p.joined(separator: " ")
+        updateBanner(s, group: group ?? .idle, blockers: blockers)
+        if case .elsewhere(let pid) = s.reach {
+            empty.isHidden = true
+            message.scroll.isHidden = false
+            message.show(note: "Runs in another terminal\(pid.map { " (pid \($0))" } ?? "") · read-only here · sessions you start with ⌘N open in this pane",
+                         text: s.lastMessage ?? "No reply yet.")
+        } else {
+            empty.isHidden = terminal != nil
+            empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R reattaches."]
+        }
+        needsLayout = true
+    }
+
+    private func updateBanner(_ s: Session, group: PhaseGroup, blockers: [String]) {
+        let now = Date()
+        banner.buttons.forEach { $0.removeFromSuperview() }
+        banner.buttons = []
+        switch group {
+        case .needsYou:
+            if case .needsYou(let q) = s.phase { banner.configure(group: group, text: q, tint: { $0.on }) }
+        case .yourTurn where !s.prompted && s.origin == .maxwell:
+            banner.configure(group: group, text: "New session · type the first prompt below", tint: { $0.fg3 })
+        case .yourTurn, .idle:
+            let offer: String? = { if case .offer(let o)? = s.lastMessage.map(Reply.classify) { return o }; return nil }()
+            let text = offer.map { "Your turn · \($0)" } ?? "Your turn · not safe to close: " + blockers.joined(separator: " · ")
+            banner.configure(group: group, text: text, tint: { $0.chk })
+        case .safeToClose:
+            banner.configure(group: group, text: "Safe to close · every check passed; → on its row lists them", tint: { $0.safe })
+            banner.add(MXButton("Not safe") { [weak self] in self?.delegate?.notSafe(s.id) })
+            if case .background = s.reach {
+                banner.add(MXButton("Close session", hint: "⌘⌫", primary: true) { [weak self] in self?.delegate?.close(s.id) })
+            }
+        case .recentlyClosed:
+            banner.configure(group: group, text: "Closed by Maxwell · stopped with claude stop, conversation kept", tint: { $0.fg3 })
+            banner.add(MXButton("Reopen", primary: true) { [weak self] in self?.delegate?.reopen(s.id) })
+        case .limited:
+            guard case .limited(let reset) = s.phase else { break }
+            let name = account?.name ?? s.accountId
+            let when = reset.map { $0 > now ? "resets \(Format.reset($0, now: now))" : "limit has reset" } ?? "waiting for the reset time"
+            banner.configure(group: group, text: "Hit the usage limit on \(name) · \(when)", tint: { $0.fg3 })
+            if let scheduled = delegate?.scheduledResume(s.id) {
+                banner.add(MXButton("Resumes \(Format.clock.string(from: scheduled)) ✓", small: false))
+            } else if case .background = s.reach {
+                let label = reset.map { $0 > now ? "Resume at \(Format.clock.string(from: $0))" : "Resume now" } ?? "Resume now"
+                banner.add(MXButton(label, hint: "⇧⌘R") { [weak self] in self?.delegate?.resume(s.id) })
+            }
+            if let other = delegate?.roomiest(for: s.id) {
+                let left = other.usedPercent.map { " · \(100 - Int($0))% left" } ?? ""
+                banner.add(MXButton("Move to \(other.name)\(left)", hint: "⇧⌘M", primary: true) { [weak self] in self?.delegate?.move(s.id) })
+            }
+        case .working:
+            banner.isHidden = true
+            return
+        }
+        banner.isHidden = false
+    }
+
+    override func layout() {
+        super.layout()
+        let w = bounds.width, h = Metrics.header
+        glyph.frame = NSRect(x: 8, y: 0, width: 16, height: h)
+        let tw = min(title.textWidth + 2, w * 0.45)
+        title.frame = NSRect(x: 28, y: 0, width: tw, height: h)
+        let pw = project.textWidth + 2
+        project.frame = NSRect(x: title.frame.maxX + 8, y: 0, width: pw, height: h)
+        pills.frame = NSRect(x: project.frame.maxX + 10, y: 0, width: max(0, w - project.frame.maxX - 22), height: h)
+        headerLine.frame = NSRect(x: 0, y: h - 1, width: w, height: 1)
+        var y = h
+        if !banner.isHidden && session != nil {
+            banner.frame = NSRect(x: 0, y: y, width: w, height: Metrics.header)
+            y += Metrics.header
+        }
+        if session == nil { y = 0 }
+        content.frame = NSRect(x: 0, y: y, width: w, height: bounds.height - y)
+        content.subviews.forEach { $0.frame = content.bounds }
+        empty.frame = content.frame
+        message.scroll.frame = content.frame
+        overview.frame = bounds
+    }
+}
+
+/// Holds the terminals. Transparent in dark themes; a dark well in light ones.
+final class TerminalWell: MXView {
+    override func draw(_ r: NSRect) {
+        guard let bg = t.terminalBackground, subviews.contains(where: { !$0.isHidden }) else { return }
+        bg.setFill()
+        bounds.fill()
+    }
+}
+
+/// The state strip under the header: glyph, one line, actions on the right.
+final class Banner: MXView {
+    private let glyph = GlyphView(frame: .zero)
+    private let label = Label()
+    var buttons: [MXButton] = []
+    private var tint: (Theme) -> NSColor = { $0.fg3 }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        [glyph, label].forEach(addSubview)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(group: PhaseGroup, text: String, tint: @escaping (Theme) -> NSColor) {
+        glyph.group = group
+        label.text = text.replacingOccurrences(of: "\n", with: " ")
+        self.tint = tint
+        label.color = { t in group == .working || group == .limited ? t.fg2 : t.fg }
+        needsDisplay = true
+        needsLayout = true
+    }
+
+    func add(_ b: MXButton) { buttons.append(b); addSubview(b); needsLayout = true }
+
+    override func draw(_ r: NSRect) {
+        tint(t).withAlphaComponent(0.08).setFill()
+        bounds.fill()
+        tint(t).withAlphaComponent(0.3).setFill()
+        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+    }
+
+    override func layout() {
+        super.layout()
+        var x = bounds.width - 8
+        for b in buttons.reversed() {
+            let s = b.intrinsicContentSize
+            x -= s.width
+            b.frame = NSRect(x: x, y: (bounds.height - s.height) / 2, width: s.width, height: s.height)
+            x -= 6
+        }
+        glyph.frame = NSRect(x: 8, y: 0, width: 16, height: bounds.height)
+        label.frame = NSRect(x: 28, y: 0, width: max(0, x - 34), height: bounds.height)
+    }
+}
+
+/// Quiet multi-line text for empty and read-only states.
+final class EmptyState: MXView {
+    var lines: [String] = [] { didSet { needsDisplay = true } }
+    override func draw(_ r: NSRect) {
+        var y: CGFloat = 16
+        for (i, l) in lines.enumerated() {
+            Text.draw(l, in: NSRect(x: 16, y: y, width: bounds.width - 32, height: 18), color: i == 0 ? t.fg2 : t.fg3)
+            y += 18
+        }
+    }
+}
+
+/// A session's last reply, wrapped and scrollable, for sessions Maxwell cannot attach to.
+final class MessageView: NSObject {
+    let scroll = NSScrollView()
+    private let text = NSTextView()
+
+    override init() {
+        super.init()
+        text.isEditable = false
+        text.drawsBackground = false
+        text.textContainerInset = NSSize(width: 18, height: 14)
+        text.isVerticallyResizable = true
+        text.autoresizingMask = [.width]
+        text.textContainer?.widthTracksTextView = true
+        scroll.documentView = text
+        scroll.useThinScroller()
+        scroll.isHidden = true
+    }
+
+    func show(note: String, text body: String) {
+        let t = Look.theme
+        let out = NSMutableAttributedString()
+        let p = NSMutableParagraphStyle(); p.lineSpacing = 2; p.paragraphSpacing = 9
+        let tight = NSMutableParagraphStyle(); tight.lineSpacing = 2; tight.paragraphSpacing = 2
+        out.append(NSAttributedString(string: note + "\n", attributes: [.font: Fonts.mono(Metrics.fontSize - 1), .foregroundColor: t.fg3, .paragraphStyle: p]))
+        // The hook keeps the last 2000 characters; say so when the start is cut.
+        if body.count >= 2000 { out.append(NSAttributedString(string: "…\n", attributes: [.font: Fonts.mono(Metrics.fontSize), .foregroundColor: t.fg3, .paragraphStyle: tight])) }
+        let link = try? NSRegularExpression(pattern: #"\[([^\]]+)\]\([^)]+\)"#)
+        let lines = body.components(separatedBy: "\n")
+        for (i, raw) in lines.enumerated() where !raw.trimmingCharacters(in: .whitespaces).isEmpty {
+            var line = raw
+            let heading = line.hasPrefix("#") || (line.hasPrefix("**") && line.hasSuffix("**"))
+            while line.hasPrefix("#") { line.removeFirst() }
+            if heading { line = line.trimmingCharacters(in: .whitespaces) }
+            line = line.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
+            if let link { line = link.stringByReplacingMatches(in: line, range: NSRange(line.startIndex..., in: line), withTemplate: "$1") }
+            let lead = line.trimmingCharacters(in: .whitespaces)
+            let listItem = lead.hasPrefix("- ") || lead.first?.isNumber == true
+            let nextIsList = lines.indices.contains(i + 1) && { let n = lines[i + 1].trimmingCharacters(in: .whitespaces); return n.hasPrefix("- ") || n.first?.isNumber == true }()
+            out.append(NSAttributedString(string: line + "\n", attributes: [
+                .font: Fonts.mono(Metrics.fontSize, heading ? .semibold : .regular),
+                .foregroundColor: raw.hasSuffix("?") || raw.hasSuffix("?**") ? t.on : heading ? t.fg : t.fg.withAlphaComponent(0.9),
+                .paragraphStyle: listItem && nextIsList ? tight : p]))
+        }
+        text.textStorage?.setAttributedString(out)
+        text.scrollToBeginningOfDocument(nil)
+    }
+}
+
+/// What the middle pane shows with no session open: the state of everything, and the keys.
+final class Overview: MXView {
+    var counts: [(PhaseGroup, Int)] = [] { didSet { needsDisplay = true } }
+
+    override func draw(_ r: NSRect) {
+        let x: CGFloat = 32
+        var y: CGFloat = 40
+        Text.draw("No session open", in: NSRect(x: x, y: y, width: bounds.width - 2 * x, height: 22), color: t.fg, font: Fonts.mono(Metrics.fontSize + 2, .semibold))
+        y += 30
+        let hints: [PhaseGroup: String] = [.needsYou: "⌘J jumps to the next one", .safeToClose: "⇧⌘X closes them all"]
+        for (g, n) in counts where !g.folds {
+            Glyph.draw(g, at: NSPoint(x: x + 5, y: y + 11), color: t.color(for: g))
+            let w = Text.draw("\(n)", in: NSRect(x: x + 20, y: y, width: 40, height: 22), color: n > 0 && g != .working ? t.color(for: g) : t.fg2, font: Fonts.mono(Metrics.fontSize, .semibold))
+            Text.draw(g.title.lowercased(), in: NSRect(x: x + 28 + w, y: y, width: 160, height: 22), color: t.fg2)
+            if n > 0, let h = hints[g] { Text.draw(h, in: NSRect(x: x + 200, y: y, width: 260, height: 22), color: t.fg3) }
+            y += 24
+        }
+        y += 18
+        t.hair2.setFill(); NSRect(x: x, y: y, width: min(460, bounds.width - 2 * x), height: 1).fill()
+        y += 14
+        let keys = [("J K", "move in the list"), ("⏎", "open the session"), ("⌘0–9", "switch project"), ("⌘N", "new session"), ("⌘K", "every action")]
+        for (k, what) in keys {
+            let kw = Text.width(k, font: Fonts.mono(Metrics.fontSize - 1)) + 12
+            let kr = NSRect(x: x, y: y + 2, width: kw, height: 18)
+            t.hover.setFill(); NSBezierPath(roundedRect: kr, xRadius: 4, yRadius: 4).fill()
+            t.hair.setStroke(); let b = NSBezierPath(roundedRect: kr.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4); b.lineWidth = 1; b.stroke()
+            Text.draw(k, in: kr, color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1), align: .center)
+            Text.draw(what, in: NSRect(x: x + 76, y: y, width: 300, height: 22), color: t.fg3)
+            y += 26
+        }
+    }
+}

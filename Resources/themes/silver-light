@@ -1,0 +1,24 @@
+# Silver Light: brushed aluminium, cooler and a step darker than Paper; ink type on frosted grey.
+appearance = light
+background = #e3e6ea
+background-opacity = 0.82
+plane = #1c26330b
+panel = #eef0f3
+fg = #15171a
+fg2 = #42464d
+fg3 = #6b7079
+hair = #1c263322
+hair2 = #1c263312
+hover = #1c26330d
+sel = #1b1e23
+sel-fg = #f1f3f5
+row-sel = #ffffffb0
+dim = #ffffff2a
+on = #a95800
+chk = #6a3fb8
+safe = #18793c
+cursor = #15171a
+selection = #c3cddd
+terminal-foreground = #15171a
+terminal-cursor = #15171a
+terminal-selection = #c3cddd

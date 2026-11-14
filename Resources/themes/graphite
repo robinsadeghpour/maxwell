@@ -1,0 +1,21 @@
+# Graphite: dark glass. Colour means "this is on you"; anything that runs on its own stays grey.
+appearance = dark
+background = #0b0c10
+background-opacity = 0.74
+plane = #ffffff07
+panel = #17181d
+fg = #e7e8ea
+fg2 = #a5a9b0
+fg3 = #6e737b
+hair = #ffffff15
+hair2 = #ffffff0b
+hover = #ffffff0d
+sel = #dfe2e6
+sel-fg = #0d0e11
+row-sel = #ffffff17
+dim = #0000003a
+on = #ffb340
+chk = #b58cff
+safe = #4be27f
+cursor = #d8dbdf
+selection = #3a3d44

@@ -1,0 +1,25 @@
+# Paper: light frosted grey with ink type. The terminal is paper too; Maxwell raises the
+# contrast of Claude Code's dark-theme colours (Ghostty minimum-contrast) so they stay readable.
+appearance = light
+background = #f3f4f6
+background-opacity = 0.80
+plane = #0000000a
+panel = #fbfbfc
+fg = #1b1c1f
+fg2 = #505259
+fg3 = #85878e
+hair = #0000001c
+hair2 = #0000000f
+hover = #0000000b
+sel = #1d1d1f
+sel-fg = #f6f6f7
+row-sel = #ffffffc0
+dim = #ffffff2e
+on = #b86200
+chk = #7a3fc0
+safe = #1d8a45
+cursor = #1d1d1f
+selection = #c9d2e3
+terminal-foreground = #1b1c1f
+terminal-cursor = #1b1c1f
+terminal-selection = #c9d2e3

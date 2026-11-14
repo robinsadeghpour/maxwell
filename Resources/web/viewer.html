@@ -1,0 +1,81 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="hljs.css">
+<script src="marked.min.js"></script>
+<script src="highlight.min.js"></script>
+<style>
+  :root { color-scheme: dark; --fg:#e6e7e9; --dim:#a2a6ac; --faint:#6b6f76; --line:rgba(255,255,255,.08); --code:rgba(255,255,255,.05); --accent:#c88bff; --size:12px; --prose: "JetBrains Mono", ui-monospace, monospace; }
+  html,body { background: transparent; margin:0; }
+  body { color:var(--fg); font: var(--size)/1.65 var(--prose); padding: 2px 18px 60px; -webkit-font-smoothing: antialiased; }
+  #doc { max-width: 820px; }
+  h1,h2,h3,h4 { line-height:1.25; margin: 1.4em 0 .5em; font-weight: 600; }
+  h1 { font-size: 1.6em; border-bottom:1px solid var(--line); padding-bottom:.3em; }
+  h2 { font-size: 1.3em; border-bottom:1px solid var(--line); padding-bottom:.25em; }
+  h3 { font-size: 1.1em; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  code, pre { font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace; font-size: calc(var(--size) - .5px); }
+  :not(pre) > code { background: var(--code); padding: .1em .35em; border-radius: 4px; }
+  pre { background: var(--code); border:1px solid var(--line); border-radius: 3px; padding: 10px 12px; overflow:auto; }
+  pre code.hljs { background: transparent; padding: 0; }
+  table { border-collapse: collapse; margin: 1em 0; display:block; overflow:auto; }
+  th, td { border: 1px solid var(--line); padding: 5px 10px; text-align:left; vertical-align: top; }
+  th { background: var(--code); font-weight:600; }
+  blockquote { margin: 0; padding: 0 1em; color: var(--dim); border-left: 3px solid var(--line); }
+  hr { border:0; border-top:1px solid var(--line); }
+  li > input[type=checkbox] { margin: 0 .45em 0 -1.3em; vertical-align: middle; }
+  li:has(> input[type=checkbox]) { list-style: none; }
+  body.code { padding: 0; }
+  body.code pre { margin:0; border:0; border-radius:0; background: transparent; padding: 6px 14px; font-size: var(--size); line-height: 1.5; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--faint); opacity: .6; border-radius: 2px; border: 3px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { border-width: 2px; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  #flash { position: fixed; top: 6px; right: 10px; font: 11px "JetBrains Mono", ui-monospace, monospace; color: var(--faint); opacity: 0; transition: opacity .3s; }
+  #flash.on { opacity: 1; }
+  /* Dark ink on paper thins out under grayscale smoothing at 1x; the system default keeps it at full weight. */
+  body.light { -webkit-font-smoothing: auto; font-weight: 500; }
+  body.light .hljs { color:#24292e } body.light .hljs-keyword, body.light .hljs-doctag, body.light .hljs-type { color:#cf222e }
+  body.light .hljs-title, body.light .hljs-title.function_ { color:#8250df } body.light .hljs-string, body.light .hljs-regexp { color:#0a3069 }
+  body.light .hljs-attr, body.light .hljs-number, body.light .hljs-literal, body.light .hljs-variable, body.light .hljs-meta { color:#0550ae }
+  body.light .hljs-comment, body.light .hljs-code { color:#6e7781 } body.light .hljs-built_in, body.light .hljs-symbol { color:#953800 }
+  body.light .hljs-name, body.light .hljs-selector-tag, body.light .hljs-quote { color:#116329 }
+</style></head>
+<body><div id="doc"></div><div id="flash">reloaded</div>
+<script>
+marked.setOptions({ gfm: true });
+function esc(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+let scheme = 'dark';
+function setTheme(t) {
+  const r = document.documentElement.style;
+  for (const k of ['fg','dim','faint','line','code','accent']) r.setProperty('--' + k, t[k]);
+  r.setProperty('--size', t.size + 'px');
+  r.setProperty('--prose', t.prose === 'sans' ? '-apple-system, "SF Pro Text", sans-serif' : '"JetBrains Mono", ui-monospace, monospace');
+  r.colorScheme = t.scheme;
+  scheme = t.scheme;
+  document.body.classList.toggle('light', scheme === 'light');
+}
+function render(p) {
+  const doc = document.getElementById('doc');
+  const y = window.scrollY;
+  document.body.className = p.kind + (scheme === 'light' ? ' light' : '');
+  let base = document.querySelector('base') || document.head.appendChild(document.createElement('base'));
+  base.href = 'file://' + encodeURI(p.base);
+  if (p.kind === 'md') {
+    doc.innerHTML = marked.parse(p.text);
+    doc.querySelectorAll('pre code').forEach(el => {
+      if (el.textContent.length < 200000) hljs.highlightElement(el);
+    });
+  } else {
+    // Highlight cost grows with size; very big files stay plain.
+    const big = p.text.length > 1000000;
+    const html = (big || p.lang === 'plaintext') ? esc(p.text) : hljs.highlight(p.text, { language: p.lang, ignoreIllegals: true }).value;
+    doc.innerHTML = '<pre><code class="hljs">' + html + '</code></pre>';
+  }
+  if (p.reload) {
+    window.scrollTo(0, y);
+    const f = document.getElementById('flash'); f.classList.add('on'); setTimeout(() => f.classList.remove('on'), 700);
+  } else {
+    window.scrollTo(0, 0);
+  }
+}
+</script></body></html>

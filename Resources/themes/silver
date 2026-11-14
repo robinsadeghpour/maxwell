@@ -1,0 +1,21 @@
+# Silver: dark brushed-metal greys with a cool selection. The light side is silver-light.
+appearance = dark
+background = #14161a
+background-opacity = 0.78
+plane = #dce2ea08
+panel = #1d2026
+fg = #eceef1
+fg2 = #b4b9c0
+fg3 = #787e86
+hair = #dce2ea1f
+hair2 = #dce2ea0f
+hover = #dce2ea12
+sel = #c9cdd2
+sel-fg = #101215
+row-sel = #dce2ea1c
+dim = #0000003a
+on = #ffcf5c
+chk = #9fb7ff
+safe = #3dff76
+cursor = #e6e8eb
+selection = #3b4048

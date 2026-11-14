@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="See every Claude Code session across your projects and accounts: which ones need you, which are still working, and which you can close. Free and open source for macOS.">
+<meta property="og:title" content="Maxwell · The session manager for Claude Code">
+<meta property="og:description" content="See every Claude Code session across your projects and accounts: which ones need you, which are still working, and which you can close. Free and open source for macOS.">
+<meta property="og:image" content="https://www.runmaxwell.com/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="canonical" href="https://www.runmaxwell.com/">
+<meta property="og:url" content="https://www.runmaxwell.com/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 9 9'%3E%3Crect x='-1' y='-1' width='9' height='9' rx='2' fill='%230a0a0b'/%3E%3Cpath fill='%23ededef' d='M0 0h1v1H0zM6 0h1v1H6zM0 1h2v1H0zM5 1h2v1H5zM1 2h5v1H1zM1 3h1v1H1zM3 3h1v1H3zM5 3h1v1H5zM1 4h5v1H1zM2 5h3v1H2zM2 6h1v1H2zM4 6h1v1H4z'/%3E%3Cpath fill='%23f0a33a' d='M2 3h1v1H2zM4 3h1v1H4z'/%3E%3C/svg%3E">
+<title>Maxwell · The session manager for Claude Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Round 4: one page, built from round 3's Field. Plain copy in Linear's pattern
+   (name what it is; short headings, one line each). No dot ground. Hairline frame only.
+   The hero band is Streams: lines converge on Maxwell and fan out into four groups. Dark only. */
+:root {
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --gmono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: "Geist", -apple-system, "Helvetica Neue", sans-serif;
+  --bg: #0a0a0b; --raise: #101012; --ink: #ededef; --dim: #8a8d94; --faint: #5b5e65; --line: #1c1d20; --tick: #3a3c41;
+  --need: #f0a33a; --turn: #a497f7; --work: #7d828b; --safe: #6fd08f;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { margin: 0; -webkit-font-smoothing: antialiased; font: 400 15px/1.6 var(--sans); }
+main { overflow-x: clip; }
+a { color: inherit; }
+canvas { display: block; max-width: 100%; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.band { position: relative; border-top: 1px solid var(--line); }
+.frame { position: relative; max-width: 1120px; margin-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); border-inline: 1px solid var(--line); }
+@media (min-width: 1160px) { .frame { margin-inline: auto; } }
+.frame > .x { position: absolute; top: -5px; width: 9px; height: 9px; pointer-events: none;
+  background: linear-gradient(var(--tick), var(--tick)) center / 9px 1px no-repeat, linear-gradient(var(--tick), var(--tick)) center / 1px 9px no-repeat; }
+.frame > .x.l { left: -5px; } .frame > .x.r { right: -5px; }
+.in { padding: 72px clamp(20px, 5vw, 64px); }
+
+.nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px clamp(20px, 5vw, 64px); font: 400 13px/1 var(--sans); color: var(--dim); }
+.nav b { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 500; font-size: 14px; }
+.nav b svg { width: 18px; height: 18px; }
+.nav nav { display: flex; gap: 26px; align-items: center; }
+.nav nav a { text-decoration: none; transition: color .15s; }
+.nav nav a:hover { color: var(--ink); }
+@media (max-width: 640px) { .nav nav a.hide-s { display: none; } }
+
+.hero { padding: 96px clamp(20px, 5vw, 64px) 56px; }
+h1 { margin: 0; font: 500 clamp(36px, 5.4vw, 64px)/1.04 var(--sans); letter-spacing: -.035em; max-width: 16ch; text-wrap: balance; }
+.lede { margin: 22px 0 0; max-width: 52ch; font-size: 18px; line-height: 1.55; color: var(--dim); }
+.ctas { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 32px; }
+.btn { display: inline-flex; align-items: center; gap: 9px; padding: 11px 16px; border-radius: 8px; background: var(--ink); color: var(--bg); text-decoration: none; font: 500 14px/1 var(--sans); transition: opacity .15s; }
+.btn:hover { opacity: .88; }
+.btn svg { width: 14px; height: 14px; }
+.btn.ghost { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.ghost:hover { box-shadow: inset 0 0 0 1px var(--tick); opacity: 1; }
+.meta { margin-top: 18px; font: 400 12.5px/1.5 var(--gmono); color: var(--faint); }
+
+/* the animated band */
+.flow { position: relative; height: clamp(300px, 38vw, 420px); }
+.flow canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gate { position: absolute; z-index: 2; width: 52px; height: 52px; margin: -26px 0 0 -26px; pointer-events: none; }
+.gate svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.lbl { position: absolute; z-index: 2; transform: translateY(-50%); display: flex; gap: 10px; align-items: baseline; padding: 5px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font: 400 12px/1.2 var(--gmono); color: var(--dim); white-space: nowrap; pointer-events: none; }
+.lbl i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); align-self: center; }
+.lbl b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .lbl { font-size: 10.5px; padding: 4px 6px; } }
+
+/* sections in Linear's pattern: short heading, one line */
+.sec-h { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 48px; align-items: end; }
+h2 { margin: 0; font: 500 clamp(28px, 3.4vw, 40px)/1.1 var(--sans); letter-spacing: -.03em; text-wrap: balance; }
+.sec-h p { margin: 0; color: var(--dim); font-size: 16px; max-width: 46ch; }
+@media (max-width: 760px) { .sec-h { grid-template-columns: 1fr; } }
+.reel-pad { padding: 0 clamp(12px, 3vw, 40px) 40px; margin-top: 40px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid3 > div { padding: 32px clamp(20px, 3vw, 36px) 36px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
+.grid3 > div:nth-child(3n) { border-right: 0; }
+.grid3 > div:nth-last-child(-n+3) { border-bottom: 0; }
+.grid3 h3 { margin: 0 0 8px; font: 500 15.5px/1.35 var(--sans); letter-spacing: -.01em; }
+.grid3 p { margin: 0; color: var(--dim); font-size: 14.5px; line-height: 1.6; }
+.grid3 code, .steps code { font: 12.5px var(--mono); color: var(--ink); }
+.grid3 small { display: block; margin-bottom: 18px; font: 400 11.5px/1 var(--gmono); color: var(--faint); }
+@media (max-width: 860px) { .grid3 { grid-template-columns: 1fr; } .grid3 > div { border-right: 0; } .grid3 > div:nth-last-child(-n+3) { border-bottom: 1px solid var(--line); } .grid3 > div:last-child { border-bottom: 0; } }
+.groups { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.groups div { padding: 20px 18px 22px; border-right: 1px solid var(--line); min-width: 0; }
+.groups div:last-child { border-right: 0; }
+.groups b { display: flex; gap: 8px; align-items: center; font: 400 12.5px/1.3 var(--gmono); color: var(--ink); margin-bottom: 8px; }
+.groups b i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); flex: none; }
+.groups b i.o { background: none; box-shadow: inset 0 0 0 1.5px var(--c); }
+.groups p { margin: 0; font-size: 13.5px; color: var(--dim); line-height: 1.5; }
+@media (max-width: 960px) { .groups { grid-template-columns: repeat(3, minmax(0, 1fr)); } .groups div:nth-child(3) { border-right: 0; } .groups div:nth-child(-n+3) { border-bottom: 1px solid var(--line); } }
+@media (max-width: 560px) { .groups { grid-template-columns: 1fr 1fr; } .groups div { border-bottom: 1px solid var(--line); } .groups div:nth-child(odd) { border-right: 1px solid var(--line); } .groups div:nth-child(even) { border-right: 0; } }
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+.split > div { min-width: 0; }
+.split > div + div { border-left: 1px solid var(--line); }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } .split > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+.term { margin: 0; padding: 28px 30px; font: 400 13px/1.85 var(--mono); color: var(--dim); overflow-x: auto; background: var(--raise); height: 100%; box-sizing: border-box; }
+.term b { color: var(--ink); font-weight: 500; }
+.term .g { color: var(--safe); } .term .a { color: var(--need); }
+.steps { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 12px; }
+.steps li { display: grid; grid-template-columns: 22px 1fr; color: var(--dim); font-size: 15px; }
+.steps li::before { content: "–"; color: var(--faint); }
+.steps b { color: var(--ink); font-weight: 500; }
+.install { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 36px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.install > div { padding: 22px 24px; min-width: 0; }
+.install > div + div { border-left: 1px solid var(--line); }
+.install small { display: block; font: 400 11.5px/1 var(--gmono); color: var(--faint); margin-bottom: 12px; }
+.install h3 { margin: 0 0 4px; font: 500 15px/1.35 var(--sans); }
+.install p { margin: 0; color: var(--dim); font-size: 14px; }
+.install code { font: 12.5px var(--mono); color: var(--ink); }
+@media (max-width: 760px) { .install { grid-template-columns: 1fr; } .install > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+.foot { display: flex; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding: 26px clamp(20px, 5vw, 64px) 90px; font: 400 12.5px/1.6 var(--sans); color: var(--faint); }
+.foot nav { display: flex; gap: 22px; }
+.foot a { text-decoration: none; } .foot a:hover { color: var(--ink); }
+
+/* =================================================================
+   THE REEL: a 960×600 mock of the Maxwell window, scaled to fit
+   ================================================================= */
+.reel-frame { position: relative; width: 100%; max-width: 100%; aspect-ratio: 960 / 640; }
+.reel { position: absolute; left: 0; top: 0; width: 960px; height: 640px; transform-origin: 0 0;
+  display: grid; grid-template-rows: 34px minmax(0, 1fr) 76px 24px; overflow: hidden; isolation: isolate;
+  font: 400 12px/1.5 var(--mono); color: var(--r-ink); background: var(--r-bg);
+  border: 1px solid var(--r-line2); border-radius: 11px; box-shadow: var(--r-shadow, none); }
+.r-top { display: flex; align-items: stretch; background: var(--r-chrome); border-bottom: 1px solid var(--r-line); }
+.r-dots { display: flex; gap: 8px; align-items: center; padding: 0 14px; }
+.r-dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--r-line2); }
+.r-tab { display: flex; align-items: center; gap: 8px; padding: 0 16px; background: var(--r-bg); border-inline: 1px solid var(--r-line); margin-bottom: -1px; }
+.r-top .sp { flex: 1; }
+.r-top .ic { display: flex; align-items: center; gap: 16px; padding: 0 14px; color: var(--r-dim); }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--r-dim)); flex: none; }
+.r-body { display: grid; grid-template-columns: 250px minmax(0, 1fr) 0px; min-height: 0; transition: grid-template-columns .55s cubic-bezier(.2, .8, .2, 1); }
+.reel.viewer .r-body { grid-template-columns: 250px minmax(0, 1fr) 280px; }
+.r-side { background: var(--r-panel); border-right: 1px solid var(--r-line); overflow: hidden; }
+.r-proj { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--r-line); font-weight: 500; }
+.r-proj svg { width: 14px; height: 14px; }
+.r-proj span { color: var(--r-dim); font-weight: 400; }
+.r-proj kbd { margin-left: auto; font: inherit; font-size: 11px; color: var(--r-dim); }
+.r-g { display: flex; gap: 8px; padding: 8px 14px 2px; font-weight: 500; color: var(--c); }
+.r-g span { color: var(--r-dim); font-weight: 400; }
+.r-row { position: relative; margin: 1px 7px; padding: 4px 8px 4px 24px; border-radius: 5px; line-height: 1.4; }
+.r-row .gl { position: absolute; left: 9px; top: 4px; color: var(--c); }
+.r-row b { display: flex; justify-content: space-between; gap: 8px; font-weight: 500; white-space: nowrap; }
+.r-row b em { font-style: normal; font-weight: 400; color: var(--r-dim); }
+.r-row small { display: block; font-size: 11px; color: var(--r-dim); white-space: nowrap; }
+.r-row.sel { background: var(--r-sel); box-shadow: inset 2px 0 0 var(--c); }
+.r-row.in { animation: rIn .6s cubic-bezier(.2, .8, .2, 1); }
+.r-row.out { animation: rOut .35s ease-in forwards; }
+@keyframes rIn { from { background: var(--r-flash); transform: translateX(-8px); } }
+@keyframes rOut { to { opacity: 0; transform: translateX(-12px); } }
+.r-row .mv { display: inline-block; margin-top: 5px; padding: 2px 7px; border: 1px solid var(--r-line2); border-radius: 4px; font-size: 11px; color: var(--r-ink); background: var(--r-bg); transition: background-color .15s, transform .15s; }
+.r-row .mv.press { background: var(--r-ink); color: var(--r-bg); transform: scale(.96); }
+.r-checks { list-style: none; margin: 6px 0 2px; padding: 0; font-size: 11px; color: var(--r-dim); }
+.r-checks li { display: flex; gap: 7px; white-space: nowrap; animation: rFade .3s ease-out; }
+.r-checks li i { font-style: normal; color: var(--r-safe); }
+@keyframes rFade { from { opacity: 0; transform: translateY(-3px); } }
+.r-term { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.r-head { display: flex; align-items: center; gap: 9px; height: 31px; flex: none; padding: 0 16px; border-bottom: 1px solid var(--r-line); white-space: nowrap; }
+.r-head b { font-weight: 500; }
+.r-head span { color: var(--r-dim); }
+.r-banner { display: flex; align-items: center; gap: 9px; padding: 6px 16px; flex: none; background: var(--r-needbg); border-bottom: 1px solid var(--r-line); animation: rFade .3s ease-out; }
+.r-screen { padding: 14px 18px; white-space: pre; overflow: hidden; line-height: 1.62; flex: 1; }
+.r-screen .d { color: var(--r-dim); }
+.r-screen .a { color: var(--r-need); }
+.r-screen .g { color: var(--r-safe); }
+.r-screen .p { background: var(--r-ink); color: var(--r-bg); }
+.r-screen .ln { animation: rFade .35s ease-out both; }
+.r-view { background: var(--r-panel); border-left: 1px solid var(--r-line); overflow: hidden; }
+.r-view-in { width: 280px; }
+.r-view header { display: flex; justify-content: space-between; height: 31px; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--r-line); color: var(--r-dim); }
+.r-view header b { font-weight: 500; color: var(--r-ink); }
+.r-md { padding: 14px 18px; font: 400 12.5px/1.55 var(--sans); }
+.r-md h4 { margin: 0 0 8px; font: 600 17px/1.2 var(--sans); letter-spacing: -.01em; }
+.r-md h5 { margin: 14px 0 4px; font: 600 12.5px/1.3 var(--sans); }
+.r-md p, .r-md ol { margin: 0 0 8px; color: var(--r-ink); }
+.r-md ol { padding-left: 18px; }
+.r-md blockquote { margin: 10px 0 0; padding: 6px 10px; border-left: 2px solid var(--r-need); background: var(--r-bg); color: var(--r-dim); }
+.r-md code { font: 11.5px var(--mono); }
+.r-usage { display: grid; grid-template-columns: 1.25fr 1fr; background: var(--r-panel); border-top: 1px solid var(--r-line); transition: background-color .4s; }
+.reel.uhot .r-usage { background: var(--r-sel); }
+.r-u { display: grid; grid-template-columns: 62px minmax(0, 1fr) 34px minmax(0, 1fr) 34px; gap: 3px 10px; align-content: center; padding: 0 16px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.r-u + .r-u { border-left: 1px solid var(--r-line); grid-template-columns: 62px minmax(0, 1fr) 40px minmax(0, 1fr) 54px; }
+.r-u .h { color: var(--r-dim); font-size: 10px; letter-spacing: .06em; }
+.r-u .n { text-align: right; }
+.bar { height: 3px; background: var(--r-line); border-radius: 2px; overflow: hidden; align-self: center; }
+.bar i { display: block; height: 100%; background: var(--r-dim); transition: width 1.4s cubic-bezier(.3, .7, .2, 1), background-color .3s; }
+.bar i.hot { background: var(--r-need); }
+.r-status { display: flex; align-items: center; gap: 16px; padding: 0 12px; background: var(--r-chrome); border-top: 1px solid var(--r-line); font-size: 11px; color: var(--r-dim); white-space: nowrap; overflow: hidden; }
+.r-status b { font-weight: 500; color: var(--c); }
+.r-status .sp { flex: 1; }
+.r-notif { position: absolute; right: 14px; top: 44px; width: 300px; display: grid; grid-template-columns: 34px 1fr; gap: 3px 11px; padding: 11px 13px; z-index: 5;
+  font: 400 12px/1.4 var(--sans); color: var(--r-ink); background: var(--r-pop); border: 1px solid var(--r-line2); border-radius: 13px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.22); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  transform: translateX(340px); transition: transform .55s cubic-bezier(.2, .9, .25, 1.05); }
+.reel.notif .r-notif { transform: none; }
+.r-notif .ico { grid-row: span 3; width: 34px; height: 34px; border-radius: 8px; background: #1b1c1f; display: grid; place-items: center; }
+.r-notif .ico svg { width: 22px; height: 22px; }
+.r-notif b { font-weight: 600; display: flex; justify-content: space-between; }
+.r-notif b span { font-weight: 400; color: var(--r-dim); }
+.r-notif small { color: var(--r-dim); font-size: 12px; }
+.r-pal { position: absolute; left: 50%; top: 82px; width: 470px; margin-left: -235px; z-index: 6; background: var(--r-pop); border: 1px solid var(--r-line2); border-radius: 10px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.28); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  opacity: 0; transform: translateY(-6px) scale(.985); transition: opacity .18s, transform .18s; pointer-events: none; overflow: hidden; }
+.reel.pal .r-pal { opacity: 1; transform: none; }
+.r-pal .q { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--r-line); font-size: 13px; }
+.r-pal .q span { color: var(--r-dim); }
+.r-pal .q i { display: inline-block; width: 7px; height: 15px; background: var(--r-ink); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.r-pal ul { list-style: none; margin: 0; padding: 5px; }
+.r-pal li { display: grid; grid-template-columns: 14px 1fr auto; gap: 9px; padding: 6px 9px; border-radius: 6px; align-items: baseline; }
+.r-pal li.sel { background: var(--r-sel); }
+.r-pal li b { font-weight: 500; }
+.r-pal li b mark { background: none; color: var(--r-need); text-decoration: underline; text-underline-offset: 3px; }
+.r-pal li small { color: var(--r-dim); font-size: 11px; grid-column: 2; }
+.r-pal li em { font-style: normal; color: var(--r-dim); font-size: 11px; }
+.r-pal footer { padding: 7px 14px; border-top: 1px solid var(--r-line); color: var(--r-dim); font-size: 11px; }
+.r-toast { position: absolute; left: 50%; bottom: 116px; transform: translate(-50%, 10px); z-index: 5; padding: 8px 14px; border-radius: 8px; background: var(--r-ink); color: var(--r-bg); opacity: 0; transition: opacity .25s, transform .25s; white-space: nowrap; }
+.reel.toast .r-toast { opacity: 1; transform: translate(-50%, 0); }
+.r-keys { position: absolute; left: 270px; bottom: 116px; z-index: 7; display: flex; gap: 5px; opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; }
+.reel.keys .r-keys { opacity: 1; transform: none; }
+.r-keys kbd { min-width: 34px; padding: 7px 10px; text-align: center; font: 500 15px/1 var(--mono); color: var(--r-ink); background: var(--r-pop); border: 1px solid var(--r-line2); border-bottom-width: 3px; border-radius: 7px; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.chapters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.chapters button { all: unset; cursor: pointer; display: grid; gap: 8px; font: 400 12px/1.35 var(--mono); color: var(--ch-dim); min-width: 0; }
+.chapters button i { display: block; height: 2px; background: var(--ch-line); border-radius: 1px; overflow: hidden; }
+.chapters button i b { display: block; height: 100%; width: 0; background: var(--ch-ink); }
+.chapters button[aria-current="true"] { color: var(--ch-ink); }
+.chapters button:hover { color: var(--ch-ink); }
+.chapters button:focus-visible { outline: 1px solid var(--ch-ink); outline-offset: 4px; }
+.chapters button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 560px) { .chapters { gap: 6px; } .chapters button { font-size: 10.5px; } }
+
+
+.reel-wrap { --r-bg: #111113; --r-panel: #141416; --r-chrome: #0e0e10; --r-ink: #e3e5e8; --r-dim: #8b9097; --r-line: #222327; --r-line2: #34363b; --r-sel: #1f2024;
+  --r-need: var(--need); --r-turn: var(--turn); --r-safe: var(--safe); --r-needbg: rgba(240,163,58,.1); --r-flash: rgba(240,163,58,.22); --r-pop: rgba(30,31,35,.94); --r-shadow: 0 30px 80px rgba(0,0,0,.45);
+  --ch-ink: var(--ink); --ch-dim: var(--faint); --ch-line: var(--line); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+</style>
+<style>[hidden]{display:none!important} body{padding-top:env(safe-area-inset-top,0px)}</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="demon" viewBox="0 0 7 7"><path fill="currentColor" d="M0 0h1v1H0zM6 0h1v1H6zM0 1h2v1H0zM5 1h2v1H5zM1 2h5v1H1zM1 3h1v1H1zM3 3h1v1H3zM5 3h1v1H5zM1 4h5v1H1zM2 5h3v1H2zM2 6h1v1H2zM4 6h1v1H4z"/></symbol>
+  <symbol id="apple" viewBox="0 0 16 16"><path fill="currentColor" d="M11.2 8.5c0-1.6 1.3-2.4 1.4-2.4-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6C4.4 4.8 3.3 5.5 2.7 6.6c-1.2 2.1-.3 5.2.9 6.9.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.2-.5s1.3.5 2.2.5 1.5-.9 2-1.7c.6-.9.9-1.8.9-1.9 0 0-1.8-.7-1.8-3.1ZM9.6 3.6c.4-.5.8-1.3.7-2-.6 0-1.4.4-1.9 1-.4.5-.8 1.2-.7 1.9.7.1 1.4-.4 1.9-.9Z"/></symbol>
+  <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 0Z"/></symbol>
+</svg>
+
+<main>
+  <div class="band" style="border-top:0"><div class="frame">
+    <header class="nav"><b><svg aria-hidden="true"><use href="#demon"/></svg>Maxwell</b><nav><a class="hide-s" href="#features">Features</a><a class="hide-s" href="#install">Install</a><a href="https://github.com/robinsadeghpour/maxwell">GitHub</a></nav></header>
+  </div></div>
+
+  <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="hero">
+      <h1>The session manager for Claude Code</h1>
+      <p class="lede">See every Claude Code session across your projects and accounts: which ones need you, which are still working, and which you can close.</p>
+      <div class="ctas">
+        <a class="btn" href="https://github.com/robinsadeghpour/maxwell/releases/latest"><svg aria-hidden="true"><use href="#apple"/></svg>Download for macOS</a>
+        <a class="btn ghost" href="https://github.com/robinsadeghpour/maxwell"><svg aria-hidden="true"><use href="#gh"/></svg>View on GitHub</a>
+      </div>
+      <p class="meta">Free and open source · MIT · macOS</p>
+    </div>
+  </div></div>
+
+  <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="flow" id="flow">
+      <canvas id="flow-cv" role="img" aria-label="Animation: session events flow in from the left, pass through Maxwell, and leave sorted into four lines: needs you, your turn, working, safe to close."></canvas>
+      <div class="gate" id="gate"></div>
+      <div id="lbls"></div>
+    </div>
+  </div></div>
+
+  <div class="band" id="features"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="in" style="padding-bottom:0">
+      <div class="sec-h"><h2>One window for every session</h2><p>The Claude session in the middle, everything else you have running on the left, usage for each account along the bottom.</p></div>
+    </div>
+    <div class="reel-pad"><div class="reel-wrap" data-reel></div></div>
+  </div></div>
+
+  <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="in" style="padding-bottom:40px">
+      <div class="sec-h"><h2>Sorted by what they need</h2><p>Each session is in exactly one group. You only have to look at the first two.</p></div>
+    </div>
+    <div class="groups">
+      <div style="--c:var(--need)"><b><i></i>Needs you</b><p>Asked a question or wants a permission.</p></div>
+      <div style="--c:var(--turn)"><b><i></i>Your turn</b><p>Finished its reply and is waiting.</p></div>
+      <div style="--c:var(--work)"><b><i></i>Working</b><p>Still running.</p></div>
+      <div style="--c:var(--need)"><b><i class="o"></i>Limited</b><p>Hit a usage limit.</p></div>
+      <div style="--c:var(--safe)"><b><i class="o"></i>Safe to close</b><p>Done, with proof.</p></div>
+      <div style="--c:var(--faint)"><b><i></i>Idle</b><p>Quiet for a day.</p></div>
+    </div>
+  </div></div>
+
+  <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="grid3">
+      <div><h3>Notifications</h3><p>A Mac notification when a session asks you something. ⌘J opens the next one.</p></div>
+      <div><h3>Every account</h3><p>5-hour and weekly usage per account. ⌘T starts a session on the one with the most left.</p></div>
+      <div><h3>Search</h3><p>⌘P finds a session by title, project, branch, account, last message or a file it touched.</p></div>
+      <div><h3>The real session</h3><p>The middle pane is the Claude session itself, in a Ghostty terminal. Closing Maxwell doesn't stop it.</p></div>
+      <div><h3>Files beside it</h3><p>Markdown files a session writes open rendered on the right.</p></div>
+      <div><h3>Projects</h3><p>A rail on the left switches projects. Pin the ones you use; the rest show up when they need you.</p></div>
+    </div>
+  </div></div>
+
+  <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="split">
+      <div class="in">
+        <h2>Safe to close</h2>
+        <p class="lede" style="font-size:16px;margin-top:14px">A session is only marked safe when every check passes. If a check can't run, it isn't safe.</p>
+        <ul class="steps">
+          <li><span>Nothing is running, including background tasks and subagents.</span></li>
+          <li><span>No new activity for 2 hours.</span></li>
+          <li><span>Git is clean and pushed, and the PR is merged.</span></li>
+          <li><span>Haiku reads the last message and confirms it's finished.</span></li>
+          <li><span>Closing runs <code>claude stop</code>. You can undo it or reopen it later.</span></li>
+        </ul>
+      </div>
+      <div><pre class="term" data-term></pre></div>
+    </div>
+  </div></div>
+
+  <div class="band" id="install"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <div class="in">
+      <div class="sec-h"><h2>Install</h2><p>Everything stays on your Mac. Nothing is sent anywhere except the Haiku reads, through your own Claude account.</p></div>
+      <div class="install">
+        <div><small>1</small><h3>Download</h3><p>Unzip the latest release and move Maxwell to Applications.</p></div>
+        <div><small>2</small><h3>Install hooks</h3><p>Choose Maxwell › Install Hooks. Your settings are backed up first.</p></div>
+        <div><small>3</small><h3>Add accounts</h3><p>One line per account in <code>~/.config/maxwell/config</code>.</p></div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
+    <footer class="foot"><span>Maxwell is free and open source under the MIT licence. Named after Maxwell's demon.</span><nav><a href="https://github.com/robinsadeghpour/maxwell">GitHub</a><a href="https://github.com/robinsadeghpour/maxwell/releases">Releases</a><a href="https://ghostty.org">Ghostty</a></nav></footer>
+  </div></div>
+</main>
+
+<script>
+(() => {
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const DEMON = ["1000001", "1100011", "0111110", "0101010", "0111110", "0011100", "0010100"];
+const DEMON_SVG = '<svg viewBox="0 0 7 7" aria-hidden="true"><use href="#demon"/></svg>';
+const cssv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const hex3 = (h) => { h = h.replace('#', ''); const n = parseInt(h, 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+const DPR = () => Math.min(devicePixelRatio || 1, 2);
+
+const SESS = {
+  'stripe-webhooks':      { acct: 'work',     proj: 'api' },
+  'web-auth':             { acct: 'work',     proj: 'web' },
+  'onboarding-copy':      { acct: 'personal', proj: 'web' },
+  'flaky-e2e':            { acct: 'work2',    proj: 'web' },
+  'ios-push':             { acct: 'work',     proj: 'ios' },
+  'fix-logo-orientation': { acct: 'work2',    proj: 'maxwell' },
+  'release-v0.1.7':       { acct: 'work2',    proj: 'maxwell' },
+  'landing-page':         { acct: 'personal', proj: 'web' },
+};
+const AGE = { 'stripe-webhooks': '2m', 'web-auth': '18m', 'onboarding-copy': '6m', 'flaky-e2e': '41m', 'ios-push': '9m', 'fix-logo-orientation': '3m', 'release-v0.1.7': '2h', 'landing-page': '5h' };
+const GROUPS = [
+  { k: 'need', label: 'Needs you', glyph: '●', c: 'var(--r-need)' },
+  { k: 'turn', label: 'Your turn', glyph: '◐', c: 'var(--r-turn)' },
+  { k: 'work', label: 'Working', glyph: '○', c: 'var(--r-dim)' },
+  { k: 'limited', label: 'Limited', glyph: '◇', c: 'var(--r-need)' },
+  { k: 'safe', label: 'Safe to close', glyph: '✓', c: 'var(--r-safe)' },
+];
+const CHECKS = [
+  ['Nothing running', 'hooks · 0 tasks'], ['Quiet for 2h 14m', 'events.jsonl'], ['Asks nothing', 'last message'],
+  ['Git clean, pushed', 'origin/main'], ['PR #212 merged', 'gh'], ['Haiku: finished', '$0.0002'],
+];
+const L = (s, cls = '') => `<span class="ln ${cls}">${s}</span>`;
+const SCREENS = {
+  head: (name) => `<span class="d">✻ Claude Code · Opus 5.5 · ~/projects/${SESS[name].proj}</span>\n\n`,
+  working: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; Add idempotency keys to the Stripe webhook handler</span>\n\n` +
+    `  Read <b>3</b> files · Edited webhooks.ts <span class="g">+42</span> <span class="a">−7</span>\n` +
+    `  Wrote migrations/0042_event_keys.sql\n\n` +
+    `<span class="d">✻ Running tests… (1m 12s · esc to interrupt)</span>`,
+  needs: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; Add idempotency keys to the Stripe webhook handler</span>\n\n` +
+    `  Read <b>3</b> files · Edited webhooks.ts <span class="g">+42</span> <span class="a">−7</span>\n\n` +
+    L(`● Tests pass. The migration adds a unique index on events.key.\n`) +
+    L(`\n<b>Run it on staging now?</b>\n\n`) +
+    L(`<span class="a">❯</span> 1. Yes, run it\n  2. No, I'll run it later\n  3. Type something\n`) +
+    L(`\n<span class="d">Enter to select · ↑/↓ to navigate · Esc to cancel</span>`),
+  answered: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; Add idempotency keys to the Stripe webhook handler</span>\n\n` +
+    `  ● Tests pass. The migration adds a unique index on events.key.\n` +
+    `  <span class="d">❯ 1. Yes, run it</span>\n\n` +
+    L(`  Bash(npm run migrate -- --env staging)\n`) +
+    L(`<span class="d">✻ Migrating… (4s · esc to interrupt)</span>`),
+  logo: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; The project logos render upside down in the rail</span>\n\n` +
+    `  Read ProjectLogo.swift, IconArt.swift\n` +
+    `  Edited ProjectLogo.swift <span class="g">+9</span> <span class="a">−4</span>\n\n` +
+    `● Fixed. Bitmap rows are now read top-down, and a test\n  checks the orientation of all six logos.\n\n` +
+    `  Want me to also redraw the monogram fallback?`,
+  release: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; Release 0.1.7 with the update notes</span>\n\n` +
+    `  Bash(./release.sh 0.1.7 "Maxwell Dev and in-app updates")\n` +
+    `  <span class="g">✓</span> 41 tests passed\n  <span class="g">✓</span> Published github.com/…/releases/tag/v0.1.7\n\n` +
+    `● Released and verified. Nothing left to do here.`,
+  limited: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; Add rich push notifications with images</span>\n\n` +
+    `  Edited NotificationService.swift <span class="g">+120</span>\n\n` +
+    L(`<span class="a">⎿ You've hit your limit · resets 6:40pm</span>\n`) +
+    L(`  <span class="d">/upgrade or wait for the window to reset</span>`),
+  moved: (n) => SCREENS.head(n) +
+    `<span class="p">&gt; Add rich push notifications with images</span>\n\n` +
+    `  Edited NotificationService.swift <span class="g">+120</span>\n\n` +
+    L(`<span class="d">Resumed on work2 · same conversation</span>\n\n`) +
+    L(`<span class="d">✻ Writing the image attachment test… (6s)</span>`),
+  plan: (n, wrote) => SCREENS.head(n) +
+    `<span class="p">&gt; Plan the idempotency work before you start</span>\n\n` +
+    `  Read webhooks.ts, events.ts, schema.prisma\n\n` +
+    (wrote ? L(`  Wrote <u>docs/plan.md</u> <span class="d">(38 lines)</span>\n\n`) + L(`● The plan is in docs/plan.md. Three steps, migration first.`) : `<span class="d">✻ Thinking… (14s)</span>`),
+};
+const PAL_ITEMS = [
+  { n: 'fix-logo-orientation', g: 'turn', m: 'maxwell · touched ProjectLogo.swift' },
+  { n: 'landing-page', g: 'safe', m: 'web · mentions logo.svg' },
+  { n: 'stripe-webhooks', g: 'work', m: 'api · webhooks.ts' },
+  { n: 'onboarding-copy', g: 'turn', m: 'web · "Offered two headlines"' },
+  { n: 'Close all safe', g: null, m: 'action · ⇧⌘X' },
+];
+
+function makeReel(host) {
+  host.innerHTML = `
+  <div class="reel-frame"><div class="reel" role="img" aria-label="Animated tour of the Maxwell window. Chapters below the animation pick a feature.">
+    <div class="r-top"><div class="r-dots"><i></i><i></i><i></i></div><div class="r-tab"><span class="dot" data-tabdot></span><span data-tab></span></div><div class="sp"></div><div class="ic"><span>＋</span><span>⌕</span><span>◐</span></div></div>
+    <div class="r-body">
+      <div class="r-side"><div class="r-proj">${DEMON_SVG}All projects <span data-count></span><kbd>⌘P</kbd></div><div data-side></div></div>
+      <div class="r-term"><div class="r-head" data-head></div><div data-banner></div><div class="r-screen" data-screen></div></div>
+      <div class="r-view"><div class="r-view-in"><header><b>plan.md</b><span data-pin>docs ⌥⌘P</span></header><div class="r-md">
+        <h4>Webhook idempotency</h4>
+        <p>Store each Stripe event once, keyed by its id. Retries hit the unique index and return 200.</p>
+        <h5>Steps</h5>
+        <ol><li>Migration: unique index on <code>events.key</code></li><li>Handler checks the key first</li><li>Backfill keys for the last 30 days</li></ol>
+        <h5>Risks</h5>
+        <p>Old events have no key. The backfill runs before the index.</p>
+        <blockquote>Run the migration on staging before prod.</blockquote>
+      </div></div></div>
+    </div>
+    <div class="r-usage">
+      <div class="r-u"><span class="h">USAGE</span><span class="h">5 HOURS</span><span></span><span class="h">WEEK</span><span></span><span data-acct="work">work</span><span class="bar"><i></i></span><span class="n"></span><span class="bar"><i></i></span><span class="n"></span><span data-acct="work2">work2</span><span class="bar"><i></i></span><span class="n"></span><span class="bar"><i></i></span><span class="n"></span><span data-acct="personal">personal</span><span class="bar"><i></i></span><span class="n"></span><span class="bar"><i></i></span><span class="n"></span></div>
+      <div class="r-u"><span class="h">SYSTEM</span><span class="h">CPU</span><span></span><span class="h">MEMORY</span><span></span><span>claude 8</span><span class="bar"><i style="width:6%"></i></span><span class="n">2.0%</span><span class="bar"><i style="width:25%"></i></span><span class="n">1.9 GB</span><span>maxwell</span><span class="bar"><i style="width:1%"></i></span><span class="n">0.4%</span><span class="bar"><i style="width:4%"></i></span><span class="n">131 MB</span><span>machine</span><span class="bar"><i style="width:31%"></i></span><span class="n">31%</span><span class="bar"><i style="width:72%"></i></span><span class="n">34/48 GB</span></div>
+    </div>
+    <div class="r-status" data-status></div>
+    <div class="r-notif"><span class="ico" style="color:#e3e5e8">${DEMON_SVG}</span><b>Maxwell <span>now</span></b><span>stripe-webhooks needs you</span><small>Run it on staging now?</small></div>
+    <div class="r-pal"><div class="q"><span>⌕</span><b data-q></b><i></i></div><ul data-pal></ul><footer>↑↓ move · ⏎ open · esc close</footer></div>
+    <div class="r-toast" data-toast></div>
+    <div class="r-keys" data-keys></div>
+  </div></div>
+  <div class="chapters" role="tablist" aria-label="Tour chapters"></div>`;
+  const R = host.querySelector('.reel'), frame = host.querySelector('.reel-frame');
+  const $ = (s) => host.querySelector(s);
+  const side = $('[data-side]'), head = $('[data-head]'), banner = $('[data-banner]'), screen = $('[data-screen]');
+  const bars = host.querySelectorAll('.r-usage .r-u:first-child .bar i'), nums = host.querySelectorAll('.r-usage .r-u:first-child .n');
+  const fit = () => { R.style.transform = `scale(${frame.clientWidth / 960})`; };
+  new ResizeObserver(fit).observe(frame); fit();
+
+  let st, timers = [], scene = 0, running = false, chapterBars = [];
+  const base = () => ({
+    groups: { need: ['web-auth'], turn: ['onboarding-copy', 'fix-logo-orientation'], work: ['stripe-webhooks', 'flaky-e2e', 'ios-push'], limited: [], safe: ['release-v0.1.7', 'landing-page'] },
+    active: 'stripe-webhooks', screen: SCREENS.working('stripe-webhooks'), banner: null,
+    expanded: null, checks: 0, moveBtn: null, inRow: null, outRow: null,
+    usage: { work: [49, 61], work2: [4, 87], personal: [0, 71] }, acctOverride: {},
+  });
+  function where(name) { for (const g of GROUPS) if (st.groups[g.k].includes(name)) return g; return GROUPS[2]; }
+  function move(name, to, front = true) {
+    for (const g of GROUPS) st.groups[g.k] = st.groups[g.k].filter((n) => n !== name);
+    if (front) st.groups[to].unshift(name); else st.groups[to].push(name);
+    st.inRow = name;
+  }
+  function render() {
+    let h = '', total = 0;
+    for (const g of GROUPS) {
+      const items = st.groups[g.k]; if (!items.length) continue; total += items.length;
+      h += `<div class="r-g" style="--c:${g.c}">${g.label} <span>${items.length}</span></div>`;
+      for (const n of items) {
+        const acct = st.acctOverride[n] || SESS[n].acct;
+        const cls = ['r-row', n === st.active ? 'sel' : '', n === st.inRow ? 'in' : '', n === st.outRow ? 'out' : ''].join(' ');
+        let extra = '';
+        if (st.expanded === n) extra = `<ul class="r-checks">${CHECKS.slice(0, st.checks).map(([a, b]) => `<li><i>✓</i>${a} <span style="margin-left:auto">${b}</span></li>`).join('')}</ul>`;
+        if (g.k === 'limited') extra = `<small>resets 18:40 · work at 100%</small>` + (st.moveBtn ? `<span class="mv ${st.moveBtn === 'press' ? 'press' : ''}">Move to work2 · 4% used →</span>` : '');
+        h += `<div class="${cls}" style="--c:${g.c}"><span class="gl">${g.glyph}</span><b>${n}<em>${AGE[n]}</em></b><small>${acct} · ${SESS[n].proj}</small>${extra}</div>`;
+      }
+    }
+    side.innerHTML = h;
+    $('[data-count]').textContent = total;
+    const g = where(st.active), acct = st.acctOverride[st.active] || SESS[st.active].acct;
+    head.innerHTML = `<span class="dot" style="--c:${g.c}"></span><b>${st.active}</b><span>${SESS[st.active].proj} › ${st.active}</span><span>[${acct}]</span>`;
+    $('[data-tab]').textContent = st.active; $('[data-tabdot]').style.setProperty('--c', g.c);
+    banner.innerHTML = st.banner ? `<div class="r-banner"><span class="dot" style="--c:var(--r-need)"></span>${st.banner}</div>` : '';
+    screen.innerHTML = st.screen;
+    ['work', 'work2', 'personal'].forEach((a, i) => {
+      const [h5, wk] = st.usage[a];
+      bars[i * 2].style.width = h5 + '%'; bars[i * 2].classList.toggle('hot', h5 >= 100);
+      bars[i * 2 + 1].style.width = wk + '%'; bars[i * 2 + 1].classList.toggle('hot', wk >= 85);
+      nums[i * 2].textContent = h5 + '%'; nums[i * 2 + 1].textContent = wk + '%';
+    });
+    const c = (k) => st.groups[k].length;
+    $('[data-status]').innerHTML = `<span><b style="--c:var(--r-need)">● ${c('need')}</b> needs you</span><span><b style="--c:var(--r-turn)">◐ ${c('turn')}</b> your turn</span><span><b style="--c:var(--r-dim)">○ ${c('work')}</b> working</span>${c('limited') ? `<span><b style="--c:var(--r-need)">◇ ${c('limited')}</b> limited</span>` : ''}<span><b style="--c:var(--r-safe)">✓ ${c('safe')}</b> safe</span><span class="sp"></span><span>J K move · ⏎ open · ⌘N new · ⇧⌘X close safe</span>`;
+    st.inRow = null;
+  }
+  const cls = (c, on) => R.classList.toggle(c, on);
+  let keyT;
+  function keys(...ks) { $('[data-keys]').innerHTML = ks.map((k) => `<kbd>${k}</kbd>`).join(''); cls('keys', true); clearTimeout(keyT); keyT = setTimeout(() => cls('keys', false), 1100); }
+  function toast(t) { $('[data-toast]').textContent = t; cls('toast', !!t); }
+  function pal(q, sel) {
+    const items = PAL_ITEMS.filter((it) => !q || (it.n + ' ' + it.m).toLowerCase().includes(q));
+    $('[data-q]').textContent = q;
+    $('[data-pal]').innerHTML = items.map((it, i) => {
+      const g = it.g ? GROUPS.find((x) => x.k === it.g) : null;
+      const name = q ? esc(it.n).replace(new RegExp(q, 'i'), (m) => `<mark>${m}</mark>`) : esc(it.n);
+      const meta = q ? esc(it.m).replace(new RegExp(q, 'i'), (m) => `<mark style="background:none;color:var(--r-need)">${m}</mark>`) : esc(it.m);
+      return `<li class="${i === sel ? 'sel' : ''}"><span style="color:${g ? g.c : 'var(--r-dim)'}">${g ? g.glyph : '›'}</span><b>${name}</b><em>${g ? g.label : ''}</em><small>${meta}</small></li>`;
+    }).join('');
+  }
+  function resetOverlays() { ['viewer', 'notif', 'pal', 'toast', 'keys', 'uhot'].forEach((c) => cls(c, false)); }
+
+  const SCENES = [
+    { name: 'Needs you', dur: 6400, steps: [
+      [700, () => { move('stripe-webhooks', 'need'); st.banner = 'Claude needs your permission'; st.screen = SCREENS.needs('stripe-webhooks'); render(); }],
+      [1000, () => cls('notif', true)],
+      [2900, () => keys('⌘J')],
+      [3900, () => keys('1', '⏎')],
+      [4300, () => { cls('notif', false); move('stripe-webhooks', 'work'); st.banner = null; st.screen = SCREENS.answered('stripe-webhooks'); render(); }],
+    ] },
+    { name: 'Search', dur: 6200, steps: [
+      [500, () => { keys('⌘P'); pal('', 0); cls('pal', true); }],
+      ...['l', 'lo', 'log', 'logo'].map((q, i) => [1100 + i * 170, () => pal(q, 0)]),
+      [2500, () => pal('logo', 1)], [2900, () => pal('logo', 0)],
+      [3500, () => { keys('⏎'); cls('pal', false); st.active = 'fix-logo-orientation'; st.screen = SCREENS.logo('fix-logo-orientation'); render(); }],
+    ] },
+    { name: 'Safe to close', dur: 7600, steps: [
+      [400, () => { keys('J', 'J'); st.active = 'release-v0.1.7'; st.expanded = 'release-v0.1.7'; st.screen = SCREENS.release('release-v0.1.7'); render(); }],
+      ...CHECKS.map((_, i) => [900 + i * 380, () => { st.checks = i + 1; render(); }]),
+      [3900, () => keys('⇧⌘X')],
+      [4400, () => { st.outRow = 'release-v0.1.7'; render(); st.outRow = null; }],
+      [4750, () => { st.groups.safe = st.groups.safe.filter((n) => n !== 'release-v0.1.7'); st.active = 'landing-page'; st.expanded = null; st.screen = SCREENS.head('landing-page') + '<span class="d">● Shipped. The page is live and the PR is merged.</span>'; render(); toast('Closed release-v0.1.7 · ⌘Z to undo'); }],
+      [7000, () => toast('')],
+    ] },
+    { name: 'Usage', dur: 7200, steps: [
+      [300, () => cls('uhot', true)],
+      [500, () => { st.usage.work = [100, 74]; render(); }],
+      [1700, () => { move('ios-push', 'limited'); st.active = 'ios-push'; st.screen = SCREENS.limited('ios-push'); render(); }],
+      [2600, () => { st.moveBtn = 'show'; render(); }],
+      [3800, () => { st.moveBtn = 'press'; render(); }],
+      [4200, () => { st.moveBtn = null; st.acctOverride['ios-push'] = 'work2'; move('ios-push', 'work'); st.usage.work2 = [9, 88]; st.screen = SCREENS.moved('ios-push'); render(); toast('Moved ios-push to work2'); }],
+      [6300, () => { toast(''); cls('uhot', false); }],
+    ] },
+    { name: 'Files beside', dur: 6600, steps: [
+      [400, () => { st.screen = SCREENS.plan('stripe-webhooks', false); render(); }],
+      [1300, () => { st.screen = SCREENS.plan('stripe-webhooks', true); render(); }],
+      [1900, () => cls('viewer', true)],
+      [4300, () => keys('⌥⌘P')],
+      [4500, () => { $('[data-pin]').textContent = 'pinned'; }],
+    ] },
+  ];
+  const chapters = host.querySelector('.chapters');
+  chapters.innerHTML = SCENES.map((s, i) => `<button role="tab" data-i="${i}"><i><b></b></i><span>${s.name}</span></button>`).join('');
+  chapterBars = [...chapters.querySelectorAll('b')];
+  chapters.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) play(+b.dataset.i, true); });
+
+  function clear() { timers.forEach(clearTimeout); timers = []; }
+  function setChapters(i, dur, animate) {
+    chapters.querySelectorAll('button').forEach((b, k) => b.setAttribute('aria-current', k === i ? 'true' : 'false'));
+    chapterBars.forEach((b, k) => { b.style.transition = 'none'; b.style.width = k < i ? '100%' : '0%'; });
+    const b = chapterBars[i];
+    if (!animate) { b.style.width = '100%'; return; }
+    void b.offsetWidth; b.style.transition = `width ${dur}ms linear`; b.style.width = '100%';
+  }
+  function play(i, user) {
+    clear(); scene = i; st = base(); resetOverlays(); $('[data-pin]').textContent = 'docs ⌥⌘P';
+    const sc = SCENES[i];
+    if (i === 1) { st.active = 'stripe-webhooks'; }
+    render();
+    if (REDUCED || !running) { // jump to the scene's end state, no motion
+      sc.steps.forEach(([, fn]) => fn()); cls('keys', false); setChapters(i, 0, false); return;
+    }
+    setChapters(i, sc.dur, true);
+    for (const [t, fn] of sc.steps) timers.push(setTimeout(fn, t));
+    timers.push(setTimeout(() => play((i + 1) % SCENES.length), sc.dur));
+  }
+  return {
+    start() { running = !REDUCED; play(scene); },
+    stop() { running = false; clear(); },
+  };
+}
+
+
+
+/* the demon, drawn in the same dots as the flow */
+document.getElementById('gate').innerHTML = `<svg viewBox="-.5 -.5 7 7" aria-hidden="true">${DEMON.map((r, y) => [...r].map((v, x) => {
+  const eye = y === 3 && (x === 2 || x === 4);
+  return `<circle cx="${x}" cy="${y}" r="${v === '1' ? .4 : eye ? .4 : .14}" fill="${v === '1' ? 'var(--ink)' : eye ? 'var(--need)' : 'var(--line)'}"/>`;
+}).join('')).join('')}</svg>`;
+
+/* =================================================================
+   The flow: particles in, through the gate, out in four lines.
+   mode 0 Streams: horizontal lines converge on the gate and fan out.
+   mode 1 Rays: straight rays in from every side, four rays out.
+   mode 2 Quiet: Streams with few, slow dots.
+   ================================================================= */
+function makeFlow(cv) {
+  const gl = cv.getContext('webgl', { antialias: true, alpha: false, premultipliedAlpha: false });
+  if (!gl) return { start() {}, tick() {}, mode() {} };
+  const VS = `attribute vec4 a; attribute float j;
+  uniform float t, mode, NIN, dpr; uniform vec2 res, g; uniform float laneGap, R;
+  uniform vec3 c0, c1, c2, c3, cdim;
+  varying vec4 vc;
+  vec2 inP(float idx, float k) {
+    if (mode < .5 || mode > 1.5) {
+      float ly = res.y * (.08 + .84 * idx / (NIN - 1.));
+      float x = mix(-10., g.x, k);
+      float y = mix(ly, g.y, smoothstep(.35, 1., k));
+      return vec2(x, y);
+    }
+    float ang = 6.2832 * idx / NIN + .13;
+    return g + mix(R, 26., k) * vec2(cos(ang), sin(ang));
+  }
+  vec2 outP(float ty, float k) {
+    if (mode < .5 || mode > 1.5) {
+      float ly = g.y + (ty - 1.5) * laneGap;
+      return vec2(mix(g.x, res.x + 10., k), mix(g.y, ly, smoothstep(0., .4, k)));
+    }
+    float ang = (ty - 1.5) * .3;
+    return g + mix(26., R, k) * vec2(cos(ang), sin(ang));
+  }
+  void main() {
+    float u = fract(a.x + t * a.y);
+    vec2 p; vec3 col; float al;
+    if (u < .5) {
+      float k = u / .5; p = inP(a.z, k); p.y += j * 1.5 * (1. - k);
+      col = cdim; al = smoothstep(0., .1, k) * .55;
+    } else {
+      float k = (u - .5) / .5; int ty = int(a.w);
+      p = outP(a.w, k); p.y += j * 1.5 * k;
+      col = ty == 0 ? c0 : ty == 1 ? c1 : ty == 2 ? c2 : c3;
+      al = (1. - smoothstep(.85, 1., k)) * .95;
+    }
+    float d = length(p - g); al *= smoothstep(18., 30., d);
+    vc = vec4(col, al);
+    gl_Position = vec4(p / res * 2. - 1., 0., 1.); gl_Position.y *= -1.;
+    gl_PointSize = (mode > 1.5 ? 3. : 2.) * dpr;
+  }`;
+  const FS = `precision mediump float; varying vec4 vc; uniform float round;
+  void main() { vec2 q = gl_PointCoord - .5; if (round > .5 && dot(q, q) > .25) discard; gl_FragColor = vc; }`;
+  const LVS = `attribute vec2 p; uniform vec2 res; void main() { gl_Position = vec4(p / res * 2. - 1., 0., 1.); gl_Position.y *= -1.; }`;
+  const LFS = `precision mediump float; uniform vec4 c; void main() { gl_FragColor = c; }`;
+  const prog = (vs, fs) => { const sh = (ty, s) => { const o = gl.createShader(ty); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }; const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); const U = new Proxy({}, { get: (o, k) => (k in o ? o[k] : (o[k] = gl.getUniformLocation(p, k))) }); return { p, U }; };
+  let pp, lp;
+  try { pp = prog(VS, FS); lp = prog(LVS, LFS); } catch (e) { console.warn(e); return { start() {}, tick() {}, mode() {} }; }
+  const NIN = 22, MAXN = 7000, MIX = [.15, .17, .4, .28];
+  const A = new Float32Array(MAXN * 4), J = new Float32Array(MAXN);
+  for (let i = 0; i < MAXN; i++) {
+    let r = Math.random(), ty = 0; for (; ty < 3; ty++) { if ((r -= MIX[ty]) < 0) break; }
+    A.set([Math.random(), .012 + Math.random() * .014, (Math.random() * NIN) | 0, ty], i * 4); J[i] = Math.random() * 2 - 1;
+  }
+  const ab = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ab); gl.bufferData(gl.ARRAY_BUFFER, A, gl.STATIC_DRAW);
+  const jb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, jb); gl.bufferData(gl.ARRAY_BUFFER, J, gl.STATIC_DRAW);
+  const lb = gl.createBuffer();
+  const gateEl = document.getElementById('gate'), lblHost = document.getElementById('lbls');
+  const GR = [['Needs you', '--need', 3], ['Your turn', '--turn', 4], ['Working', '--work', 9], ['Safe to close', '--safe', 5]];
+  lblHost.innerHTML = GR.map(([l, v, n]) => `<div class="lbl" style="--c:var(${v})"><i></i>${l}<b>${n}</b></div>`).join('');
+  const lbls = [...lblHost.children];
+  let W, H, g, laneGap, R, mode = 0, t = 30, last = 0, nLines = 0, colors, ok = false, ct = 0, counts = GR.map((x) => x[2]);
+  const sm = (a, b, x) => { const k = Math.max(0, Math.min(1, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+  const mix = (a, b, k) => a + (b - a) * k;
+  function layout() {
+    const d = DPR(); W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = Math.round(W * d); cv.height = Math.round(H * d); gl.viewport(0, 0, cv.width, cv.height);
+    const narrow = W < 640;
+    g = mode === 1 ? [W * (narrow ? .36 : .44), H * .5] : [W * (narrow ? .4 : .46), H * .5];
+    laneGap = Math.min(H * .2, 74); R = Math.hypot(W, H) * .6;
+    gateEl.style.left = g[0] + 'px'; gateEl.style.top = g[1] + 'px';
+    // static lines that the dots travel along
+    const L = [], seg = 48;
+    const inP = (idx, k) => mode === 1 ? (() => { const a = 6.2832 * idx / NIN + .13, r = mix(R, 26, k); return [g[0] + r * Math.cos(a), g[1] + r * Math.sin(a)]; })() : [mix(-10, g[0], k), mix(H * (.08 + .84 * idx / (NIN - 1)), g[1], sm(.35, 1, k))];
+    const outP = (ty, k) => mode === 1 ? (() => { const a = (ty - 1.5) * .3, r = mix(26, R, k); return [g[0] + r * Math.cos(a), g[1] + r * Math.sin(a)]; })() : [mix(g[0], W + 10, k), mix(g[1], g[1] + (ty - 1.5) * laneGap, sm(0, .4, k))];
+    const poly = (f) => { for (let s = 0; s < seg; s++) { const a = f(s / seg), b = f((s + 1) / seg); L.push(...a, ...b); } };
+    for (let i = 0; i < NIN; i++) poly((k) => inP(i, k * .96));
+    for (let ty = 0; ty < 4; ty++) poly((k) => outP(ty, .04 + k * .96));
+    nLines = L.length / 2;
+    gl.bindBuffer(gl.ARRAY_BUFFER, lb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(L), gl.STATIC_DRAW);
+    lbls.forEach((el, i) => {
+      const [x, y] = outP(i, mode === 1 ? .62 : .72);
+      el.style.left = Math.min(x, W - el.offsetWidth - 12) + 'px'; el.style.top = y + 'px';
+    });
+  }
+  function render() {
+    const d = DPR();
+    gl.clearColor(...colors.bg, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(lp.p); gl.uniform2f(lp.U.res, W, H); gl.uniform4f(lp.U.c, ...colors.ink, mode === 2 ? .09 : .055);
+    gl.bindBuffer(gl.ARRAY_BUFFER, lb); const pl = gl.getAttribLocation(lp.p, 'p'); gl.enableVertexAttribArray(pl); gl.vertexAttribPointer(pl, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, nLines); gl.disableVertexAttribArray(pl);
+    gl.useProgram(pp.p);
+    gl.uniform1f(pp.U.t, t); gl.uniform1f(pp.U.mode, mode); gl.uniform1f(pp.U.NIN, NIN); gl.uniform1f(pp.U.dpr, d); gl.uniform1f(pp.U.round, mode === 2 ? 1 : 0);
+    gl.uniform2f(pp.U.res, W, H); gl.uniform2f(pp.U.g, g[0], g[1]); gl.uniform1f(pp.U.laneGap, laneGap); gl.uniform1f(pp.U.R, R);
+    gl.uniform3fv(pp.U.c0, colors.need); gl.uniform3fv(pp.U.c1, colors.turn); gl.uniform3fv(pp.U.c2, colors.work); gl.uniform3fv(pp.U.c3, colors.safe); gl.uniform3fv(pp.U.cdim, colors.dim);
+    const la = gl.getAttribLocation(pp.p, 'a'), lj = gl.getAttribLocation(pp.p, 'j');
+    gl.bindBuffer(gl.ARRAY_BUFFER, ab); gl.enableVertexAttribArray(la); gl.vertexAttribPointer(la, 4, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, jb); gl.enableVertexAttribArray(lj); gl.vertexAttribPointer(lj, 1, gl.FLOAT, false, 0, 0);
+    const n = mode === 2 ? 260 : W < 640 ? 2600 : MAXN;
+    gl.drawArrays(gl.POINTS, 0, n);
+    gl.disableVertexAttribArray(la); gl.disableVertexAttribArray(lj);
+  }
+  new ResizeObserver(() => { if (ok) { layout(); render(); } }).observe(cv);
+  return {
+    start() { colors = { bg: hex3(cssv('--bg')), ink: hex3(cssv('--ink')), dim: hex3(cssv('--dim')), need: hex3(cssv('--need')), turn: hex3(cssv('--turn')), work: hex3(cssv('--work')), safe: hex3(cssv('--safe')) }; ok = true; layout(); last = performance.now(); render(); },
+    tick(now) {
+      const dt = Math.min(.05, (now - last) / 1000); last = now; if (REDUCED) return;
+      t += dt * (mode === 2 ? .45 : 1); render();
+      ct += dt; if (ct > 2.2) { ct = 0; const i = (Math.random() * 4) | 0; counts[i] = Math.max(1, Math.min(12, counts[i] + (Math.random() < .5 ? 1 : -1))); lbls[i].querySelector('b').textContent = counts[i]; }
+    },
+    mode(m) { mode = m; if (ok) { layout(); render(); } },
+  };
+}
+
+const TERM = `<b>$ maxwell state</b>
+
+<span class="g">✓</span> <b>release-v0.1.7</b>       <span class="g">safe to close</span>
+  ├ nothing running       0 tasks, 0 agents
+  ├ quiet for 2h 14m
+  ├ git clean, pushed     origin/main
+  ├ PR #212 merged
+  └ haiku: finished
+
+<span class="a">●</span> <b>stripe-webhooks</b>      <span class="a">not safe</span>
+  └ asks a question       "Run it on staging?"
+
+○ <b>flaky-e2e</b>            not safe
+  └ 1 background task     npm run e2e`;
+document.querySelector('[data-term]').innerHTML = TERM;
+
+const flow = makeFlow(document.getElementById('flow-cv'));
+const reel = makeReel(document.querySelector('[data-reel]'));
+function loop(now) { flow.tick(now); requestAnimationFrame(loop); }
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
+  flow.start(); reel.start();
+  requestAnimationFrame(loop);
+});
+})();
+</script>
+
+</body>
+</html>
