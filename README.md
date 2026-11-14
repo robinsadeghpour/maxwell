@@ -158,13 +158,13 @@ Speed and memory are checked on every build by `./measure.sh`: window on screen 
 
 ## Develop
 
-You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) and Zig 0.17 (`brew install zig`). Releases also need [uv](https://docs.astral.sh/uv/) for the DMG (`brew install uv`).
+You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) and Zig 0.17 (`brew install zig`). Releases also need a Developer ID Application certificate, an App Store Connect API key in [asc](https://github.com/rorkai/App-Store-Connect-CLI) for notarization, and [uv](https://docs.astral.sh/uv/) for the DMG. The top of `release.sh` lists the one-time setup.
 
 ```sh
 ./build.sh          # builds Maxwell Dev (first run also builds Ghostty, ~3 min)
 ./build.sh test     # reducer and verdict tests, from recorded real hook payloads
 ./measure.sh        # performance budgets, fails loudly
-./release.sh 0.1.13 "What changed"  # tests, builds the app, DMG and zip, publishes them on GitHub
+./release.sh 0.1.13 "What changed"  # tests, builds, signs, notarizes, publishes the DMG and zip
 ```
 
 **Maxwell Dev** is a separate app with its own ID, name and a "dev" badge on its Dock icon. It works on your real sessions and config, but quitting, crashing or relaunching it never touches the Maxwell you work in. The released Maxwell changes only when you click **Restart to update**.

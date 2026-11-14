@@ -5,3 +5,4 @@ spike/build/
 .DS_Store
 site/.vercel
 docs/screenshots/
+.release.env
