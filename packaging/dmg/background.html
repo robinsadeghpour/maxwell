@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400&display=swap">
+<style>
+html,body{margin:0;width:660px;height:400px;background:#f4f4f2;overflow:hidden}
+.frame{position:absolute;inset:0 26px;border-left:1px solid #dfdfdb;border-right:1px solid #dfdfdb}
+.h{position:absolute;left:0;right:0;height:1px;background:#dfdfdb}
+.x{position:absolute;width:9px;height:9px;background:linear-gradient(#b9bab5,#b9bab5) center/9px 1px no-repeat,linear-gradient(#b9bab5,#b9bab5) center/1px 9px no-repeat}
+svg{position:absolute;left:0;top:0}
+p{position:absolute;left:0;right:0;bottom:44px;margin:0;text-align:center;font:400 12px/1 "Geist Mono",ui-monospace,Menlo,monospace;color:#8a8c90;letter-spacing:.02em}
+</style></head><body>
+<div class="frame"></div>
+<div class="h" style="top:56px"></div><div class="h" style="top:330px"></div>
+<i class="x" style="left:22px;top:52px"></i><i class="x" style="right:22px;top:52px"></i><i class="x" style="left:22px;top:326px"></i><i class="x" style="right:22px;top:326px"></i>
+<svg width="660" height="400" viewBox="0 0 660 400">
+  <g fill="#b3b4b0" id="dots"></g>
+  <path d="M452 186 l10 7 l-10 7" fill="none" stroke="#e8a33d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+<p>Drag Maxwell to Applications</p>
+<script>
+const g=document.getElementById('dots');
+for(let x=236;x<=448;x+=8){const k=(x-236)/212;const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+c.setAttribute('cx',x);c.setAttribute('cy',193);c.setAttribute('r',1.6);if(k>.75)c.setAttribute('fill','#e8a33d');c.setAttribute('opacity',(.35+.65*k).toFixed(2));g.appendChild(c);}
+</script></body></html>

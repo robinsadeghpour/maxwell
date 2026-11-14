@@ -100,7 +100,7 @@ Every key can be changed with a `keybind` line in the config.
 
 You need a Mac with Apple silicon, macOS 14 or later, and Claude Code.
 
-1. [Download Maxwell](https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.zip) (or pick a version from [Releases](https://github.com/robinsadeghpour/maxwell/releases)), unzip it and move Maxwell to Applications.
+1. [Download Maxwell](https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.dmg), open it and drag Maxwell to Applications. Older versions are on [Releases](https://github.com/robinsadeghpour/maxwell/releases).
 2. Maxwell isn't notarized by Apple yet, so macOS blocks it the first time. Open **System Settings › Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Maxwell.app` once.
 3. Choose **Maxwell › Install Hooks**. That's how Maxwell learns what your sessions are doing.
 
@@ -158,13 +158,13 @@ Speed and memory are checked on every build by `./measure.sh`: window on screen 
 
 ## Develop
 
-You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) and Zig 0.17 (`brew install zig`).
+You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) and Zig 0.17 (`brew install zig`). Releases also need [uv](https://docs.astral.sh/uv/) for the DMG (`brew install uv`).
 
 ```sh
 ./build.sh          # builds Maxwell Dev (first run also builds Ghostty, ~3 min)
 ./build.sh test     # reducer and verdict tests, from recorded real hook payloads
 ./measure.sh        # performance budgets, fails loudly
-./release.sh 0.1.7 "What changed"   # tests, builds the release, publishes it on GitHub
+./release.sh 0.1.13 "What changed"  # tests, builds the app, DMG and zip, publishes them on GitHub
 ```
 
 **Maxwell Dev** is a separate app with its own ID, name and a "dev" badge on its Dock icon. It works on your real sessions and config, but quitting, crashing or relaunching it never touches the Maxwell you work in. The released Maxwell changes only when you click **Restart to update**.

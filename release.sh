@@ -15,6 +15,9 @@ ZIP=build/release/Maxwell-v$V.zip
 rm -f "$ZIP"
 ditto -c -k --keepParent build/release/Maxwell.app "$ZIP"
 git push -q origin v1 v1:main
-# Maxwell.zip is the same file under a fixed name, so releases/latest/download/Maxwell.zip always works.
-cp "$ZIP" build/release/Maxwell.zip
-gh release create "v$V" "$ZIP" build/release/Maxwell.zip --target main --title "v$V" --notes "$NOTES"
+# The DMG is what people download (drag to Applications); the zip is what the in-app updater fetches.
+# Maxwell.dmg is the same DMG under a fixed name, so releases/latest/download/Maxwell.dmg always works.
+DMG=build/release/Maxwell-v$V.dmg
+uvx dmgbuild -s packaging/dmg/settings.py -D app=build/release/Maxwell.app Maxwell "$DMG"
+cp "$DMG" build/release/Maxwell.dmg
+gh release create "v$V" "$DMG" build/release/Maxwell.dmg "$ZIP" --target main --title "v$V" --notes "$NOTES"
