@@ -238,11 +238,15 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         return r
     }
 
-    /// Right-click on a row: move it to another project, or back to its folder's.
+    /// Right-click on a row: open, rename, move to another project, bring in, close.
     private func sessionMenu(_ s: Session) -> NSMenu {
         let state = store.state
         let current = state.project(s, in: projects), home = projects.name(for: s.cwd)
         let m = NSMenu()
+        m.addItem(MenuAction("Open") { [weak self] in self?.open(s.id) })
+        m.addItem(MenuAction("Rename…") { [weak self] in self?.rename(s.id) })
+        m.addItem(MenuAction("Suggest a Title") { [weak self] in self?.suggestTitle(s.id) })
+        m.addItem(.separator())
         let move = NSMenuItem(title: "Move to Project", action: nil, keyEquivalent: "")
         let sub = NSMenu()
         var names = pinnedNames
@@ -252,7 +256,48 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         move.isEnabled = sub.numberOfItems > 0
         m.addItem(move)
         if current != home { m.addItem(MenuAction("Move back to \(home)") { [weak self] in self?.store.moveProject(s.id, to: nil) }) }
+        m.addItem(.separator())
+        if case .elsewhere = s.reach {
+            m.addItem(MenuAction("Bring into Maxwell") { [weak self] in self?.bringIn(s.id, force: false) })
+            let close = MenuAction("Close Session (runs in another terminal)") {}
+            close.isEnabled = false
+            close.action = nil
+            m.addItem(close)
+        } else if s.phase != .ended {
+            let close = MenuAction("Close Session") { [weak self] in self?.close(s.id) }
+            close.keyEquivalent = "\u{8}"
+            close.keyEquivalentModifierMask = .command
+            m.addItem(close)
+        }
         return m
+    }
+
+    /// Your own title for a session, kept in Maxwell. Empty goes back to the automatic one.
+    func rename(_ id: SessionID) {
+        guard let s = store.state.sessions[id], let w = window else { return }
+        let a = NSAlert()
+        a.messageText = "Rename Session"
+        a.informativeText = "Shown in the list, tabs and search. Leave it empty to go back to the automatic title."
+        let field = NSTextField(string: s.named?.byYou == true ? s.title : "")
+        field.placeholderString = s.title
+        field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
+        a.accessoryView = field
+        a.addButton(withTitle: "Rename")
+        a.addButton(withTitle: "Cancel")
+        a.window.initialFirstResponder = field
+        a.beginSheetModal(for: w) { [weak self] r in
+            guard r == .alertFirstButtonReturn else { return }
+            self?.store.rename(id, to: field.stringValue)
+        }
+    }
+
+    func suggestTitle(_ id: SessionID) {
+        guard let s = store.state.sessions[id] else { return }
+        if s.named?.byYou == true { store.rename(id, to: "") }
+        toast("Asking Haiku for a title…")
+        store.suggestTitle(store.state.sessions[id] ?? s) { [weak self] t in
+            self?.toast(t.map { "Titled “\($0)”." } ?? "Couldn't get a title. Try again in a moment.")
+        }
     }
 
     /// Moving a session to its folder's own project is a move back: no record of a move remains.
@@ -523,12 +568,36 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// ⌘⌫ and the banner button: the same confirm sheet as Close all safe, for one session.
+    /// ⌘⌫, the row menu and the banner button. Safe sessions close at once; any other asks
+    /// first and says what is still open. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
-        guard let s = store.state.sessions[id] else { return }
-        let bad = store.checks(s).filter { $0.outcome != .pass }
-        guard bad.isEmpty else { return toast("Not safe to close: " + bad.map { "\($0.kind.title) (\($0.detail))" }.joined(separator: ", ") + ".") }
-        presentClose([s])
+        guard let s = store.state.sessions[id], s.phase != .ended else { return }
+        if case .elsewhere = s.reach { return toast("“\(s.title)” runs in another terminal. Bring it into Maxwell first, or close it there.") }
+        let open = store.checks(s).filter { $0.outcome != .pass }
+        guard !open.isEmpty, let w = window else { return closeNow(s) }
+        let a = NSAlert()
+        a.messageText = s.phase == .working ? "“\(s.title)” is still working. Close it anyway?" : "Close “\(s.title)”?"
+        let reasons = open.prefix(4).map { "• \($0.kind.title): \($0.detail)" }.joined(separator: "\n")
+        a.informativeText = "Not safe to close yet:\n\(reasons)\n\nClaude stops, and the conversation is kept. Undo right after, or reopen it from Recently closed for 7 days."
+        a.addButton(withTitle: "Close Session")
+        a.addButton(withTitle: "Cancel")
+        a.beginSheetModal(for: w) { [weak self] r in
+            guard r == .alertFirstButtonReturn, let self, let fresh = self.store.state.sessions[id] else { return }
+            self.closeNow(fresh)
+        }
+    }
+
+    private func closeNow(_ s: Session) {
+        store.closeNow(s.id) { [weak self] outcome in
+            guard let self else { return }
+            switch outcome {
+            case .closed:
+                self.forget(s.id)
+                mark("close: \(s.title)")
+                self.root.status.show(toast: "Closed “\(s.title)”. The conversation is kept.", action: ("Undo", { [weak self] in self?.reopen(s.id) }), seconds: 10)
+            case .skipped(let why), .failed(let why): self.toast("Couldn't close “\(s.title)”: \(why)")
+            }
+        }
     }
 
     /// Opens the confirm sheet for every session safe to close. `onlyNamed` limits it to names
@@ -727,6 +796,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 items.append(SearchItem(kind: .session, title: s.title, fields: [
                     (s.title, 3, ""), (project, 2, ""), (s.branch ?? s.doneCheck?.branch ?? "", 2, "branch"), (acct, 1, ""),
                     (s.lastMessage ?? "", 1, "said"), (files.joined(separator: " "), 1, "edited"), (s.name, 1, ""),
+                    (s.hookTitle != s.title ? s.hookTitle ?? "" : "", 2, "was"), (s.firstPrompt ?? "", 1, "asked"),
                 ], detail: "\(project.lowercased()) · \(acct) · \(Format.age(s.lastEventAt, now: now))", group: g, boost: boost) { [weak self] in self?.open(s.id) })
             }
         }
@@ -997,7 +1067,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "undo-close", title: "Undo Close", menu: "Session", shortcut: Shortcut("cmd+z"), isEnabled: { [weak self] in self?.root.status.toastAction != nil }) { [weak self] in
                 self?.root.status.runToastAction()
             },
-            Action(id: "close-session", title: "Close Session (if safe)", menu: "Session", shortcut: Shortcut("cmd+backspace"), isEnabled: hasCurrent) { [weak self] in
+            Action(id: "close-session", title: "Close Session", menu: "Session", shortcut: Shortcut("cmd+backspace"), isEnabled: hasCurrent) { [weak self] in
                 if let id = self?.current { self?.close(id) }
             },
             Action(id: "close-all-safe", title: "Close All Safe Sessions", menu: "Session", shortcut: Shortcut("cmd+shift+x")) { [weak self] in self?.closeAllSafe() },

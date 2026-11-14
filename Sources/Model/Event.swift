@@ -19,6 +19,8 @@ enum Event: Equatable {
     /// What the session's transcript points at (see `ProjectHints`); nil when nothing stands out.
     case projectSuggested(SessionID, String?)
     case suggestionDismissed(SessionID, project: String)
+    /// You renamed a session, or a model titled one whose own title said little; empty text clears yours.
+    case titled(SessionID, SessionTitle)
 }
 
 struct Hook: Equatable {

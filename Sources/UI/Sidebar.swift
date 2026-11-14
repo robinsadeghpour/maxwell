@@ -422,7 +422,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     /// The row's menu under the row, as a right-click would show it (test hook for captures).
     func showMenu(_ id: SessionID, submenu: Bool = false) {
         guard let i = items.firstIndex(where: { if case .session(let r) = $0 { return r.session.id == id }; return false }),
-              case .session(let r) = items[i], let row = menuFor?(r.session), let m = submenu ? row.items.first?.submenu : row else { return }
+              case .session(let r) = items[i], let row = menuFor?(r.session), let m = submenu ? row.items.first(where: { $0.hasSubmenu })?.submenu : row else { return }
         let rect = rowRects()[i]
         openMenu = m
         m.popUp(positioning: m.items.first, at: NSPoint(x: rect.minX + 60, y: rect.midY), in: self)

@@ -287,6 +287,37 @@ do {
     check(restarted.moved == ["m2": "Acme"], "after a restart the move holds and the undone one is gone")
     check(restarted.dismissed["m3"] == ["Acme"], "after a restart a dismissal holds")
 }
+// Titles: weak ones get a model's, yours always wins, a /rename in Claude beats the model's.
+do {
+    let dir = home.appendingPathComponent(".claude").path
+    func prompt(_ p: String, title: String?, at dt: Double) -> Event {
+        .hook(Hook(at: t0.addingTimeInterval(dt), configDir: dir, sessionId: "n1", cwd: "/tmp/x", transcriptPath: nil,
+                   kind: .promptSubmitted(prompt: p, title: title)))
+    }
+    var st = reduce(AppState(accounts: accounts), prompt("hi, do I need to do anything for the stripe webhook", title: "hi, do I need to do", at: 0))
+    let n1 = { st.sessions["n1"]! }
+    check(n1().weakTitle, "a title that is the prompt's first words is weak")
+    st = reduce(st, .titled("n1", SessionTitle(text: "Stripe Webhook Setup", byYou: false, replaced: "hi, do I need to do")))
+    check(n1().title == "Stripe Webhook Setup" && !n1().weakTitle, "the model's title shows")
+    st = reduce(st, prompt("next", title: "Webhooks", at: 1))
+    check(n1().title == "Webhooks", "a /rename in Claude beats the model's title")
+    st = reduce(st, .titled("n1", SessionTitle(text: "Billing", byYou: true, replaced: nil)))
+    st = reduce(st, .titled("n1", SessionTitle(text: "Model Again", byYou: false, replaced: "Webhooks")))
+    check(n1().title == "Billing", "yours is never replaced by a model's")
+    st = reduce(st, .titled("n1", SessionTitle(text: "", byYou: true, replaced: nil)))
+    check(n1().title == "Webhooks", "clearing yours goes back to the automatic title")
+    st = reduce(AppState(accounts: accounts), prompt("fix ACM-56 in the billing page", title: "Billing Page ACM-56", at: 0))
+    check(!st.sessions["n1"]!.weakTitle, "Claude's own title is kept")
+    check(Titles.isSlug("mx-slack") && !Titles.isSlug("Find File Tree Panel"), "a lowercase slug is a generated name")
+    check(Titles.isGeneric("Continue Previous Task") && !Titles.isGeneric("Resume Maxwell Work"), "only generic words is weak")
+    check(Titles.clean("\"Stripe Webhook Setup.\"\nextra") == "Stripe Webhook Setup" && Titles.clean("Title: Foo Bar") == "Foo Bar", "model answers are cleaned")
+
+    let log = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("mx-title-\(getpid()).jsonl")
+    MaxwellRecord.append(MaxwellRecord.titled("n2", "Renamed", byYou: true), at: t0, to: log)
+    let restarted = EventLog.fold(url: log, accounts: accounts)
+    try? FileManager.default.removeItem(at: log)
+    check(restarted.named["n2"]?.text == "Renamed", "a rename logged before the session's first event holds after a restart")
+}
 do {
     var v = ProjectVotes()
     let edit = #"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/r/acme/apps/web/x.ts"}},{"type":"tool_use","name":"Bash","input":{"command":"cd ~/projects/orbit && git -C /r/acme status"}}]}}"#

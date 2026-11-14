@@ -23,6 +23,20 @@ func runCLI(_ args: [String]) -> Int32? {
             try ProjectLogos.writeSheet(projects, overrides: config.logos, to: URL(fileURLWithPath: args[2]))
         case "accounts":
             for a in config.accounts { print("\(a.id)\t\(a.configDir.path)\tenv=\(a.configDirEnv ?? "(unset)")") }
+        case "titles":
+            // Every live session's title and where it comes from. --suggest asks Haiku for the weak
+            // ones and prints its titles without saving them.
+            var state = EventLog(url: Paths.eventLog).readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
+            for a in config.accounts { if let snap = AgentsProbe.snapshot(a) { state = reduce(state, .agents(snap)) } }
+            let now = Date()
+            for s in state.sessions.values.filter({ $0.phase != .ended && now.timeIntervalSince($0.lastEventAt) < 7 * 86400 }).sorted(by: { $0.lastEventAt > $1.lastEventAt }) {
+                let source = s.named.flatMap { s.title == $0.text ? ($0.byYou ? "yours" : "model") : nil } ?? (s.hookTitle != nil ? "claude" : s.tabTitle != nil ? "tab" : s.firstPrompt != nil ? "prompt" : "name")
+                var line = "  \(s.id.prefix(8))  \(s.weakTitle ? "weak " : "     ") \(source.padding(toLength: 6, withPad: " ", startingAt: 0))  \(s.title)"
+                if args.contains("--suggest"), s.weakTitle, s.firstPrompt != nil, let a = state.most5hRoom(now: now) {
+                    line += "  →  " + (Titler.title(s, account: a).title ?? "(no answer)")
+                }
+                print(line)
+            }
         case "state":
             // The audit: what the sidebar would show now, from the event log, live listings, repo
             // checks and model reads (made here for candidates without one), with every check.

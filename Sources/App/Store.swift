@@ -46,6 +46,7 @@ final class Store {
         state = events.reduce(into: state) { reduce(into: &$0, $1) }
         guard state != before else { return }
         judgeCandidates()
+        titleWeak()
         for (id, s) in state.sessions {
             let old = before.sessions[id]?.phase
             // A repo check older than the last activity is unknown; take a new one.
@@ -226,6 +227,44 @@ final class Store {
         }
     }
 
+    // MARK: titles
+
+    private var titling = Set<SessionID>()
+    private var titleFailedAt: [SessionID: Date] = [:]
+
+    /// Sessions active in the last week whose title says little, once each has a first prompt
+    /// and a reply to read. One at a time, on the judge's queue.
+    private func titleWeak() {
+        let now = Date()
+        let weak = state.sessions.values.filter {
+            $0.weakTitle && $0.lastMessage != nil && $0.phase != .ended && $0.listedAt != nil
+                && now.timeIntervalSince($0.lastEventAt) < 7 * 86400 && !titling.contains($0.id)
+                && titleFailedAt[$0.id].map { now.timeIntervalSince($0) > 3600 } ?? true
+        }
+        for s in weak { suggestTitle(s) }
+    }
+
+    /// Asks the model for a title now (also "Suggest a Title" on a row).
+    func suggestTitle(_ s: Session, done: ((String?) -> Void)? = nil) {
+        guard !titling.contains(s.id), let account = state.most5hRoom(now: Date()) else { done?(nil); return }
+        titling.insert(s.id)
+        judgeQueue.async { [weak self] in
+            let o = Titler.title(s, account: account)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.titling.remove(s.id)
+                guard let t = o.title else { self.titleFailedAt[s.id] = Date(); done?(nil); return }
+                self.record(MaxwellRecord.titled(s.id, t, byYou: false, replaced: s.hookTitle, costUSD: o.costUSD))
+                done?(t)
+            }
+        }
+    }
+
+    /// Your title for a session; empty clears it, so the model's or Claude's shows again.
+    func rename(_ id: SessionID, to text: String) {
+        record(MaxwellRecord.titled(id, text.trimmingCharacters(in: .whitespacesAndNewlines), byYou: true))
+    }
+
     // MARK: closing
 
     /// What happened to one session in a close.
@@ -276,6 +315,12 @@ final class Store {
                 then(fresh?.phase == .ended ? nil : fresh)
             }
         }
+    }
+
+    /// You chose to close it: `claude stop` now, without the safety checks. The conversation is kept.
+    func closeNow(_ id: SessionID, done: @escaping (CloseOutcome) -> Void) {
+        guard let s = state.sessions[id], let a = state.account(s.accountId) else { return done(.skipped("no longer listed")) }
+        stop(s, account: a, then: done)
     }
 
     private func stop(_ s: Session, account a: Account, then: @escaping (CloseOutcome) -> Void) {

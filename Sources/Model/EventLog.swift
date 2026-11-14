@@ -99,6 +99,14 @@ enum MaxwellRecord {
         return f
     }
 
+    /// `by`: "you" or "haiku". `replaced`: Claude's title the model's replaces.
+    static func titled(_ id: SessionID, _ text: String, byYou: Bool, replaced: String? = nil, costUSD: Double? = nil) -> [String: Any] {
+        var f: [String: Any] = ["type": "titled", "session": id, "title": text, "by": byYou ? "you" : "haiku"]
+        if let replaced { f["replaced"] = replaced }
+        if let costUSD { f["costUsd"] = costUSD }
+        return f
+    }
+
     static func dismissed(_ id: SessionID, suggestion project: String) -> [String: Any] {
         ["type": "suggestion-dismissed", "session": id, "project": project]
     }
@@ -133,6 +141,9 @@ enum MaxwellRecord {
         case "reopened": return .reopened(sid, at: at)
         case "not-safe": return .markedNotSafe(sid, at: at)
         case "moved": return .movedToProject(sid, m["project"] as? String)
+        case "titled":
+            guard let text = m["title"] as? String else { return nil }
+            return .titled(sid, SessionTitle(text: text, byYou: m["by"] as? String == "you", replaced: m["replaced"] as? String))
         case "suggestion-dismissed": return (m["project"] as? String).map { .suggestionDismissed(sid, project: $0) }
         default: return nil
         }

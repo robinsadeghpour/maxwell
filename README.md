@@ -58,6 +58,8 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 - **Files open beside the session.** When a session writes or mentions a Markdown file, it opens on the right, rendered. ⌘-click any path in the terminal to open it.
 - **Usage for every account.** 5-hour and weekly use with reset times, next to CPU and memory for your Claude processes.
 - **Panels go where you want them.** Sessions, viewer, usage and system can sit left, right or bottom, collapse to a stripe, and remember their place on each screen, like tool windows in JetBrains IDEs.
+- **Names you can read at a glance.** A session keeps Claude's title when it says something. When it's only a slug ("acme-75"), generic ("Continue Previous Task") or the first words of the prompt ("hi, do I need to do"), Haiku names the task once, for about $0.0003. Right-click a session to rename it yourself. Your name always wins. `Maxwell titles` lists every title and where it came from.
+- **Right-click a session** to open, rename, move it to another project, bring it in from a terminal, or close it.
 - **Search everything.** ⌘P, or Shift twice, finds a session by title, project, branch, account, last message or a file it touched.
 
 ## Safe to close means safe
@@ -69,7 +71,7 @@ Closing a session that's still working, or that's waiting on you, costs you work
 3. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
 4. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" asks you to confirm and shows the list first.
 5. **Checked again at the moment of closing.** If anything changed, that session is skipped.
-6. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days.
+6. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days. You can close any session yourself too, from its right-click menu or ⌘⌫. If it isn't safe yet, Maxwell says what's still open and asks first.
 7. **"Not safe" teaches it.** Mark a wrong call and it becomes a test case, so the mistake can't repeat.
 
 Run `Maxwell state` to audit every session and see which check holds each one back.
@@ -86,6 +88,7 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘T | New session in the current folder, on the account with the most room |
 | ⌘N | New session, choosing folder and account |
 | Esc or click outside | Close search, the palette or a panel |
+| ⌘⌫ | Close the session: at once when it's safe, otherwise after saying what's still open |
 | ⇧⌘X | Close all safe (asks first) |
 | ⌘Z | Undo the last close |
 | ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |

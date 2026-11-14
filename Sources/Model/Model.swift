@@ -121,6 +121,13 @@ struct DoneCheck: Equatable {
     }
 }
 
+/// A title from Maxwell's log. `replaced`: Claude's title when a model wrote this one.
+struct SessionTitle: Equatable {
+    var text: String
+    var byYou: Bool
+    var replaced: String?
+}
+
 struct Session: Equatable {
     let id: SessionID
     var name: String
@@ -129,7 +136,9 @@ struct Session: Equatable {
     var branch: String?
     var hookTitle: String?      // Claude Code's session_title
     var tabTitle: String?       // ~/.claude/tab-titles (an optional hook)
-    var promptTitle: String?    // first words of the first prompt
+    var firstPrompt: String?    // the first prompt, up to 400 characters
+    /// A title you gave it in Maxwell, or one a model wrote because Claude's said little.
+    var named: SessionTitle?
     var phase: Phase
     var lastMessage: String?
     var contextTokens: Int?
@@ -154,13 +163,29 @@ struct Session: Equatable {
 }
 
 extension Session {
-    /// What the session is about, best source first.
-    var title: String { hookTitle ?? tabTitle ?? promptTitle ?? name }
+    /// What the session is about. Yours wins; a model's shows only while the session's own
+    /// title is weak, so a later `/rename` in Claude takes over again.
+    var title: String {
+        if let n = named, n.byYou || ownTitleWeak { return n.text }
+        return ownTitle
+    }
+    /// Claude's title, the tab title, the first prompt's words, or the generated name.
+    var ownTitle: String { hookTitle ?? tabTitle ?? promptTitle ?? name }
+    /// First words of the first prompt.
+    var promptTitle: String? { firstPrompt.map(Titles.fromPrompt) }
     /// True when the title is only the generated name ("acme-75"), so it says nothing about the work.
-    var untitled: Bool { hookTitle == nil && tabTitle == nil && promptTitle == nil }
+    var untitled: Bool { named == nil && hookTitle == nil && tabTitle == nil && firstPrompt == nil }
+    /// The title says little about the work: none, a generated slug ("acme-75"), only generic
+    /// words ("Continue Previous Task"), or the first words of the first prompt ("hi, do I need
+    /// to do"). Such sessions get a model-written title.
+    var weakTitle: Bool { named == nil && ownTitleWeak }
+    var ownTitleWeak: Bool {
+        guard let t = (hookTitle ?? tabTitle)?.trimmingCharacters(in: .whitespaces), !t.isEmpty else { return true }
+        return Titles.isSlug(t) || Titles.isGeneric(t) || (firstPrompt.map { Titles.isFragment(t, of: $0) } ?? false)
+    }
 
     init(id: SessionID, name: String, accountId: AccountID, cwd: String, at: Date, origin: Origin, reach: Reach) {
-        self.init(id: id, name: name, accountId: accountId, cwd: cwd, branch: nil, hookTitle: nil, tabTitle: nil, promptTitle: nil,
+        self.init(id: id, name: name, accountId: accountId, cwd: cwd, branch: nil, hookTitle: nil, tabTitle: nil, firstPrompt: nil, named: nil,
                   phase: .yourTurn, lastMessage: nil, contextTokens: nil, lastEventAt: at, startedAt: at,
                   origin: origin, reach: reach, doneCheck: nil, transcriptPath: nil)
     }
@@ -181,6 +206,8 @@ struct AppState: Equatable {
     var moved: [SessionID: String] = [:]
     /// The project a session's transcript points at, from the background scan.
     var suggested: [SessionID: String] = [:]
+    /// Titles you gave sessions, or a model wrote, by id (kept off the session: one can fold first).
+    var named: [SessionID: SessionTitle] = [:]
     /// Suggestions you waved away, per session.
     var dismissed: [SessionID: Set<String>] = [:]
 
