@@ -1,5 +1,8 @@
 import Foundation
 
+// TerminalHostsTests starts this binary as a process whose environment it reads.
+if ProcessInfo.processInfo.environment["MX_TEST_WAIT"] != nil { sleep(5); exit(0) }
+
 // Runs with ./build.sh test. Fixtures are real hook lines recorded from test sessions.
 
 var failures = 0
@@ -469,6 +472,7 @@ linearTests()
 linearPluginTests()
 viewerTabsTests()
 projectFoldersTests()
+terminalHostsTests()
 
 print(failures == 0 ? "reducer tests: all passed" : "reducer tests: \(failures) failed")
 exit(failures == 0 ? 0 : 1)

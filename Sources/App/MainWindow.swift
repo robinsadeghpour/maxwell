@@ -9,6 +9,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private var shells: [(id: String, view: TerminalView)] = []
     private var shellsMade = 0
     private func shell(_ id: String?) -> TerminalView? { shells.first { $0.id == id }?.view }
+    /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
+    private var hosted: [SessionID: String] = [:]
+    private let terminalHosts = TerminalHosts()
+    /// The terminal a session runs in: its own attached one, or the Maxwell terminal hosting it.
+    private func terminal(for id: SessionID) -> TerminalView? { terminals[id] ?? hosted[id].flatMap(shell) }
     /// The terminal on screen when it is a plain one (test runs type into it).
     var shownShell: TerminalView? { shell(current) }
     private var visited: [SessionID] = []
@@ -194,6 +199,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func render(_ state: AppState) {
         let now = Date(), rules = store.config.rules
         if projects.rules != store.config.projects { projects = Projects(rules: store.config.projects) }
+        followHostedTerminals(state)
         let all = state.grouped(now: now, rules: rules)
         // One rail entry per project with live sessions; config rules first, in config order.
         var byProject: [String: [(PhaseGroup, Session)]] = [:]
@@ -266,7 +272,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                               blockers: s.map { state.checks($0, now: now, rules: rules).filter { $0.outcome != .pass }.map { "\($0.title): \($0.detail)" } } ?? [],
                               project: s.map { state.project($0, in: projects) },
                               account: s.flatMap { state.account($0.accountId) },
-                              terminal: current.flatMap { detached.contains($0) ? nil : terminals[$0] },
+                              terminal: current.flatMap { detached.contains($0) ? nil : terminal(for: $0) },
                               summary: PhaseGroup.allCases.filter { !$0.folds }.map { g in (g, (scope == nil ? all : shown).first { $0.0 == g }?.1.count ?? 0) })
         if let t = shell(current) {
             let row = shellRows().first { $0.id == current }
@@ -337,7 +343,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         m.addItem(MenuAction("Open Terminal Here") { [weak self] in self?.openShell(in: s.cwd) })
         if current != home { m.addItem(MenuAction("Move back to \(home)") { [weak self] in self?.store.moveProject(s.id, to: nil) }) }
         m.addItem(.separator())
-        if case .elsewhere = s.reach {
+        if let shellId = hosted[s.id] {
+            m.addItem(MenuAction("Close Terminal") { [weak self] in self?.closeShell(shellId) })
+        } else if case .elsewhere = s.reach {
             m.addItem(MenuAction("Bring into Maxwell") { [weak self] in self?.bringIn(s.id, force: false) })
             let close = MenuAction("Close Session (runs in another terminal)") {}
             close.isEnabled = false
@@ -406,7 +414,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         parts.insert(state.account(s.accountId)?.name ?? s.accountId, at: min(parts.count, scope == nil ? 1 : 0))
         if let tasks = s.runningTasks, !tasks.isEmpty { parts.append(tasks.summary) }
         // Started outside Maxwell and still there: say where, so an unfamiliar row explains itself.
-        if case .elsewhere = s.reach { parts.append("in a terminal") }
+        if case .elsewhere = s.reach, hosted[s.id] == nil { parts.append("in a terminal") }
         return parts.joined(separator: " · ")
     }
 
@@ -554,7 +562,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewerForced = nil
         render(store.state)
         showViewer(for: id)
-        if let t = terminals[id], !detached.contains(id) { window?.makeFirstResponder(t) }
+        if let t = terminal(for: id), !detached.contains(id) { window?.makeFirstResponder(t) }
     }
 
     private func attach(_ s: Session, short: String, account a: Account) {
@@ -582,9 +590,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let usable = { (f: String?) in f.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } }
         let dir = usable(folder) ?? usable(here) ?? folderHere(state) ?? Paths.home.path
         let size = root.sessionPane.content.bounds.size
-        let t = TerminalView(frame: NSRect(origin: .zero, size: size == .zero ? NSSize(width: 800, height: 600) : size), workingDirectory: dir)
         shellsMade += 1
         let id = "shell-\(shellsMade)"
+        let t = TerminalView(frame: NSRect(origin: .zero, size: size == .zero ? NSSize(width: 800, height: 600) : size), workingDirectory: dir,
+                             env: [TerminalHosts.envKey: TerminalHosts.tag(id)])
         t.onExit = { [weak self] in self?.closeShell(id) }
         t.onCwd = { [weak self] in if let self { self.render(self.store.state) } }
         t.onOpenURL = { raw, cwd in
@@ -608,10 +617,26 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     private func shellRows() -> [ShellRow] {
-        shells.map { sh in
+        let busy = Set(hosted.values)
+        return shells.filter { !busy.contains($0.id) }.map { sh in
             let dir = sh.view.cwd ?? Paths.home.path
             let title = dir == Paths.home.path ? "~" : (dir as NSString).lastPathComponent
             return ShellRow(id: sh.id, title: title, detail: (dir as NSString).abbreviatingWithTildeInPath)
+        }
+    }
+
+    /// `claude` started in a Maxwell terminal: its row takes the terminal's place, and the pane
+    /// follows. When it exits, the terminal's row comes back and the pane goes back to it.
+    private func followHostedTerminals(_ state: AppState) {
+        let before = hosted
+        hosted = terminalHosts.hosts(Array(state.sessions.values), terminalIds: shells.map(\.id))
+        guard let c = current else { return }
+        if shell(c) != nil, let sid = hosted.first(where: { $0.value == c })?.key {
+            current = sid
+            visited.removeAll { $0 == sid }
+            visited.insert(sid, at: 0)
+        } else if hosted[c] == nil, let shellId = before[c], shell(shellId) != nil {
+            current = shellId
         }
     }
 
@@ -671,7 +696,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// as soon as their turn ends. The terminal tabs are left at a shell prompt.
     func bringAllIn() {
         let state = store.state
-        let candidates = state.sessions.values.filter { if case .elsewhere = $0.reach { return true }; return false }
+        let candidates = state.sessions.values.filter { if case .elsewhere = $0.reach { return hosted[$0.id] == nil }; return false }
         toast("Looking for sessions in other terminals…")
         DispatchQueue.global().async { [weak self] in
             let live = candidates.filter { s in
@@ -1421,7 +1446,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func focusMain() {
-        if let id = current, let t = terminals[id] ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
+        if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
         else { window?.makeFirstResponder(root.sidebar.list) }
     }
 

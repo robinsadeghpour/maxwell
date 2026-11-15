@@ -95,7 +95,7 @@ final class SessionPane: MXView {
         }
         pills.text = p.joined(separator: " ")
         updateBanner(s, group: group ?? .idle, blockers: blockers)
-        if case .elsewhere = s.reach {
+        if case .elsewhere = s.reach, terminal == nil {
             empty.isHidden = true
             message.scroll.isHidden = false
             message.show(note: "Runs in another terminal, read-only here. Bring it into Maxwell to work with it in this pane.",
