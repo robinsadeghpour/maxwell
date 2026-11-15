@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-status-line",
+    date: "2026-11-15",
+    versions: "0.1.19",
+    title: "Every reply ends with where the session stands",
+    figure: fig.wrapLine(),
+    body: `
+<p>Sessions now end each reply with a short status line: <strong>Safe to close</strong>, <strong>Not done</strong> or <strong>Needs you</strong>, and a few words on why. Maxwell shows the line on the session's row, so you can read where every session stands without opening it.</p>
+<p>The line is also evidence. <strong>Needs you</strong> moves the session to Needs you. <strong>Not done</strong> keeps it out of Safe to close, whatever else passes. Maxwell gives each new session the rule through its SessionStart hook, so nothing changes in your prompts.</p>
+<p>Turn it off with <code>wrap-line = off</code> in the config.</p>`,
+    fixes: [
+      "The installed hook now updates itself when Maxwell updates",
+    ],
+  },
+  {
     slug: "2026-11-15-terminal-keys",
     date: "2026-11-15",
     versions: "0.1.15 – 0.1.18",

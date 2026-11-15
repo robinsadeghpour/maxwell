@@ -6,6 +6,15 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Every reply ends with where the session stands</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-status-line</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-status-line</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Sessions now end each reply with a short status line: &lt;strong&gt;Safe to close&lt;/strong&gt;, &lt;strong&gt;Not done&lt;/strong&gt; or &lt;strong&gt;Needs you&lt;/strong&gt;, and a few words on why. Maxwell shows the line on the session's row, so you can read where every session stands without opening it.&lt;/p&gt;
+&lt;p&gt;The line is also evidence. &lt;strong&gt;Needs you&lt;/strong&gt; moves the session to Needs you. &lt;strong&gt;Not done&lt;/strong&gt; keeps it out of Safe to close, whatever else passes. Maxwell gives each new session the rule through its SessionStart hook, so nothing changes in your prompts.&lt;/p&gt;
+&lt;p&gt;Turn it off with &lt;code&gt;wrap-line = off&lt;/code&gt; in the config.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;The installed hook now updates itself when Maxwell updates&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Terminal keys that work like Ghostty</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-terminal-keys</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-terminal-keys</guid>

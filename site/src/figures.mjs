@@ -151,3 +151,21 @@ export const launch = (caption) => plate(`<div class="stack">
     </div>
   </div>
 </div>`, caption);
+
+export const wrapLine = (caption) => plate(`<div class="w lg"><div class="split2">
+  <div>
+    <div class="wh"><b>Billing totals</b><span class="sp"></span><span class="acct">work</span></div>
+    <div class="scr"><span class="m">⏺</span> Merged #212 and moved ACME-56
+  to Done. Nothing else is open.
+
+  <span class="g">Safe to close</span> <span class="m">· PR merged, ticket done</span></div>
+  </div>
+  <div>
+    <div class="gh" style="--c:${C.need};padding-top:12px">${dot("need")} Needs you <span>1</span></div>
+    <div class="row">${dot("need")}<b>Invoice PDF export <em>1m</em></b><small><span style="color:var(--need)">Needs you</span> · pick a paper size</small></div>
+    <div class="gh" style="--c:${C.turn}">${dot("turn")} Your turn <span>1</span></div>
+    <div class="row">${dot("turn")}<b>Onboarding copy <em>8m</em></b><small>Not done · two screens left</small></div>
+    <div class="gh" style="--c:${C.safe}">${dot("safe", true)} Safe to close <span>1</span></div>
+    <div class="row sel" style="--c:${C.safe};margin-bottom:10px">${dot("safe", true)}<b>Billing totals <em>now</em></b><small>Safe to close · PR merged, ticket done</small></div>
+  </div>
+</div></div>`, caption);

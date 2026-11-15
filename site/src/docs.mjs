@@ -87,6 +87,8 @@ export const pages = {
 <li><strong>Closing never deletes.</strong> Maxwell only runs <code>claude stop</code>, which keeps the conversation.</li>
 <li><strong>"Not safe" teaches it.</strong> Mark a wrong call and it becomes a test case, so the mistake can't repeat.</li>
 </ol>
+<h2>The status line</h2>
+<p>Every new session is asked to end each reply with one line: <strong>Safe to close</strong>, <strong>Not done</strong> or <strong>Needs you</strong>, and a few words. Maxwell shows it on the row. <strong>Needs you</strong> moves the session to Needs you, and <strong>Not done</strong> keeps it out of Safe to close. A <strong>Safe to close</strong> line is one more piece of evidence, never enough alone. <code>wrap-line = off</code> turns it off.</p>
 <h2>Close sessions</h2>
 <p>${k("⇧ ⌘ X")} closes every safe session. It shows the list and asks first. ${k("⇧ ⌘ ⌫")} closes the selected session: at once when it's safe, otherwise after saying what's still open.</p>
 <p>${k("⌘ Z")} undoes a close for 10 seconds. Anything closed in the last 7 days can be reopened from <strong>Recently closed</strong>.</p>
@@ -376,6 +378,7 @@ safe-after = 2h               <span class="c"># quiet time before a session can 
 idle-after = 24h              <span class="c"># quiet time before a stopped session folds into Idle</span>
 judge = on                    <span class="c"># off skips the model read, so nothing is ever safe</span>
 skip-permissions = on         <span class="c"># off keeps Claude's own permission mode</span>
+wrap-line = on                <span class="c"># off: replies don't end with a status line</span>
 notify = true
 auto-open = true              <span class="c"># open .md files and artifacts a session writes</span>
 artifacts = viewer            <span class="c"># viewer | browser</span></code></pre>

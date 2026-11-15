@@ -34,7 +34,35 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-terminal-keys">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-status-line">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.19</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-status-line">Every reply ends with where the session stands</a></h2>
+    <figure class="fig"><div class="plate" aria-hidden="true"><div class="w lg"><div class="split2">
+  <div>
+    <div class="wh"><b>Billing totals</b><span class="sp"></span><span class="acct">work</span></div>
+    <div class="scr"><span class="m">⏺</span> Merged #212 and moved ACME-56
+  to Done. Nothing else is open.
+
+  <span class="g">Safe to close</span> <span class="m">· PR merged, ticket done</span></div>
+  </div>
+  <div>
+    <div class="gh" style="--c:var(--need);padding-top:12px"><i class="d" style="--c:var(--need)"></i> Needs you <span>1</span></div>
+    <div class="row"><i class="d" style="--c:var(--need)"></i><b>Invoice PDF export <em>1m</em></b><small><span style="color:var(--need)">Needs you</span> · pick a paper size</small></div>
+    <div class="gh" style="--c:var(--turn)"><i class="d" style="--c:var(--turn)"></i> Your turn <span>1</span></div>
+    <div class="row"><i class="d" style="--c:var(--turn)"></i><b>Onboarding copy <em>8m</em></b><small>Not done · two screens left</small></div>
+    <div class="gh" style="--c:var(--safe)"><i class="d o" style="--c:var(--safe)"></i> Safe to close <span>1</span></div>
+    <div class="row sel" style="--c:var(--safe);margin-bottom:10px"><i class="d o" style="--c:var(--safe)"></i><b>Billing totals <em>now</em></b><small>Safe to close · PR merged, ticket done</small></div>
+  </div>
+</div></div></div></figure>
+    <div class="prose"><p>Sessions now end each reply with a short status line: <strong>Safe to close</strong>, <strong>Not done</strong> or <strong>Needs you</strong>, and a few words on why. Maxwell shows the line on the session's row, so you can read where every session stands without opening it.</p>
+<p>The line is also evidence. <strong>Needs you</strong> moves the session to Needs you. <strong>Not done</strong> keeps it out of Safe to close, whatever else passes. Maxwell gives each new session the rule through its SessionStart hook, so nothing changes in your prompts.</p>
+<p>Turn it off with <code>wrap-line = off</code> in the config.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>The installed hook now updates itself when Maxwell updates</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-terminal-keys">
   <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.15 – v0.1.18</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-15-terminal-keys">Terminal keys that work like Ghostty</a></h2>
