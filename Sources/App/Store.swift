@@ -145,8 +145,9 @@ final class Store {
         guard let account = state.account(s.accountId) else { onBrought?(s, "no account \(s.accountId)"); return }
         bringing.insert(s.id)
         let name = String((s.name.isEmpty ? s.title : s.name).prefix(40))
+        let skip = config.skipPermissions
         DispatchQueue.global().async { [weak self] in
-            let why = Self.move(s, account: account, name: name)
+            let why = Self.move(s, account: account, name: name, skipPermissions: skip)
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.bringing.remove(s.id)
@@ -158,10 +159,10 @@ final class Store {
         }
     }
 
-    private static func move(_ s: Session, account: Account, name: String) -> String? {
-        var skip = true
+    private static func move(_ s: Session, account: Account, name: String, skipPermissions: Bool) -> String? {
+        var skip = skipPermissions
         if let p = ClaudeCLI.terminalProcess(sessionId: s.id, account: account) {
-            skip = p.skipsPermissions
+            skip = skipPermissions || p.skipsPermissions
             kill(p.pid, SIGTERM)
             let until = Date().addingTimeInterval(15)
             while kill(p.pid, 0) == 0, Date() < until { usleep(200_000) }
@@ -242,8 +243,9 @@ final class Store {
     /// Starts a background session and resolves its full id from the next listing.
     func newSession(account: Account, cwd: String, name: String, model: String? = nil, prompt: String? = nil,
                     done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
+        let skip = config.skipPermissions
         DispatchQueue.global().async { [weak self] in
-            let r = ClaudeCLI.startBackground(account: account, cwd: cwd, name: name, model: model, prompt: prompt)
+            let r = ClaudeCLI.startBackground(account: account, cwd: cwd, name: name, skipPermissions: skip, model: model, prompt: prompt)
             DispatchQueue.main.async {
                 guard let self else { return }
                 switch r {

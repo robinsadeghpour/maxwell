@@ -233,6 +233,7 @@ for handBack in [
 ] { check(Reply.classify(handBack) != .statement, "hand-back is not a finished report: \(handBack.prefix(40))") }
 check(Config.parse("project = Orbit ~/projects/orbit*").projects == [ProjectRule(name: "Orbit", glob: "~/projects/orbit*")], "project rules parse")
 check(Config.parse("safe-after = 90m").safeAfter == 5400 && Config().safeAfter == 7200, "safe-after parses, default 2h")
+check(Config().skipPermissions && Config.parse(Config.starter).skipPermissions && !Config.parse("skip-permissions = off").skipPermissions, "skip-permissions defaults on, off turns it off")
 check(Config().theme(systemDark: true) == "graphite" && Config().theme(systemDark: false) == "paper", "the pair follows the system")
 check(Config.parse("appearance = light").theme(systemDark: true) == "paper" && Config.parse("theme-dark = silver\nappearance = dark").theme(systemDark: false) == "silver", "appearance pins a side")
 check(Config.parse("theme = silver\nappearance = light").theme(systemDark: false) == "silver", "theme = stays a fixed override")

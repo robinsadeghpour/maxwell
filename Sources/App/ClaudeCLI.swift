@@ -76,10 +76,11 @@ enum ClaudeCLI {
         }
     }
 
-    /// `claude --bg --name <name> [--model <model>] [prompt]` in `cwd`. Returns the short id it prints.
-    /// `model` is for test runs (haiku); sessions you start keep your default.
-    static func startBackground(account: Account, cwd: String, name: String, model: String? = nil, prompt: String? = nil) -> Swift.Result<String, StartError> {
+    /// `claude --bg --name <name> [--dangerously-skip-permissions] [--model <model>] [prompt]` in `cwd`.
+    /// Returns the short id it prints. `model` is for test runs (haiku); sessions you start keep your default.
+    static func startBackground(account: Account, cwd: String, name: String, skipPermissions: Bool, model: String? = nil, prompt: String? = nil) -> Swift.Result<String, StartError> {
         var args = ["--bg", "--name", name]
+        if skipPermissions { args.append("--dangerously-skip-permissions") }
         if let model { args += ["--model", model] }
         if let prompt { args.append(prompt) }
         let r = run(claudePath, args, cwd: cwd, env: env(for: account), timeout: 30)
