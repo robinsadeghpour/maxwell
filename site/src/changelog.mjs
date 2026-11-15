@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-cleaner-panels",
+    date: "2026-11-15",
+    versions: "0.1.20",
+    title: "Quieter plugin lists and a tidier Settings",
+    figure: fig.panels(),
+    body: `
+<p>The Linear and Slack lists now read like lists. Ticket keys sit in their own dim column, so titles line up. A ticket with nothing to add is one line tall. Status badges are a dot and a word. A row's buttons show when the pointer is on it, so they no longer crowd the text.</p>
+<p>Every Settings tab picks its options from one segmented control, and notes wrap instead of being cut off. Each plugin's description reads in full under its switch.</p>`,
+    fixes: [
+      "Fixed × on the System or Usage panel closing both. It now closes only its own panel. The bottom panels together still hide with ⌥⌘J",
+      "Plugin panel section titles now match the other panel headers",
+    ],
+  },
+  {
     slug: "2026-11-15-status-line",
     date: "2026-11-15",
     versions: "0.1.19",

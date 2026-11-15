@@ -148,7 +148,7 @@ project-logo = Acme ~/projects/acme/apps/web/app/icon.png</code></pre>
     figure: fig.panels(),
     body: `
 <h2>Move a panel</h2>
-<p>Drag a panel's header to another side. A panel collapses to a thin stripe and opens again with one click. Panels remember their place on each screen, like tool windows in JetBrains IDEs.</p>
+<p>Drag a panel's header to another side. A panel's × collapses that panel alone to a thin stripe, and it opens again with one click. Panels remember their place on each screen, like tool windows in JetBrains IDEs.</p>
 <h2>Toggle sides</h2>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌘ B")}</td><td>Left panels</td></tr>

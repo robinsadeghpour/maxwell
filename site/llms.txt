@@ -37,6 +37,7 @@
 
 ## Changelog
 
+- [Quieter plugin lists and a tidier Settings](https://www.runmaxwell.com/changelog/2026-11-15-cleaner-panels) (2026-11-15, v0.1.20)
 - [Every reply ends with where the session stands](https://www.runmaxwell.com/changelog/2026-11-15-status-line) (2026-11-15, v0.1.19)
 - [Terminal keys that work like Ghostty](https://www.runmaxwell.com/changelog/2026-11-15-terminal-keys) (2026-11-15, v0.1.15 – 0.1.18)
 - [Plugins: Linear and Slack](https://www.runmaxwell.com/changelog/2026-11-15-plugins) (2026-11-15, v0.1.14)
