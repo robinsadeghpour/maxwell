@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-pin-and-mark-sessions",
     date: "2026-11-15",
-    versions: "0.1.44",
+    versions: "0.1.45",
     title: "Pin sessions, and overrule a verdict",
     figure: "",
     body: `
@@ -17,6 +17,16 @@ export default [
     fixes: [
       "Sessions that started before Maxwell asked for the status line now get the request with your next prompt",
     ],
+  },
+  {
+    slug: "2026-11-15-open-a-folder-with-maxwell",
+    date: "2026-11-15",
+    versions: "0.1.44",
+    title: "Start a session from any terminal's folder",
+    figure: "",
+    body: `
+<p>Run <code>open -a Maxwell .</code> in any terminal, or drop a folder on Maxwell in the Dock, and the new-session panel opens with that folder picked. ${k("⏎")} starts the session there, so you don't need a terminal inside Maxwell to start in the right place.</p>`,
+    fixes: [],
   },
   {
     slug: "2026-11-15-claude-in-a-maxwell-terminal",
