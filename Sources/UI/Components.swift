@@ -363,6 +363,23 @@ final class Label: MXView, TipSource {
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? { tip.map { ($0, bounds) } }
 }
 
+/// A borderless one-line text input in the mono font, for panels that draw their own frame.
+enum PlainField {
+    static func make(font: NSFont = Fonts.mono(), delegate: NSTextFieldDelegate? = nil) -> NSTextField {
+        let f = NSTextField()
+        f.isBordered = false
+        f.drawsBackground = false
+        f.focusRingType = .none
+        f.font = font
+        f.delegate = delegate
+        return f
+    }
+
+    static func placeholder(_ f: NSTextField, _ text: String, color: NSColor) {
+        f.placeholderAttributedString = NSAttributedString(string: text, attributes: [.foregroundColor: color, .font: f.font ?? Fonts.mono()])
+    }
+}
+
 enum Format {
     static let clock: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm"; return f }()
     static let dayClock: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEE HH:mm"; return f }()

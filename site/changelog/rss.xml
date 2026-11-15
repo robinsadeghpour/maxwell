@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>New sessions start in the right project</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-new-sessions-start-in-the-right-project</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-new-sessions-start-in-the-right-project</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘N&lt;/kbd&gt;&lt;/span&gt; now starts with the project. Inside a project, it starts there and &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⏎&lt;/kbd&gt;&lt;/span&gt; goes. From All projects nothing is picked until you pick, so a session no longer lands in the folder of whatever you looked at last.&lt;/p&gt;
+&lt;p&gt;Type a few letters to find any project: the folders your sessions used, and every git repo in the usual places such as &lt;code&gt;~/projects&lt;/code&gt;, &lt;code&gt;~/Developer&lt;/code&gt; and &lt;code&gt;~/Documents/GitHub&lt;/code&gt;, even ones no session has opened yet. &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;↑&lt;/kbd&gt;&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;↓&lt;/kbd&gt;&lt;/span&gt; move, and &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘O&lt;/kbd&gt;&lt;/span&gt; still picks any folder.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Maxwell now warns before starting a session in your home folder or a folder outside any project, where Claude would see everything below it&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Groups hold up when sessions get busy</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-groups-under-load</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-groups-under-load</guid>
