@@ -57,6 +57,17 @@ struct Theme {
 
     var appearance: NSAppearance? { NSAppearance(named: dark ? .darkAqua : .aqua) }
 
+    /// A plugin's tone: quiet by default; only `bad` borrows the loud needs-you colour.
+    func color(for tone: PluginNote.Tone) -> NSColor {
+        switch tone {
+        case .neutral: return fg3
+        case .info: return fg2
+        case .good: return safe
+        case .warn: return chk
+        case .bad: return on
+        }
+    }
+
     func color(for group: PhaseGroup) -> NSColor {
         switch group {
         case .needsYou: return on

@@ -1,0 +1,320 @@
+{
+ "me": "U_ME",
+ "users": {
+  "U_ME": {
+   "name": "Me",
+   "kind": "member"
+  },
+  "U_A": {
+   "name": "Mara",
+   "kind": "member"
+  },
+  "U_B": {
+   "name": "Jonas",
+   "kind": "member"
+  },
+  "U_D": {
+   "name": "Priya",
+   "kind": "member"
+  },
+  "U_F": {
+   "name": "Sam",
+   "kind": "member"
+  },
+  "U_G": {
+   "name": "Lea",
+   "kind": "member"
+  },
+  "U_C": {
+   "name": "Alex (Northwind)",
+   "kind": "external"
+  },
+  "B_1": {
+   "name": "Ops bot",
+   "kind": "bot"
+  },
+  "B_2": {
+   "name": "CI",
+   "kind": "bot"
+  }
+ },
+ "conversations": [
+  {
+   "id": "C_SUPPORT",
+   "kind": "channel",
+   "name": "#support",
+   "external": true,
+   "messages": [
+    {
+     "ts": "1767592200.000001",
+     "user": "U_C",
+     "text": "the dashboard shows no data since yesterday for our second store",
+     "thread_ts": "1767592200.000001",
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767593400.000001",
+     "user": "U_ME",
+     "text": "looking, which store is it?",
+     "thread_ts": "1767592200.000001",
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767595800.000001",
+     "user": "U_C",
+     "text": "the Berlin one. any news?",
+     "thread_ts": "1767592200.000001",
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "D_A",
+   "kind": "dm",
+   "name": "Mara",
+   "messages": [
+    {
+     "ts": "1767585600.000001",
+     "user": "U_ME",
+     "text": "shipped the new setup page",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767600720.000001",
+     "user": "U_A",
+     "text": "checkout throws an error for the second store",
+     "thread_ts": null,
+     "files": 1,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767600780.000002",
+     "user": "U_A",
+     "text": "customer just sent this screenshot",
+     "thread_ts": null,
+     "files": 1,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767602160.000001",
+     "user": "U_A",
+     "text": "also quick q, should the trial-end email go out on day 7 or 14?",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "D_B",
+   "kind": "dm",
+   "name": "Jonas",
+   "messages": [
+    {
+     "ts": "1767579600.000001",
+     "user": "U_B",
+     "text": "btw noch ein sale, onboarding freitag",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767592800.000001",
+     "user": "U_B",
+     "text": "kannst du dir den vertrag anschauen? check mal bitte",
+     "thread_ts": null,
+     "files": 1,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "C_DEV",
+   "kind": "channel",
+   "name": "#dev",
+   "messages": [
+    {
+     "ts": "1767599400.000001",
+     "user": "U_G",
+     "text": "<@U_ME> can you review the export PR before the release?",
+     "thread_ts": "1767599400.000001",
+     "files": 0,
+     "mentions": [
+      "U_ME"
+     ],
+     "reactions": []
+    },
+    {
+     "ts": "1767600000.000001",
+     "user": "U_D",
+     "text": "I can look at the tests part",
+     "thread_ts": "1767599400.000001",
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767602700.000001",
+     "user": "U_F",
+     "text": "anyone know why staging is slow today?",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "C_OPS",
+   "kind": "channel",
+   "name": "#ops",
+   "messages": [
+    {
+     "ts": "1767584400.000001",
+     "user": "B_1",
+     "text": ":raising_hand: <@U_ME> should the design agent be switched on for the new client? They asked twice.",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [
+      "U_ME"
+     ],
+     "reactions": []
+    },
+    {
+     "ts": "1767601800.000001",
+     "user": "B_2",
+     "text": "[nightly] Success in 98s",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "D_D",
+   "kind": "dm",
+   "name": "Priya",
+   "messages": [
+    {
+     "ts": "1767588000.000001",
+     "user": "U_D",
+     "text": "could you add logins for three colleagues? names in the doc",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767588600.000001",
+     "user": "U_ME",
+     "text": "on it",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767588660.000001",
+     "user": "U_D",
+     "text": "thx!",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "C_SALES",
+   "kind": "channel",
+   "name": "#sales",
+   "messages": [
+    {
+     "ts": "1767513600.000001",
+     "user": "U_F",
+     "text": "<@U_ME> can you send me the updated pricing deck for Thursday?",
+     "thread_ts": "1767513600.000001",
+     "files": 0,
+     "mentions": [
+      "U_ME"
+     ],
+     "reactions": []
+    },
+    {
+     "ts": "1767514200.000001",
+     "user": "U_ME",
+     "text": "will do",
+     "thread_ts": "1767513600.000001",
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "D_G",
+   "kind": "dm",
+   "name": "Lea",
+   "messages": [
+    {
+     "ts": "1767598200.000001",
+     "user": "U_G",
+     "text": "can you unlock chat for the new workspace?",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767598800.000001",
+     "user": "U_ME",
+     "text": "done, should work now",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    },
+    {
+     "ts": "1767598920.000001",
+     "user": "U_G",
+     "text": "it does, thanks!",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  },
+  {
+   "id": "D_F",
+   "kind": "dm",
+   "name": "Sam",
+   "messages": [
+    {
+     "ts": "1767603600.000001",
+     "user": "U_F",
+     "text": "the search feature is life changing btw",
+     "thread_ts": null,
+     "files": 0,
+     "mentions": [],
+     "reactions": []
+    }
+   ]
+  }
+ ]
+}

@@ -5,7 +5,7 @@ import Foundation
 /// ~/projects/notes that edits Acme all day points at Acme.
 struct ProjectVotes: Equatable {
     var paths: [String: Int] = [:]     // file or folder → times touched
-    var linear: [String: Int] = [:]    // "TIN" → times an id like TIN-123 was named
+    var linear: [String: Int] = [:]    // "ACME" → times an id like ACME-123 was named
 
     /// Adds what one transcript line points at: paths from assistant tool calls, Linear ids from
     /// prompts, replies and tool output. Not from attachments or meta lines: those carry

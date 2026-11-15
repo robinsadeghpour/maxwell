@@ -54,6 +54,18 @@ struct Config: Equatable {
     var projects: [ProjectRule] = []
     var accounts: [Account] = []
     var keybinds: [String: String] = [:]   // action id -> shortcut, e.g. "new-session" -> "cmd+n"
+    /// `<plugin>.<key> = value` lines: each plugin's settings, by plugin id (docs/plugins.md).
+    var plugins: [PluginID: [String: String]] = [:]
+
+    /// Plugins are on unless `<id>.enabled = false`.
+    func pluginEnabled(_ id: PluginID) -> Bool { plugins[id]?["enabled"].map { !["false", "off"].contains($0) } ?? true }
+
+    /// A plugin's settings with the manifest's defaults filled in. Secrets are never here.
+    func pluginSettings(_ m: PluginManifest) -> [String: String] {
+        var out: [String: String] = [:]
+        for f in m.settings where f.type != .secret { out[f.key] = plugins[m.id]?[f.key] ?? f.default ?? "" }
+        return out
+    }
 
     static let lightThemes = ["paper", "silver-light"]
     static let darkThemes = ["graphite", "silver"]
@@ -130,7 +142,10 @@ struct Config: Equatable {
                 guard let eq = value.lastIndex(of: "=") else { continue }
                 c.keybinds[String(value[value.index(after: eq)...]).trimmingCharacters(in: .whitespaces)] =
                     String(value[..<eq]).trimmingCharacters(in: .whitespaces)
-            default: continue
+            default:
+                // linear.team = TIN
+                guard let dot = key.firstIndex(of: "."), dot != key.startIndex else { continue }
+                c.plugins[String(key[..<dot]), default: [:]][String(key[key.index(after: dot)...])] = value
             }
         }
         return c.accounts.isEmpty ? withDiscoveredAccounts(c) : c

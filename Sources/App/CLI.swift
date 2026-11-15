@@ -59,7 +59,7 @@ func runCLI(_ args: [String]) -> Int32? {
                     guard g != .working else { continue }
                     let checks = state.checks(s, now: now, rules: rules)
                     for c in checks where g == .safeToClose || c.outcome != .pass {
-                        print("      \(mark[c.outcome]!) \(c.kind.title): \(c.detail)  [\(c.source)]")
+                        print("      \(mark[c.outcome]!) \(c.title): \(c.detail)  [\(c.source)]")
                     }
                 }
             }

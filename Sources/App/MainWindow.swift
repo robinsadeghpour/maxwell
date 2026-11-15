@@ -91,6 +91,20 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.onSuggestion = { [weak self] id, project, accept in
             if accept { self?.store.moveProject(id, to: project) } else { self?.store.dismissSuggestion(id, project) }
         }
+        root.sidebar.list.onBadge = { [weak self] id, b in
+            if let a = b.badge.action { self?.store.runPluginAction(b.plugin, a, session: id) }
+        }
+        store.onPluginsChanged = { [weak self] in self?.pluginsChanged() }
+        root.pluginPanel.onRun = { [weak self] plugin, action, session, item in self?.store.runPluginAction(plugin, action, session: session, item: item) }
+        root.pluginPanel.onSelectSession = { [weak self] in self?.open($0) }
+        root.pluginPanel.onOpenURL = { NSWorkspace.shared.open($0) }
+        root.pluginPanel.onRestart = { [weak self] in self?.store.plugins.restart($0) }
+        store.plugins.onStartSession = { [weak self] _, prompt, name, cwd, model, done in
+            guard let self, self.startHere(prompt: prompt, name: name, cwd: cwd, model: model, done: done) else {
+                return done(.failure(.init(message: "No folder to start in. Open a session in the project first.")))
+            }
+        }
+        root.pluginPanel.onSettings = { [weak self] _ in self?.showSettings(.plugins) }
         root.sidebar.list.onDragSession = { [weak self] on in
             guard let self else { return }
             self.root.rail.sessionDrag = on
@@ -202,7 +216,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let rows = shown.map { g, list in (g, list.map { s in
             Row(session: s, group: g, detail: detail(s, state: state),
                 checks: g == .safeToClose ? state.checks(s, now: now, rules: rules) : [], closedAt: g == .recentlyClosed ? state.closed[s.id]?.at : nil,
-                suggestion: g == .recentlyClosed ? nil : state.suggestion(s, in: projects))
+                suggestion: g == .recentlyClosed ? nil : state.suggestion(s, in: projects), badges: badges(s, state: state))
         }) }
         let hours = Int(store.config.idleAfter / 3600)
         root.sidebar.list.idleNote = hours >= 48 && hours % 24 == 0 ? "quiet \(hours / 24)d+" : "quiet \(hours)h+"
@@ -223,7 +237,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.titleBar.current = current
         let s = current.flatMap { state.sessions[$0] ?? state.closed[$0]?.session }
         root.sessionPane.show(s, group: s.flatMap { state.group($0, now: now, rules: rules) },
-                              blockers: s.map { state.checks($0, now: now, rules: rules).filter { $0.outcome != .pass }.map { "\($0.kind.title): \($0.detail)" } } ?? [],
+                              blockers: s.map { state.checks($0, now: now, rules: rules).filter { $0.outcome != .pass }.map { "\($0.title): \($0.detail)" } } ?? [],
                               project: s.map { state.project($0, in: projects) },
                               account: s.flatMap { state.account($0.accountId) },
                               terminal: current.flatMap { detached.contains($0) ? nil : terminals[$0] },
@@ -233,6 +247,27 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             let n = state.sessions.values.filter { if case .needsYou = $0.phase { return true }; return false }.count
             return n > 0 ? "\(n)" : nil
         }()
+    }
+
+    /// Plugin badges for a row, plugin by plugin in name order.
+    private func badges(_ s: Session, state: AppState) -> [RowBadge] {
+        (state.notes[s.id] ?? [:]).sorted { $0.key < $1.key }.flatMap { pid, note in
+            note.badges.map { b in
+                // A badge's tooltip also lists the plugin's fields for the session.
+                var badge = b
+                let fields = note.fields.map { "\($0.label): \($0.value)" }
+                if !fields.isEmpty { badge.tooltip = ([b.tooltip ?? b.text] + fields).joined(separator: "\n") }
+                return RowBadge(plugin: pid, badge: badge, actionTitle: b.action.flatMap { a in store.plugins.manifest(pid)?.actions.first { $0.id == a }?.title })
+            }
+        }
+    }
+
+    /// Whether a plugin's action can run now: the plugin runs, and a session action applies to the session.
+    private func pluginActionEnabled(_ m: PluginManifest, _ a: PluginManifest.ActionDecl, session: SessionID?) -> Bool {
+        guard store.plugins.status[m.id]?.isRunning == true else { return false }
+        guard a.scope == .session else { return true }
+        guard let id = session, let note = store.state.notes[id]?[m.id] else { return false }
+        return note.actions?.contains(a.id) ?? true
     }
 
     /// Repo roots by folder (where a project's logo is searched; a folder outside git is its
@@ -276,6 +311,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             close.keyEquivalentModifierMask = .command
             m.addItem(close)
         }
+        let pluginItems = store.plugins.manifests.flatMap { pm in
+            pm.actions.filter { $0.scope == .session && pluginActionEnabled(pm, $0, session: s.id) }.map { a in
+                MenuAction(a.title) { [weak self] in self?.store.runPluginAction(pm.id, a.id, session: s.id) }
+            }
+        }
+        if !pluginItems.isEmpty { m.addItem(.separator()); pluginItems.forEach { m.addItem($0) } }
         return m
     }
 
@@ -378,7 +419,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         switch p {
         case .sessions: focus(1)
         case .viewer: focus(3)
-        case .usage, .system: break
+        case .usage, .system, .plugins: break
         }
     }
 
@@ -584,7 +625,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         guard !open.isEmpty, let w = window else { return closeNow(s) }
         let a = NSAlert()
         a.messageText = s.phase == .working ? "“\(s.title)” is still working. Close it anyway?" : "Close “\(s.title)”?"
-        let reasons = open.prefix(4).map { "• \($0.kind.title): \($0.detail)" }.joined(separator: "\n")
+        let reasons = open.prefix(4).map { "• \($0.title): \($0.detail)" }.joined(separator: "\n")
         a.informativeText = "Not safe to close yet:\n\(reasons)\n\nClaude stops, and the conversation is kept. Undo right after, or reopen it from Recently closed for 7 days."
         a.addButton(withTitle: "Close Session")
         a.addButton(withTitle: "Cancel")
@@ -821,6 +862,23 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     func toast(_ s: String) { root.status.show(toast: s) }
 
+    private var pluginSignature = ""
+    private var pluginRun: [PluginID: PluginStatus.Run] = [:]
+    /// Plugins changed: new actions and menu when the set changed, a toast when one stops for good.
+    private func pluginsChanged() {
+        let host = store.plugins
+        let sig = host.manifests.filter { store.config.pluginEnabled($0.id) }.map { "\($0.id)@\($0.version)" }.joined(separator: ",")
+        if sig != pluginSignature { pluginSignature = sig; rebuildActions() }
+        for (id, st) in host.status {
+            if case .failed(let why) = st.run, pluginRun[id] != st.run { toast("\(host.manifest(id)?.name ?? id) stopped: \(why). Settings › Plugins can restart it.") }
+            pluginRun[id] = st.run
+        }
+        root.pluginPanel.update(host: host, state: store.state)
+        root.setPluginPanels(!host.panels.isEmpty || host.manifests.contains { !$0.panels.isEmpty && store.config.pluginEnabled($0.id) })
+        refreshSettings()
+        render(store.state)
+    }
+
     /// ⌘K: the same search, limited to actions.
     func showPalette() { showSearch(query: "> ") }
 
@@ -879,6 +937,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         v.onAddAccount = { [weak self] in self?.addAccount() }
         v.onBrowser = { [weak self] account, choice in self?.onConfigEdit?("browser:\(account)", choice?.line ?? "") }
         v.onRunAction = { [weak self] id in self?.actions.first { $0.id == id }?.run() }
+        v.onPluginSecret = { [weak self] id, key, value in
+            self?.store.plugins.setSecret(id, key, value)
+            self?.refreshSettings()
+        }
+        v.onPluginRestart = { [weak self] in self?.store.plugins.restart($0) }
         settings.show(settingsModel, section: section)
     }
 
@@ -886,7 +949,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         SettingsModel(config: store.config, hookStatus: hookStatus, accounts: store.state.accounts, projects: projectNames, projectRoots: projectRoots,
                       actions: actions.map { ($0.id, $0.title, $0.menu, $0.shortcut?.display ?? "") }.sorted { $0.menu < $1.menu },
                       themeName: Look.theme.name, systemDark: SystemAppearance.isDark,
-                      updateReady: updater.ready?.version, updateStatus: updateStatus)
+                      updateReady: updater.ready?.version, updateStatus: updateStatus,
+                      plugins: store.plugins.manifests.map { m in
+                          PluginInfo(manifest: m, status: store.plugins.status[m.id] ?? PluginStatus(run: .off),
+                                     secretsSet: Set(m.settings.filter { $0.type == .secret && store.plugins.secrets.get(m.id, $0.key) != nil }.map(\.key)))
+                      },
+                      brokenPlugins: store.plugins.broken.map { ($0.dir.lastPathComponent, "\($0.why)") },
+                      pluginsFolder: (store.plugins.paths.user.path as NSString).abbreviatingWithTildeInPath)
     }
 
     /// Adds `account = <name> <dir>` for a folder that holds a Claude login.
@@ -969,19 +1038,29 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// ⌘T: a new session in the current session's folder on the account with the most room, no questions.
     func newSessionHere() {
         dismissOverlays()
+        guard startHere(prompt: nil, name: nil, cwd: nil, model: nil, done: { _ in }) else { return showNewSession() }
+    }
+
+    /// ⌘T and a plugin's `session/start`: the current folder (or `cwd`), the account with the most room.
+    /// False when there is no folder or account to start in.
+    @discardableResult
+    func startHere(prompt: String?, name: String?, cwd: String?, model: String?, done: @escaping (Result<SessionID, PluginHost.StartFailure>) -> Void) -> Bool {
         let state = store.state
-        guard let folder = folderHere(state), let a = state.roomiest(now: Date()) ?? state.accounts.first else { return showNewSession() }
-        let base = (folder as NSString).lastPathComponent.lowercased().replacingOccurrences(of: " ", with: "-")
+        guard let folder = cwd ?? folderHere(state), let a = state.roomiest(now: Date()) ?? state.accounts.first else { return false }
+        let base = name ?? (folder as NSString).lastPathComponent.lowercased().replacingOccurrences(of: " ", with: "-")
         let name = "\(base)-\(String(format: "%02x", Int.random(in: 0..<256)))"
         toast("Starting \(name) on \(a.name)…")
-        store.newSession(account: a, cwd: folder, name: name) { [weak self] r in
+        store.newSession(account: a, cwd: folder, name: name, model: model, prompt: prompt) { [weak self] r in
             guard let self else { return }
             switch r {
-            case .success(let id): self.toast("Started \(name) on \(a.name)."); self.open(id)
-            case .failure(.untrusted): self.toast("Not trusted on \(a.name) yet. Run claude there once and accept.")
-            case .failure(let e): self.toast("\(e)")
+            case .success(let id): self.toast("Started \(name) on \(a.name)."); self.open(id); done(.success(id))
+            case .failure(.untrusted):
+                let why = "Not trusted on \(a.name) yet. Run claude there once and accept."
+                self.toast(why); done(.failure(.init(message: why)))
+            case .failure(let e): self.toast("\(e)"); done(.failure(.init(message: "\(e)")))
             }
         }
+        return true
     }
 
     private func dismissOverlays() {
@@ -1094,6 +1173,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: actions
 
+    /// Actions and the menu bar again, for plugins that came or went.
+    func rebuildActions() {
+        actions = makeActions()
+        NSApp.mainMenu = MenuBuilder.build(actions)
+    }
+
     private func makeActions() -> [Action] {
         let hasCurrent: () -> Bool = { [weak self] in self?.current != nil }
         let hasArtifact: () -> Bool = { [weak self] in
@@ -1155,8 +1240,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 guard let self else { return }; self.onConfigEdit?("terminal-font-size", "\(Int(max(8, self.store.config.terminalFontSize - 1)))")
             },
         ]
+        let pluginPanel: () -> Bool = { [weak self] in self?.root.hasPluginPanels == true }
         for p in PanelID.allCases {
-            list.append(Action(id: "panel-\(p.rawValue)", title: "\(p.title) Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+\(p.key)")) { [weak self] in self?.togglePanel(p) })
+            list.append(Action(id: "panel-\(p.rawValue)", title: "\(p.title) Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+\(p.key)"),
+                               isEnabled: p == .plugins ? pluginPanel : { true }) { [weak self] in self?.togglePanel(p) })
         }
         for p in PanelID.allCases {
             for d in Dock.allCases {
@@ -1185,6 +1272,18 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "install-hooks", title: "Install Hooks", menu: "Maxwell", shortcut: Shortcut("cmd+shift+h")) { [weak self] in self?.installHooks() },
             Action(id: "uninstall-hooks", title: "Uninstall Hooks", menu: "Maxwell", shortcut: Shortcut("cmd+shift+u")) { [weak self] in self?.uninstallHooks() },
         ]
+        // Plugin actions: menu, ⌘K and a default shortcut unless a built-in one already has it.
+        let taken = Set(list.compactMap { $0.shortcut?.display })
+        for m in store.plugins.manifests where store.config.pluginEnabled(m.id) {
+            for a in m.actions {
+                let key = a.shortcut.flatMap(Shortcut.init).flatMap { taken.contains($0.display) ? nil : $0 }
+                list.append(Action(id: "\(m.id).\(a.id)", title: a.title, menu: "Plugins", shortcut: key,
+                                   isEnabled: { [weak self] in self.map { $0.pluginActionEnabled(m, a, session: $0.current) } ?? false }) { [weak self] in
+                    guard let self else { return }
+                    self.store.runPluginAction(m.id, a.id, session: a.scope == .session ? self.current : nil)
+                })
+            }
+        }
         let binds = store.config.keybinds
         return list.map { a in
             var a = a

@@ -1,0 +1,55 @@
+{
+ "id": "uuid-eng-41",
+ "identifier": "ENG-41",
+ "title": "Old onboarding emails",
+ "url": "https://linear.app/acme/issue/ENG-41/x",
+ "state": {
+  "id": "st-canceled",
+  "name": "Canceled",
+  "type": "canceled",
+  "position": 4
+ },
+ "team": {
+  "key": "ENG",
+  "states": {
+   "nodes": [
+    {
+     "id": "st-backlog",
+     "name": "Backlog",
+     "type": "backlog",
+     "position": 0
+    },
+    {
+     "id": "st-todo",
+     "name": "Todo",
+     "type": "unstarted",
+     "position": 1
+    },
+    {
+     "id": "st-progress",
+     "name": "In Progress",
+     "type": "started",
+     "position": 2
+    },
+    {
+     "id": "st-done",
+     "name": "Done",
+     "type": "completed",
+     "position": 3
+    },
+    {
+     "id": "st-canceled",
+     "name": "Canceled",
+     "type": "canceled",
+     "position": 4
+    },
+    {
+     "id": "st-dup",
+     "name": "Duplicate",
+     "type": "duplicate",
+     "position": 5
+    }
+   ]
+  }
+ }
+}

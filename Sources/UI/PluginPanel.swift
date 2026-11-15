@@ -1,0 +1,335 @@
+import AppKit
+
+/// The panel plugins draw into (docs/plugins.md, `panel/set`): one tab per contributed panel,
+/// and a list drawn with the same rows, badges and buttons as the session list.
+final class PluginPanel: MXView, PanelContent, TipSource {
+    struct Tab: Equatable { var plugin: PluginID; var panel: String; var title: String }
+    private(set) var tabs: [Tab] = []
+    private var views: [PluginID: [String: PluginView]] = [:]
+    private var counts: [PluginID: [String: Int]] = [:]
+    private var statuses: [PluginID: PluginStatus] = [:]
+    private var names: [PluginID: String] = [:]
+    private(set) var selected: Tab?
+    private let scroll = NSScrollView()
+    private let body = PluginListView(frame: .zero)
+    private let headerLine = Fill { $0.hair2 }
+    private var hoverTab: Int?
+
+    var onRun: ((PluginID, String, SessionID?, String?) -> Void)? { didSet { body.onRun = { [weak self] a, s, item in self?.selected.map { self?.onRun?($0.plugin, a, s, item) } } } }
+    var onSelectSession: ((SessionID) -> Void)? { didSet { body.onSelectSession = onSelectSession } }
+    var onOpenURL: ((URL) -> Void)? { didSet { body.onOpenURL = onOpenURL } }
+    var onRestart: ((PluginID) -> Void)?
+    var onSettings: ((PluginID) -> Void)?
+
+    /// The header right of the tabs drags the panel; the tabs themselves take the click.
+    var gripRect: NSRect {
+        let x = tabs.count > 1 ? (tabRects().last?.maxX ?? 0) + 4 : 0
+        return NSRect(x: x, y: 0, width: max(0, bounds.width - 64 - x), height: Metrics.header)
+    }
+    func preferredExtent(along d: Dock) -> CGFloat? { nil }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .overlay
+        scroll.documentView = body
+        addSubview(scroll)
+        addSubview(headerLine)
+        body.onStatusButton = { [weak self] in
+            guard let self, let tab = self.selected else { return }
+            if case .failed = self.statuses[tab.plugin]?.run { self.onRestart?(tab.plugin) } else { self.onSettings?(tab.plugin) }
+        }
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func update(host: PluginHost, state: AppState) {
+        let enabled = host.manifests.filter { host.status[$0.id].map { $0.run != .off } ?? false }
+        let newTabs = enabled.flatMap { m in m.panels.map { Tab(plugin: m.id, panel: $0.id, title: $0.title) } }
+        // The drag grip sits right of the tabs (gripRect), so the root re-places it when they change.
+        if newTabs != tabs { tabs = newTabs; rootView?.needsLayout = true }
+        views = host.panels
+        if counts != host.counts { counts = host.counts; rootView?.needsLayout = true }
+        statuses = host.status
+        names = Dictionary(uniqueKeysWithValues: host.manifests.map { ($0.id, $0.name) })
+        if selected == nil || !tabs.contains(selected!) {
+            let saved = UserDefaults.standard.string(forKey: "Maxwell.pluginTab")
+            selected = tabs.first { "\($0.plugin)/\($0.panel)" == saved } ?? tabs.first
+        }
+        refreshBody()
+        needsDisplay = true
+    }
+
+    func select(plugin: PluginID) {
+        guard let t = tabs.first(where: { $0.plugin == plugin }) else { return }
+        selected = t
+        UserDefaults.standard.set("\(t.plugin)/\(t.panel)", forKey: "Maxwell.pluginTab")
+        refreshBody()
+        needsDisplay = true
+    }
+
+    private func refreshBody() {
+        guard let tab = selected else { body.content = .message("No plugin adds a panel.", nil, nil); return layoutBody() }
+        let name = names[tab.plugin] ?? tab.plugin
+        let st = statuses[tab.plugin] ?? PluginStatus()
+        switch st.run {
+        case .failed(let why): body.content = .message("\(name) stopped.", why, "Restart")
+        case .stopped(let why): body.content = .message("\(name) stopped. Restarting…", why, nil)
+        case .starting: body.content = .message("Starting \(name)…", nil, nil)
+        case .off: body.content = .message("\(name) is off.", nil, "Settings…")
+        case .running:
+            if st.reported == .setup { body.content = .message(st.message ?? "\(name) needs setup.", "Settings › Plugins › \(name)", "Settings…"); break }
+            switch views[tab.plugin]?[tab.panel] {
+            case nil, .loading?: body.content = .message("Loading…", nil, nil)
+            case .empty(let title, let text, let action)?: body.content = .empty(title, text, action)
+            case .list(let sections)?: body.content = .list(sections)
+            }
+        }
+        layoutBody()
+    }
+
+    private func layoutBody() {
+        body.frame = NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: max(scroll.contentSize.height, body.contentHeight(width: scroll.contentSize.width)))
+        body.needsDisplay = true
+    }
+
+    override func layout() {
+        super.layout()
+        headerLine.frame = NSRect(x: 0, y: Metrics.header - 1, width: bounds.width, height: 1)
+        scroll.frame = NSRect(x: 0, y: Metrics.header, width: bounds.width, height: max(0, bounds.height - Metrics.header))
+        layoutBody()
+    }
+
+    private var rootView: NSView? {
+        var v = superview
+        while let x = v, !(x is RootView) { v = x.superview }
+        return v
+    }
+
+    /// "SLACK 3": the tab's title and how many of its items need you.
+    private func label(_ tab: Tab) -> String {
+        guard let n = counts[tab.plugin]?[tab.panel], n > 0 else { return tab.title.uppercased() }
+        return "\(tab.title.uppercased()) \(n)"
+    }
+
+    private func tabRects() -> [NSRect] {
+        let font = Fonts.mono(Metrics.fontSize - 2.5, .medium)
+        var x: CGFloat = 12
+        return tabs.map { tab in
+            let w = Text.width(label(tab), font: font) + 12
+            defer { x += w + 2 }
+            return NSRect(x: x - 6, y: 5, width: w, height: Metrics.header - 10)
+        }
+    }
+
+    override func draw(_ r: NSRect) {
+        let font = Fonts.mono(Metrics.fontSize - 2.5, .medium)
+        if tabs.isEmpty { Text.draw("PLUGINS", in: NSRect(x: 12, y: 0, width: 120, height: Metrics.header), color: t.fg3, font: font) }
+        for (i, (tab, rect)) in zip(tabs, tabRects()).enumerated() {
+            let on = tab == selected
+            if on || hoverTab == i {
+                (on ? t.rowSel : t.hover).setFill()
+                NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3).fill()
+            }
+            Text.draw(label(tab), in: rect.insetBy(dx: 6, dy: 0), color: on ? t.fg : t.fg3, font: font)
+        }
+        // The plugin's own one-line status, right-aligned, when it isn't simply running.
+        if let tab = selected, let st = statuses[tab.plugin], st.run == .running, let r = st.reported, r != .ok, r != .setup {
+            let x = (tabRects().last?.maxX ?? 12) + 8
+            Text.draw(st.line, in: NSRect(x: x, y: 0, width: max(0, bounds.width - 70 - x), height: Metrics.header), color: t.fg3, font: font, align: .right)
+        }
+    }
+
+    override func mouseMoved(with e: NSEvent) {
+        let p = convert(e.locationInWindow, from: nil)
+        let h = tabRects().firstIndex { $0.contains(p) }
+        if h != hoverTab { hoverTab = h; needsDisplay = true }
+    }
+    override func mouseExited(with e: NSEvent) { hoverTab = nil; needsDisplay = true }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    override func mouseDown(with e: NSEvent) {
+        let p = convert(e.locationInWindow, from: nil)
+        guard tabs.count > 1, let i = tabRects().firstIndex(where: { $0.contains(p) }) else { return super.mouseDown(with: e) }
+        select(plugin: tabs[i].plugin)
+    }
+
+    func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
+        guard let i = tabRects().firstIndex(where: { $0.contains(p) }) else { return nil }
+        let tab = tabs[i]
+        return (Tip("\(tab.title), from the \(names[tab.plugin] ?? tab.plugin) plugin").adding(statuses[tab.plugin]?.line ?? ""), tabRects()[i])
+    }
+}
+
+/// The scrolling body: a status message, an empty state, or sections of two-line rows.
+final class PluginListView: MXView, TipSource {
+    enum Content: Equatable {
+        case message(String, String?, String?)     // headline, detail, button
+        case empty(String, String?, PluginView.Button?)
+        case list([PluginView.Section])
+    }
+    var content: Content = .message("", nil, nil) { didSet { if content != oldValue { needsDisplay = true } } }
+    var onRun: ((String, SessionID?, String?) -> Void)?
+    var onSelectSession: ((SessionID) -> Void)?
+    var onOpenURL: ((URL) -> Void)?
+    var onStatusButton: (() -> Void)?
+    private var hover: Hit?
+
+    private enum Hit: Equatable { case row(String), button(String, String), statusButton }
+    private static let section: CGFloat = 24
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func contentHeight(width: CGFloat) -> CGFloat {
+        guard case .list(let sections) = content else { return 120 }
+        return sections.reduce(8) { $0 + ($1.title.isEmpty ? 0 : Self.section) + CGFloat($1.rows.count) * Metrics.row2 } + 8
+    }
+
+    private struct Layout { var sections: [(String, CGFloat)]; var rows: [(PluginView.Row, NSRect)] }
+    private func layoutRows() -> Layout {
+        guard case .list(let sections) = content else { return Layout(sections: [], rows: []) }
+        var y: CGFloat = 4, heads: [(String, CGFloat)] = [], rows: [(PluginView.Row, NSRect)] = []
+        for s in sections {
+            if !s.title.isEmpty { heads.append((s.title, y)); y += Self.section }
+            for r in s.rows { rows.append((r, NSRect(x: 0, y: y, width: bounds.width, height: Metrics.row2))); y += Metrics.row2 }
+        }
+        return Layout(sections: heads, rows: rows)
+    }
+
+    /// Action buttons on a row's second line, right-aligned; the first is the main one.
+    private func buttonRects(_ row: PluginView.Row, in r: NSRect) -> [(PluginView.Button, NSRect)] {
+        let small = Fonts.mono(Metrics.fontSize - 2)
+        var right = r.maxX - 16
+        var out: [(PluginView.Button, NSRect)] = []
+        for b in row.actions.prefix(2) {
+            let w = Text.width(b.title, font: small) + 12
+            let rect = NSRect(x: right - w, y: r.minY + 20, width: w, height: 15)
+            if rect.minX < r.minX + r.width * 0.15 { break }
+            out.append((b, rect))
+            right = rect.minX - 4
+        }
+        return out
+    }
+
+    private func statusButtonRect(_ title: String) -> NSRect {
+        NSRect(x: 14, y: 60, width: Text.width(title, font: Fonts.mono(Metrics.fontSize - 1)) + 12, height: 18)
+    }
+
+    override func draw(_ dirty: NSRect) {
+        let small = Fonts.mono(Metrics.fontSize - 2)
+        switch content {
+        case .message(let head, let detail, let button):
+            drawMessage(head, detail, button)
+        case .empty(let head, let detail, let action):
+            drawMessage(head, detail, action?.title)
+        case .list(let sections):
+            if sections.allSatisfy({ $0.rows.isEmpty }) { return drawMessage("Nothing here.", nil, nil) }
+            let l = layoutRows()
+            for (title, y) in l.sections {
+                Text.draw(title, in: NSRect(x: 14, y: y, width: bounds.width - 28, height: Self.section), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1, .semibold))
+            }
+            for (row, r) in l.rows {
+                let box = r.insetBy(dx: 6, dy: 1.5)
+                if hover == .row(row.id) { t.hover.setFill(); NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5).fill() }
+                var right = box.maxX - 10
+                if let b = row.badge {
+                    let w = min(box.width * 0.45, Text.width(b.text, font: small) + 19)
+                    let rect = NSRect(x: right - w, y: r.minY + 4.5, width: w, height: 15)
+                    let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+                    t.hair2.setFill(); path.fill(); t.hair.setStroke(); path.lineWidth = 1; path.stroke()
+                    t.color(for: b.tone).setFill()
+                    NSBezierPath(roundedRect: NSRect(x: rect.minX + 6, y: rect.midY - 2.5, width: 5, height: 5), xRadius: 1, yRadius: 1).fill()
+                    Text.draw(b.text, in: NSRect(x: rect.minX + 15, y: rect.minY, width: rect.width - 19, height: 15), color: t.fg2, font: small)
+                    right = rect.minX - 8
+                }
+                // Rows with a status lead with the session glyph that means the same, like the sessions list.
+                let indent: CGFloat = row.status == nil ? 8 : 22
+                if let st = row.status {
+                    Glyph.draw(st.glyph, at: NSPoint(x: box.minX + 11, y: r.minY + 12), color: t.color(for: st.glyph), angle: 90)
+                }
+                Text.draw(row.title, in: NSRect(x: box.minX + indent, y: r.minY + 3, width: right - box.minX - indent, height: 18), color: t.fg)
+                let buttons = buttonRects(row, in: box)
+                let subRight = buttons.map(\.1.minX).min().map { $0 - 6 } ?? box.maxX - 10
+                if let sub = row.subtitle {
+                    Text.draw(sub, in: NSRect(x: box.minX + indent, y: r.minY + 20, width: subRight - box.minX - indent, height: 15), color: t.fg3, font: small)
+                }
+                for (b, rect) in buttons {
+                    let hot = hover == .button(row.id, b.action)
+                    let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+                    (hot ? t.hover : t.hair2).setFill(); path.fill()
+                    t.hair.setStroke(); path.lineWidth = 1; path.stroke()
+                    Text.draw(b.title, in: rect, color: hot ? t.fg : t.fg2, font: small, align: .center)
+                }
+            }
+        }
+    }
+
+    private func drawMessage(_ head: String, _ detail: String?, _ button: String?) {
+        Text.draw(head, in: NSRect(x: 14, y: 14, width: bounds.width - 28, height: 18), color: t.fg2)
+        if let detail { Text.draw(detail, in: NSRect(x: 14, y: 32, width: bounds.width - 28, height: 18), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 1)) }
+        if let button {
+            let r = statusButtonRect(button)
+            let path = NSBezierPath(roundedRect: r.insetBy(dx: 0.5, dy: 0.5), xRadius: 3, yRadius: 3)
+            if hover == .statusButton { t.hover.setFill(); path.fill() }
+            t.hair.setStroke(); path.lineWidth = 1; path.stroke()
+            Text.draw(button, in: r, color: t.fg, font: Fonts.mono(Metrics.fontSize - 1), align: .center)
+        }
+    }
+
+    private var statusButtonTitle: String? {
+        switch content {
+        case .message(_, _, let b): return b
+        case .empty(_, _, let a): return a?.title
+        case .list: return nil
+        }
+    }
+
+    private func hit(_ p: NSPoint) -> (Hit, PluginView.Row?)? {
+        if let b = statusButtonTitle, statusButtonRect(b).contains(p) { return (.statusButton, nil) }
+        for (row, r) in layoutRows().rows where r.contains(p) {
+            if let (b, _) = buttonRects(row, in: r.insetBy(dx: 6, dy: 1.5)).first(where: { $0.1.insetBy(dx: -2, dy: -2).contains(p) }) { return (.button(row.id, b.action), row) }
+            return (.row(row.id), row)
+        }
+        return nil
+    }
+
+    override func mouseMoved(with e: NSEvent) {
+        let h = hit(convert(e.locationInWindow, from: nil))?.0
+        if h != hover { hover = h; needsDisplay = true }
+    }
+    override func mouseExited(with e: NSEvent) { hover = nil; needsDisplay = true }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with e: NSEvent) {
+        guard let (h, row) = hit(convert(e.locationInWindow, from: nil)) else { return }
+        switch h {
+        case .statusButton:
+            if case .empty(_, _, let a?) = content { onRun?(a.action, nil, nil) } else { onStatusButton?() }
+        case .button(_, let action): onRun?(action, row?.session, row?.id)
+        case .row:
+            guard let row else { return }
+            if let s = row.session { onSelectSession?(s) } else if let u = row.url.flatMap(URL.init(string:)) { onOpenURL?(u) }
+            else if let first = row.actions.first { onRun?(first.action, nil, row.id) }
+        }
+    }
+
+    func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
+        guard let (h, row) = hit(p), let row else { return nil }
+        let r = layoutRows().rows.first { $0.0.id == row.id }!.1
+        switch h {
+        case .button(_, let a):
+            let rect = buttonRects(row, in: r.insetBy(dx: 6, dy: 1.5)).first { $0.0.action == a }!.1
+            return (Tip(row.actions.first { $0.action == a }?.title ?? a).adding(row.title), rect)
+        case .row:
+            if row.session != nil { return (Tip("Open the session").adding(row.title), r) }
+            if let u = row.url { return (Tip("Open \(u)"), r) }
+            return nil
+        case .statusButton: return nil
+        }
+    }
+}

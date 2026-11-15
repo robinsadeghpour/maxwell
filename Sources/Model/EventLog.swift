@@ -112,13 +112,15 @@ enum MaxwellRecord {
     }
 
     static func encode(_ c: Check) -> [String: String] {
-        ["kind": c.kind.rawValue, "outcome": c.outcome.rawValue, "detail": c.detail, "source": c.source]
+        var d = ["kind": c.kind.rawValue, "outcome": c.outcome.rawValue, "detail": c.detail, "source": c.source]
+        if let n = c.name { d["name"] = n }
+        return d
     }
 
     static func decode(_ any: Any?) -> [Check] {
         ((any as? [[String: String]]) ?? []).compactMap { d in
             guard let k = d["kind"].flatMap(Check.Kind.init), let o = d["outcome"].flatMap(Check.Outcome.init) else { return nil }
-            return Check(kind: k, outcome: o, detail: d["detail"] ?? "", source: d["source"] ?? "")
+            return Check(kind: k, outcome: o, detail: d["detail"] ?? "", source: d["source"] ?? "", name: d["name"])
         }
     }
 

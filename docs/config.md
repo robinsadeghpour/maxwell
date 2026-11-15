@@ -83,6 +83,17 @@ first image in the folders its sessions run in: an Xcode `AppIcon.appiconset`, t
 then `icon.png`/`icon.svg`/`app-icon*`, then `logo*`, then `favicon*` (not `.ico`), shallower first, then
 `.github/logo.svg`; with none, a two-letter monogram. Maxwell's own key is the app icon's demon.
 
+## Plugins
+
+Each plugin's settings are lines named after it. Settings › Plugins writes them; secrets such as
+API keys go in the Keychain, never here. See [`plugins.md`](plugins.md).
+
+```
+linear.enabled = true         # false turns a plugin off (default: on)
+linear.sync = suggest         # suggest | auto | off: ticket status moves
+linear.writes = live          # live | dry-run: dry run logs moves and comments instead of sending
+```
+
 ## Keys
 
 Settings › Keys lists every action. Click a shortcut, press the new keys; ⌫ clears it, Esc cancels.

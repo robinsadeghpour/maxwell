@@ -7,13 +7,13 @@ final class Dimmer: Fill {
 
 /// The panels that live around the terminal, JetBrains tool-window style.
 enum PanelID: String, CaseIterable, Codable {
-    case sessions, viewer, usage, system
+    case sessions, viewer, usage, system, plugins
 
     var title: String { rawValue.capitalized }
     /// ⌥⌘ and this number shows, focuses or hides the panel (⌥⌘2 is the terminal).
-    var key: Int { switch self { case .sessions: return 1; case .viewer: return 3; case .usage: return 4; case .system: return 5 } }
+    var key: Int { switch self { case .sessions: return 1; case .viewer: return 3; case .usage: return 4; case .system: return 5; case .plugins: return 6 } }
     /// Lists and documents take what room there is; widgets take what they need.
-    var flexible: Bool { self == .sessions || self == .viewer }
+    var flexible: Bool { self == .sessions || self == .viewer || self == .plugins }
 }
 
 enum Dock: String, CaseIterable, Codable {
@@ -24,7 +24,7 @@ enum Dock: String, CaseIterable, Codable {
 /// Where every panel sits, which are collapsed to a stripe, and how big each area is.
 /// Saved per screen, so the laptop and the external display keep their own arrangement.
 struct PanelLayout: Codable, Equatable {
-    var place: [PanelID: Dock] = [.sessions: .left, .viewer: .right, .usage: .bottom, .system: .bottom]
+    var place: [PanelID: Dock] = [.sessions: .left, .viewer: .right, .usage: .bottom, .system: .bottom, .plugins: .right]
     var order: [PanelID] = PanelID.allCases
     var hidden: Set<PanelID> = []
     var size: [Dock: CGFloat] = [.left: Metrics.side, .right: Metrics.viewer, .bottom: 220]
@@ -80,6 +80,14 @@ final class RootView: MXView {
     let viewerPane = ViewerPane(frame: .zero)
     let usage = UsagePanel(frame: .zero)
     let system = SystemPanel(frame: .zero)
+    let pluginPanel = PluginPanel(frame: .zero)
+    /// A plugin contributes a panel: only then does the Plugins panel exist.
+    private(set) var hasPluginPanels = false
+    func setPluginPanels(_ on: Bool) {
+        guard on != hasPluginPanels else { return }
+        hasPluginPanels = on
+        sync(animated: window != nil)
+    }
     let status = StatusBar(frame: .zero)
     let sessionDim = Dimmer { $0.dim }
     let viewerDim = Dimmer { $0.dim }
@@ -190,12 +198,13 @@ final class RootView: MXView {
         case .viewer: return viewerPane
         case .usage: return usage
         case .system: return system
+        case .plugins: return pluginPanel
         }
     }
 
     /// Panels in an area that are on screen: not collapsed, and the viewer only with a file.
     func shown(_ d: Dock) -> [PanelID] {
-        panels.panels(d).filter { !panels.hidden.contains($0) && ($0 != .viewer || viewerOpen) }
+        panels.panels(d).filter { !panels.hidden.contains($0) && ($0 != .viewer || viewerOpen) && ($0 != .plugins || hasPluginPanels) }
     }
 
     func isShown(_ p: PanelID) -> Bool { shown(panels.place[p] ?? .left).contains(p) }
@@ -248,7 +257,7 @@ final class RootView: MXView {
     }
 
     private func stripeItems(_ side: Dock) -> [Stripe.Item] {
-        let hidden = { (d: Dock) in self.panels.panels(d).filter { self.panels.hidden.contains($0) } }
+        let hidden = { (d: Dock) in self.panels.panels(d).filter { self.panels.hidden.contains($0) && ($0 != .plugins || self.hasPluginPanels) } }
         var items = hidden(side).map { Stripe.Item(panel: $0, lower: false) }
         // JetBrains keeps bottom tool windows on the lower part of the left stripe.
         if side == .left { items += hidden(.bottom).map { Stripe.Item(panel: $0, lower: true) } }
@@ -592,7 +601,12 @@ final class DockView: MXView {
         let hidden = (1 - reveal) * extent
         let off: NSPoint = dock == .left ? NSPoint(x: -hidden, y: 0) : dock == .right ? NSPoint(x: hidden, y: 0) : NSPoint(x: 0, y: hidden)
         let along = dock == .bottom ? bounds.width : bounds.height
-        let fixed = views.map { $0.1.preferredExtent(along: dock) }
+        // A widget's preferred extent is its height; next to a list or document in the bottom area
+        // it gets a fixed share of the width instead, so its columns never collapse.
+        let fixed: [CGFloat?] = views.map { p, v in
+            guard let e = v.preferredExtent(along: dock) else { return nil }
+            return dock == .bottom ? min(460, along / CGFloat(views.count)) : e
+        }
         let flexCount = CGFloat(fixed.filter { $0 == nil }.count)
         let gaps = CGFloat(max(0, views.count - 1))
         let fixedSum = fixed.compactMap { $0 }.reduce(0, +)

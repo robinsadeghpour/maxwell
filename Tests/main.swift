@@ -74,7 +74,7 @@ let later = 6.0 + 7200 + 60
 var safe = evidence(s, "s1", at: later)
 check(groupOf(safe, "s1", at: later) == .safeToClose, "every check passing -> safe to close")
 check(verdictOf(safe, "s1", at: later).allSatisfy { !$0.source.isEmpty && !$0.detail.isEmpty }, "every check names what it found and where")
-check(Set(verdictOf(safe, "s1", at: later).map(\.kind)) == Set(Check.Kind.allCases).subtracting([.marked]), "the checklist has every check")
+check(Set(verdictOf(safe, "s1", at: later).map(\.kind)) == Set(Check.Kind.allCases).subtracting([.marked, .plugin]), "the checklist has every check")
 check(groupOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180) == .yourTurn, "3 minutes after the reply is your turn, not safe")
 check(outcome(verdictOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180), .quiet) == .fail, "quiet fails before safe-after")
 
@@ -387,6 +387,10 @@ if let (st, sess, now, r) = FalseSafe.decode((try? JSONSerialization.jsonObject(
 
 logoTests()
 artifactTests()
+pluginTests()
+pluginHostTests()
+linearTests()
+linearPluginTests()
 
 print(failures == 0 ? "reducer tests: all passed" : "reducer tests: \(failures) failed")
 exit(failures == 0 ? 0 : 1)

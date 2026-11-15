@@ -107,10 +107,10 @@ enum MenuBuilder {
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         add(edit, to: main)
 
-        for title in ["Session", "Projects", "View", "Panels"] {
+        for title in ["Session", "Projects", "View", "Panels", "Plugins"] {
             let m = NSMenu(title: title)
             for a in actions where a.menu == title { m.addItem(item(a)) }
-            add(m, to: main)
+            if m.numberOfItems > 0 { add(m, to: main) }
         }
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

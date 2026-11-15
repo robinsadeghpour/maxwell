@@ -8,6 +8,14 @@ struct Row: Equatable {
     var checks: [Check] = []   // Safe to close rows: the evidence, shown when expanded
     var closedAt: Date?        // Recently closed rows
     var suggestion: String?    // "→ Acme?": the project its transcript points at
+    var badges: [RowBadge] = []   // from plugins, e.g. "ACME-56 · In Review"
+}
+
+/// A plugin's badge on a session row; a click runs its action for that session.
+struct RowBadge: Equatable {
+    var plugin: PluginID
+    var badge: PluginNote.Badge
+    var actionTitle: String?
 }
 
 extension NSPasteboard.PasteboardType {
@@ -35,6 +43,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     var menuFor: ((Session) -> NSMenu?)?
     /// The suggestion chip: true moves the session there, false dismisses it.
     var onSuggestion: ((SessionID, String, Bool) -> Void)?
+    /// A plugin badge was clicked.
+    var onBadge: ((SessionID, RowBadge) -> Void)?
     /// A row drag started (true) or ended (false), so the rail can show itself as a target.
     var onDragSession: ((Bool) -> Void)?
     private var downAt: (point: NSPoint, row: Row)?
@@ -115,7 +125,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         switch it {
         case .group(let g, _): return "g\(g.rawValue)"
         case .session(let r): return r.session.id
-        case .check(let c): return "c\(c.kind.rawValue)\(c.detail)"
+        case .check(let c): return "c\(c.kind.rawValue)\(c.title)\(c.detail)"
         case .notSafe(let id): return "n" + id
         }
     }
@@ -288,15 +298,60 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             Text.draw(Self.chipText(row.suggestion!), in: c.chip, color: chipHover == .chip(s.id) ? t.fg : t.fg2, font: small, align: .center)
             Text.draw("×", in: c.close, color: chipHover == .close(s.id) ? t.fg : t.fg3, font: small, align: .center)
         }
-        let right1 = compact ? (chip?.chip.minX ?? right - ageW) - 8 : right - ageW - 8
+        let badges = badgeRects(row, in: r)
+        for (rect, b) in badges { drawBadge(b, in: rect, hot: badgeHover == BadgeHover(session: s.id, badge: b)) }
+        let badgeLeft = badges.map(\.0.minX).min()
+        let right1 = compact ? (badgeLeft ?? chip?.chip.minX ?? right - ageW) - 8 : right - ageW - 8
         if compact {
             let tagW = min(110, Text.width(row.detail, font: small))
             Text.draw(row.detail, in: NSRect(x: right1 - tagW, y: r.minY, width: tagW, height: r.height), color: t.fg3, font: small)
             Text.draw(s.title, in: NSRect(x: titleX, y: r.minY, width: right1 - 8 - tagW - titleX, height: r.height), color: fg)
         } else {
             Text.draw(s.title, in: NSRect(x: titleX, y: line1.minY, width: right1 - titleX, height: line1.height), color: fg)
-            Text.draw(row.detail, in: NSRect(x: titleX, y: line1.maxY - 1, width: (chip?.chip.minX ?? right) - 6 - titleX, height: 15), color: t.fg3, font: small)
+            Text.draw(row.detail, in: NSRect(x: titleX, y: line1.maxY - 1, width: (badgeLeft ?? chip?.chip.minX ?? right) - 6 - titleX, height: 15), color: t.fg3, font: small)
         }
+    }
+
+    private struct BadgeHover: Equatable { var session: SessionID; var badge: RowBadge }
+    private var badgeHover: BadgeHover?
+
+    /// Plugin badges, right-aligned on the detail line, left of the suggestion chip (compact: left of
+    /// the age, one badge). A badge never takes more than half the row.
+    private func badgeRects(_ row: Row, in r: NSRect) -> [(NSRect, RowBadge)] {
+        guard !row.badges.isEmpty, row.group != .recentlyClosed else { return [] }
+        let small = Fonts.mono(Metrics.fontSize - 2)
+        let box = r.insetBy(dx: 6, dy: compact ? 1 : 1.5)
+        var right: CGFloat, midY: CGFloat
+        if let c = chipRects(row, in: r) { right = c.chip.minX - 4 } else { right = box.maxX - 10 }
+        if compact {
+            if chipRects(row, in: r) == nil { right -= max(24, Text.width(rowDetail(row.session, now: Date(), closedAt: row.closedAt), font: small)) + 6 }
+            midY = r.midY
+        } else { midY = r.minY + 27.5 }
+        var out: [(NSRect, RowBadge)] = []
+        let maxW = (box.width - 28) * 0.62
+        for b in row.badges.prefix(compact ? 1 : 2) {
+            let w = min(maxW, Text.width(b.badge.text, font: small) + 19)
+            let rect = NSRect(x: right - w, y: midY - 7.5, width: w, height: 15)
+            if rect.minX < box.minX + 28 { break }
+            out.append((rect, b))
+            right = rect.minX - 4
+        }
+        return out
+    }
+
+    private func drawBadge(_ b: RowBadge, in rect: NSRect, hot: Bool) {
+        let small = Fonts.mono(Metrics.fontSize - 2)
+        let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+        (hot ? t.hover : t.hair2).setFill(); path.fill()
+        t.hair.setStroke(); path.lineWidth = 1; path.stroke()
+        t.color(for: b.badge.tone).setFill()
+        NSBezierPath(roundedRect: NSRect(x: rect.minX + 6, y: rect.midY - 2.5, width: 5, height: 5), xRadius: 1, yRadius: 1).fill()
+        Text.draw(b.badge.text, in: NSRect(x: rect.minX + 15, y: rect.minY, width: rect.width - 19, height: rect.height), color: hot ? t.fg : t.fg2, font: small)
+    }
+
+    private func badge(at p: NSPoint) -> (RowBadge, Row, NSRect)? {
+        guard let i = index(at: p), case .session(let row) = items[i] else { return nil }
+        return badgeRects(row, in: rowRects()[i]).first { $0.0.insetBy(dx: -1, dy: -2).contains(p) }.map { ($0.1, row, $0.0) }
     }
 
     private static func chipText(_ project: String) -> String { "→ \(project)?" }
@@ -330,6 +385,11 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     /// A row's state glyph, its suggestion chip, and its age column.
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         guard let i = index(at: p), case .session(let row) = items[i] else { return nil }
+        if let (b, _, rect) = badge(at: p) {
+            var tip = Tip(b.badge.tooltip ?? b.badge.text)
+            if let a = b.actionTitle { tip = tip.adding("Click: \(a)") }
+            return (tip, rect)
+        }
         if let (part, _) = chipPart(at: p), let c = chipRects(row, in: rowRects()[i]) {
             if case .chip = part { return (Tip("Move this session to \(row.suggestion ?? "")").adding("Its folder suggests it belongs there"), c.chip) }
             return (Tip("Keep it where it is"), c.close)
@@ -362,6 +422,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     override func mouseMoved(with e: NSEvent) {
         let part = chipPart(at: convert(e.locationInWindow, from: nil))?.0
         if part != chipHover { chipHover = part; needsDisplay = true }
+        let bh = badge(at: convert(e.locationInWindow, from: nil)).flatMap { b, row, _ in b.badge.action == nil ? nil : BadgeHover(session: row.session.id, badge: b) }
+        if bh != badgeHover { badgeHover = bh; needsDisplay = true }
         let i = index(at: convert(e.locationInWindow, from: nil))
         let h = i.flatMap { i -> Int? in
             switch items[i] {
@@ -372,7 +434,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         }
         if h != hoverIndex { hoverIndex = h; needsDisplay = true }
     }
-    override func mouseExited(with e: NSEvent) { hoverIndex = nil; chipHover = nil; needsDisplay = true }
+    override func mouseExited(with e: NSEvent) { hoverIndex = nil; chipHover = nil; badgeHover = nil; needsDisplay = true }
     func toggleIdle() { toggle(.idle) }
 
     func toggle(_ g: PhaseGroup) {
@@ -394,6 +456,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     override func mouseDown(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
         downAt = nil
+        if let (b, row, _) = badge(at: p), b.badge.action != nil { onBadge?(row.session.id, b); return }
         if let (part, row) = chipPart(at: p), let project = row.suggestion {
             if case .chip = part { onSuggestion?(row.session.id, project, true) } else { onSuggestion?(row.session.id, project, false) }
             return

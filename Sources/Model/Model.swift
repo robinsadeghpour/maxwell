@@ -210,6 +210,12 @@ struct AppState: Equatable {
     var named: [SessionID: SessionTitle] = [:]
     /// Suggestions you waved away, per session.
     var dismissed: [SessionID: Set<String>] = [:]
+    /// What each plugin says about a session (badges, fields, checks), by session then plugin.
+    var notes: [SessionID: [PluginID: PluginNote]] = [:]
+    /// Display names of the plugins that are on.
+    var pluginNames: [PluginID: String] = [:]
+    /// Plugins that are on but not running, with why: their checks are unknown.
+    var pluginDown: [PluginID: String] = [:]
 
     func account(_ id: AccountID) -> Account? { accounts.first { $0.id == id } }
 

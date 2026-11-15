@@ -17,10 +17,21 @@ struct SettingsModel {
     /// The version a download is ready for, and what the last manual check said.
     var updateReady: String?
     var updateStatus: String?
+    var plugins: [PluginInfo] = []
+    var brokenPlugins: [(folder: String, why: String)] = []
+    var pluginsFolder = ""
+}
+
+/// One plugin as Settings shows it.
+struct PluginInfo {
+    var manifest: PluginManifest
+    var status: PluginStatus
+    /// Secret keys that have a value in the Keychain.
+    var secretsSet: Set<String>
 }
 
 enum SettingsSection: String, CaseIterable {
-    case general = "General", appearance = "Appearance", accounts = "Accounts", projects = "Projects", keys = "Keys", advanced = "Advanced"
+    case general = "General", appearance = "Appearance", accounts = "Accounts", projects = "Projects", plugins = "Plugins", keys = "Keys", advanced = "Advanced"
 }
 
 // MARK: controls
@@ -325,6 +336,8 @@ final class SettingsView: MXView {
     /// Sets (nil: removes) an account's `browser` line.
     var onBrowser: ((String, BrowserChoice?) -> Void)?
     private var installedBrowsers: [Browsers.Installed]?
+    var onPluginSecret: ((PluginID, String, String?) -> Void)?
+    var onPluginRestart: ((PluginID) -> Void)?
     private let sections = SectionList(frame: .zero)
     private let scroll = NSScrollView()
     private let form = FormView(frame: .zero)
@@ -366,6 +379,7 @@ final class SettingsView: MXView {
         case .appearance: appearance()
         case .accounts: accounts()
         case .projects: projects()
+        case .plugins: plugins()
         case .keys: keys()
         case .advanced: advanced()
         }
@@ -644,6 +658,65 @@ final class SettingsView: MXView {
         set("keybind", binds.sorted { $0.key < $1.key }.map { "\($0.value)=\($0.key)" }.joined(separator: "\n") + "\n")
     }
 
+    private func plugins() {
+        let w = max(200, form.bounds.width - FormView.x0 * 2 - FormView.labelW)
+        if model.plugins.isEmpty { form.text("", "No plugins installed.") }
+        for p in model.plugins {
+            let m = p.manifest
+            form.header("\(m.name)  \(m.version)\(m.bundled ? "  ·  comes with Maxwell" : "")")
+            let on = c.pluginEnabled(m.id)
+            form.toggle("On", on, note: m.description) { [weak self] in self?.set("\(m.id).enabled", $0 ? "true" : "false") }
+            guard on else { continue }
+            var buttons: [(NSView, CGFloat)] = [(Label(p.status.line, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), min(w - 190, max(160, Text.width(p.status.line, font: Fonts.mono(Metrics.fontSize - 1)) + 8)))]
+            let restart = MXButton("Restart", small: true) { [weak self] in self?.onPluginRestart?(m.id) }
+            restart.tip = Tip("Stop and start \(m.name) again")
+            let log = MXButton("Open Log", small: true) {
+                NSWorkspace.shared.open(Paths.stateDir.appendingPathComponent("plugins/\(m.id).log"))
+            }
+            log.tip = Tip("What \(m.name) wrote to stderr, and when it started and stopped")
+            buttons += [(restart, restart.intrinsicContentSize.width), (log, log.intrinsicContentSize.width)]
+            form.row("Status", buttons)
+            for f in m.settings {
+                let value = c.plugins[m.id]?[f.key] ?? f.default ?? ""
+                let key = "\(m.id).\(f.key)"
+                switch f.type {
+                case .bool:
+                    form.toggle(f.title, value == "true", note: f.help) { [weak self] in self?.set(key, $0 ? "true" : "false") }
+                case .choice:
+                    form.choice(f.title, (f.choices ?? []).map { ($0, $0.prefix(1).uppercased() + $0.dropFirst().replacingOccurrences(of: "-", with: " ")) }, current: value, note: f.help) { [weak self] in self?.set(key, $0) }
+                case .string:
+                    let field = InputField(value: value, placeholder: f.placeholder ?? "", secure: false)
+                    field.onCommit = { [weak self] in self?.set(key, $0) }
+                    form.row(f.title, [(field, min(w, 280))], note: f.help)
+                case .secret:
+                    let saved = p.secretsSet.contains(f.key)
+                    let field = InputField(value: "", placeholder: saved ? "Saved in Keychain" : (f.placeholder ?? "Paste it here"), secure: true)
+                    field.onCommit = { [weak self] v in if !v.isEmpty { self?.onPluginSecret?(m.id, f.key, v) } }
+                    var controls: [(NSView, CGFloat)] = [(field, min(w - 70, 280))]
+                    if saved {
+                        let clear = MXButton("Remove", small: true) { [weak self] in self?.onPluginSecret?(m.id, f.key, nil) }
+                        clear.tip = Tip("Delete it from the Keychain")
+                        controls.append((clear, clear.intrinsicContentSize.width))
+                    }
+                    form.row(f.title, controls, note: f.help ?? "Kept in the macOS Keychain, only \(m.name) can read it.")
+                }
+            }
+        }
+        if !model.brokenPlugins.isEmpty {
+            form.header("Couldn't load")
+            for b in model.brokenPlugins { form.text(b.folder, b.why) }
+        }
+        form.header("Install")
+        let reveal = MXButton("Reveal in Finder") { [weak self] in
+            guard let self else { return }
+            let url = URL(fileURLWithPath: (self.model.pluginsFolder as NSString).expandingTildeInPath)
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+        form.row("Plugins folder", [(Label(model.pluginsFolder, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), min(w, 320))])
+        form.row("", [(reveal, reveal.intrinsicContentSize.width)], note: "Copy a plugin's folder in; Maxwell picks it up. docs/plugins.md shows how to write one.")
+    }
+
     private func advanced() {
         form.header("Hooks")
         let install = MXButton("Install hooks", hint: "⇧⌘H") { [weak self] in self?.onInstallHooks?() }
@@ -670,6 +743,52 @@ final class SettingsView: MXView {
         } else { super.keyDown(with: e) }
     }
     override var acceptsFirstResponder: Bool { true }
+}
+
+/// A one-line text box with a hairline border. Commits on Return or when focus leaves.
+final class InputField: MXView, NSTextFieldDelegate {
+    private let field: NSTextField
+    var onCommit: ((String) -> Void)?
+    private var committed: String
+
+    init(value: String, placeholder: String, secure: Bool) {
+        field = secure ? NSSecureTextField() : NSTextField()
+        committed = value
+        super.init(frame: .zero)
+        field.stringValue = value
+        field.placeholderString = placeholder
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = Fonts.mono(Metrics.fontSize - 1)
+        field.delegate = self
+        field.cell?.isScrollable = true
+        field.cell?.usesSingleLineMode = true
+        addSubview(field)
+        lookChanged()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func lookChanged() {
+        super.lookChanged()
+        field.textColor = t.fg
+        field.placeholderAttributedString = NSAttributedString(string: field.placeholderString ?? "", attributes: Text.attrs(t.fg3, Fonts.mono(Metrics.fontSize - 1)))
+    }
+    override func layout() { super.layout(); field.frame = NSRect(x: 7, y: (bounds.height - 18) / 2, width: bounds.width - 14, height: 18) }
+    override func draw(_ r: NSRect) {
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 4.5), xRadius: 3, yRadius: 3)
+        t.hair2.setFill(); path.fill()
+        (window?.firstResponder === field.currentEditor() ? t.fg3 : t.hair).setStroke(); path.lineWidth = 1; path.stroke()
+    }
+    override func mouseDown(with e: NSEvent) { window?.makeFirstResponder(field) }
+    func controlTextDidBeginEditing(_ n: Notification) { needsDisplay = true }
+    func controlTextDidEndEditing(_ n: Notification) {
+        needsDisplay = true
+        let v = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard v != committed else { return }
+        committed = v
+        onCommit?(v)
+    }
 }
 
 /// One account's 5-hour and weekly bars, the same component as the usage panel.

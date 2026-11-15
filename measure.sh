@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Performance budgets for build/Maxwell.app. Exits 1 if any budget is exceeded.
-#   window on screen < 300 ms · idle < 150 MB · launch peak < 200 MB · 20 visited sessions < 400 MB
+#   window on screen < 300 ms · idle < 150 MB · launch peak < 200 MB · 20 visited sessions < 400 MB · plugins < 30 MB
 #   · artifacts on up to 3 accounts < 400 MB (claude.ai's sign-in page on each account's data store in turn)
 # Memory is phys_footprint (what Activity Monitor shows) of Maxwell plus the WebKit
 # helpers it started. The `claude attach` children are reported separately: they are
@@ -33,11 +33,17 @@ measure() { # name wait limit args...
   $CLEAN $BIN "$@" --quit-after $((wait + 4)) 2>/dev/null &
   local pid=$!
   sleep $wait
-  local app=$(fp $pid) wk=0 kids=0 nk=0
+  local app=$(fp $pid) wk=0 kids=0 nk=0 plug=0 np=0
   for p in $(comm -13 <(echo "$before") <(webkit)); do wk=$(echo "$wk + $(fp $p)" | bc); done
-  for p in $(pgrep -P $pid); do kids=$(echo "$kids + $(ps -o rss= -p $p | awk '{printf "%.1f", $1/1024}')" | bc); nk=$((nk + 1)); done
+  for p in $(pgrep -P $pid); do
+    # Plugins (Contents/Resources/plugins/…) are Maxwell's; claude attach children are Claude Code's.
+    if ps -o command= -p $p | grep -q '/plugins/'; then local f=$(fp $p); plug=$(echo "$plug + ${f:-0}" | bc); np=$((np + 1)); continue; fi
+    local r=$(ps -o rss= -p $p | awk '{printf "%.1f", $1/1024}')
+    kids=$(echo "$kids + ${r:-0}" | bc); nk=$((nk + 1))
+  done
   local total=$(echo "$app + $wk" | bc)
   budget "$name" "$total" "$limit" "MB (app $app + webkit $wk; $nk claude attach children ${kids} MB rss, not counted)"
+  budget "$name, $np plugin process(es)" "$plug" 30 "MB"
   wait $pid 2>/dev/null
 }
 

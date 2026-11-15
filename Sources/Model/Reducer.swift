@@ -159,6 +159,22 @@ func reduce(into s: inout AppState, _ event: Event) {
                                                 reach: .background(shortId: shortId))
         session.origin = .maxwell
         s.sessions[id] = session
+
+    case .annotated(let plugin, let id, let note):
+        if let note, !note.isEmpty || note.actions != nil { s.notes[id, default: [:]][plugin] = note }
+        else { s.notes[id]?[plugin] = nil; if s.notes[id]?.isEmpty == true { s.notes[id] = nil } }
+
+    case .pluginState(let plugin, let name, let down):
+        s.pluginNames[plugin] = name
+        s.pluginDown[plugin] = down
+
+    case .pluginOff(let plugin):
+        s.pluginNames[plugin] = nil
+        s.pluginDown[plugin] = nil
+        for id in Array(s.notes.keys) {
+            s.notes[id]?[plugin] = nil
+            if s.notes[id]?.isEmpty == true { s.notes[id] = nil }
+        }
     }
 }
 

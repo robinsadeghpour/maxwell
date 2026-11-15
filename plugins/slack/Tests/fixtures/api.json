@@ -1,0 +1,21 @@
+{
+  "auth.test": {"ok": true, "user_id": "U_ME", "team_id": "T1", "url": "https://example.slack.com/"},
+  "search.messages is:dm": {"ok": true, "messages": {"paging": {"pages": 1}, "matches": [
+    {"channel": {"id": "D_A", "is_im": true, "name": "U_A"}, "ts": "1767603600.000100",
+     "permalink": "https://example.slack.com/archives/D_A/p1767603600000100"}]}},
+  "search.messages <@U_ME>": {"ok": true, "messages": {"paging": {"pages": 0}, "matches": []}},
+  "search.messages from:<@U_ME>": {"ok": true, "messages": {"paging": {"pages": 1}, "matches": [
+    {"channel": {"id": "C_SUPPORT", "is_channel": true, "name": "support", "is_ext_shared": true}, "ts": "1767604200.000100",
+     "permalink": "https://example.slack.com/archives/C_SUPPORT/p1767604200000100?thread_ts=1767603600.000100&cid=C_SUPPORT"}]}},
+  "conversations.history D_A": {"ok": true, "has_more": false, "messages": [
+    {"type": "message", "user": "U_A", "text": "can you check the invoice export?", "ts": "1767603660.000100"},
+    {"type": "message", "subtype": "channel_join", "user": "U_A", "text": "joined", "ts": "1767603610.000100"},
+    {"type": "message", "user": "U_A", "text": "hey", "ts": "1767603600.000100"}]},
+  "conversations.replies C_SUPPORT": {"ok": true, "has_more": false, "messages": [
+    {"type": "message", "user": "U_C", "text": "the dashboard is empty for yesterday", "ts": "1767603600.000100", "thread_ts": "1767603600.000100", "reply_count": 2},
+    {"type": "message", "user": "U_ME", "text": "looking, which store?", "ts": "1767604200.000100", "thread_ts": "1767603600.000100"},
+    {"type": "message", "user": "U_C", "text": "the second one, any news?", "ts": "1767604800.000100", "thread_ts": "1767603600.000100"}]},
+  "users.info U_A": {"ok": true, "user": {"id": "U_A", "team_id": "T1", "real_name": "Teammate A", "profile": {"display_name": ""}}},
+  "users.info U_C": {"ok": true, "user": {"id": "U_C", "team_id": "T2", "real_name": "C", "profile": {"display_name": "Customer C"}}},
+  "users.info U_ME": {"ok": true, "user": {"id": "U_ME", "team_id": "T1", "real_name": "Me", "profile": {"display_name": "me"}}}
+}

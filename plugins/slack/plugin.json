@@ -1,0 +1,70 @@
+{
+  "id": "slack",
+  "name": "Slack",
+  "version": "0.1.0",
+  "description": "Who is waiting on a reply from you. Reads your DMs, mentions and threads; never posts.",
+  "protocol": 1,
+  "run": [
+    "./maxwell-slack"
+  ],
+  "settings": [
+    {
+      "key": "user-token",
+      "title": "User OAuth Token",
+      "type": "secret",
+      "help": "From ⌘K › Connect Slack…: the app's xoxp-… token."
+    },
+    {
+      "key": "days",
+      "title": "Look back (days)",
+      "type": "string",
+      "default": "14",
+      "placeholder": "14"
+    },
+    {
+      "key": "poll",
+      "title": "Check every",
+      "type": "choice",
+      "choices": [
+        "1m",
+        "2m",
+        "5m"
+      ],
+      "default": "2m"
+    },
+    {
+      "key": "source",
+      "title": "Source",
+      "type": "choice",
+      "choices": [
+        "slack",
+        "demo"
+      ],
+      "default": "slack"
+    }
+  ],
+  "actions": [
+    {
+      "id": "refresh",
+      "title": "Check Slack Now",
+      "scope": "global"
+    },
+    {
+      "id": "connect",
+      "title": "Connect Slack…",
+      "scope": "global"
+    },
+    {
+      "id": "open-next",
+      "title": "Open Next Slack Message Waiting on You",
+      "scope": "global",
+      "shortcut": "cmd+shift+s"
+    }
+  ],
+  "panels": [
+    {
+      "id": "waiting",
+      "title": "Slack"
+    }
+  ]
+}

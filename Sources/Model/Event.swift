@@ -21,6 +21,12 @@ enum Event: Equatable {
     case suggestionDismissed(SessionID, project: String)
     /// You renamed a session, or a model titled one whose own title said little; empty text clears yours.
     case titled(SessionID, SessionTitle)
+    /// A plugin's annotation of a session (docs/plugins.md); nil clears it. In memory only.
+    case annotated(PluginID, SessionID, PluginNote?)
+    /// A plugin is on; `down` says why it isn't running right now, nil while it runs.
+    case pluginState(PluginID, name: String, down: String?)
+    /// A plugin was turned off or removed: its notes and checks go with it.
+    case pluginOff(PluginID)
 }
 
 struct Hook: Equatable {

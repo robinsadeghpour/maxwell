@@ -61,6 +61,7 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 - **Panels go where you want them.** Sessions, viewer, usage and system can sit left, right or bottom, collapse to a stripe, and remember their place on each screen, like tool windows in JetBrains IDEs.
 - **Names you can read at a glance.** A session keeps Claude's title when it says something. When it's only a slug ("acme-75"), generic ("Continue Previous Task") or the first words of the prompt ("hi, do I need to do"), Haiku names the task once, for about $0.0003. Right-click a session to rename it yourself. Your name always wins. `Maxwell titles` lists every title and where it came from.
 - **Right-click a session** to open, rename, move it to another project, bring it in from a terminal, or close it.
+- **Plugins.** Linear and Slack ship with Maxwell. Linear shows each session's ticket and status on its row and adds "ticket done" to Safe to close. Slack lists who is waiting on a reply from you; Start Session links a session to the message, and it isn't safe to close until you've replied. Anyone can write a plugin in any language ([`docs/plugins.md`](docs/plugins.md)).
 - **Search everything.** ⌘P, or Shift twice, finds a session by title, project, branch, account, last message or a file it touched.
 
 ## Safe to close means safe
@@ -97,7 +98,8 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌥⌘R, ⇧⌘O | Reload the artifact, open it in the account's browser |
 | ⇧⌘I | Show or hide Idle |
 | ⇧⌘L | Switch light and dark (View › Appearance: Light, Dark, Follow System) |
-| ⌘, | Settings: General, Appearance, Accounts, Projects, Keys, Advanced (⌘1–6 inside) |
+| ⇧⌘O | Open the session's Linear ticket |
+| ⌘, | Settings: General, Appearance, Accounts, Projects, Plugins, Keys, Advanced (⌘1–7 inside) |
 
 Every key can be changed with a `keybind` line in the config.
 
@@ -115,7 +117,7 @@ Maxwell checks GitHub for a new release every few hours. When one is ready, the 
 
 ## What it touches on your Mac
 
-Everything stays on your machine. Maxwell sends nothing anywhere, apart from the Haiku reads above, which go through your own Claude account.
+Everything stays on your machine. Maxwell sends nothing anywhere, apart from the Haiku reads above, which go through your own Claude account, and what plugins you turn on send (the Linear plugin talks to Linear's API with your key, and the Slack plugin reads your DMs, mentions and threads with your token, read only; each only after you add a key).
 
 | What | Where | Undo |
 |---|---|---|
@@ -125,6 +127,8 @@ Everything stays on your machine. Maxwell sends nothing anywhere, apart from the
 | Event log | `~/.local/state/maxwell/events.jsonl` | delete the folder |
 | Config | `~/.config/maxwell/config` | delete the file |
 | claude.ai logins, one per account | Maxwell's own WebKit storage | Settings › Accounts › Sign out |
+| Your plugins | `~/.config/maxwell/plugins/` | delete the folder |
+| Plugin secrets (Linear API key, Slack token) | Keychain, "Maxwell plugin <id>" | Settings › Plugins › Remove |
 
 ## Configure
 
@@ -176,6 +180,8 @@ You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent Metal
 
 **Maxwell Dev** is a separate app with its own ID, name and a "dev" badge on its Dock icon. It works on your real sessions and config, but quitting, crashing or relaunching it never touches the Maxwell you work in. The released Maxwell changes only when you click **Restart to update**.
 
+`MAXWELL_PLUGINS_DIR` points Maxwell at another plugins folder, `MAXWELL_LINEAR_FIXTURES` and `MAXWELL_SLACK_FIXTURES` make the plugins read recorded fixtures, and `MAXWELL_AGENTS_FIXTURE` replaces `claude agents --json` with a file, for screenshots of demo sessions.
+
 Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the window stays behind yours and never takes focus, and keys and clicks are injected inside the app with `--keys "2:shift shift;3:esc"` and `--click "4:700,600"`. Screenshots come from `--snap`.
 
 | Folder | What's in it |
@@ -184,6 +190,9 @@ Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the w
 | `Sources/App` | App delegate, window, store, probes (agents, git, transcripts), CLI |
 | `Sources/UI` | The component set, rail, panels, search, viewer, libghostty embed, themes, motion |
 | `Sources/Install` | Hook installer that edits settings without reordering them |
+| `Sources/Plugins` | Plugin host: discovery, the JSON-RPC wire, restarts, Keychain secrets |
+| `plugins/` | Plugins that ship with Maxwell (Linear, Slack) and the Swift plugin SDK |
+| `examples/plugins/` | A complete plugin in 55 lines of Python |
 | `hook/` | The hook and status-line tap, in C |
 | `docs/` | Config reference and the images in this README |
 | `site/` | The website, [runmaxwell.com](https://www.runmaxwell.com) |
@@ -194,8 +203,6 @@ Ghostty is pinned to `8046a2360340ec9788e0089da5a9ed0378adf0ea`. To upgrade, cha
 
 Early. v1 covers the core: what needs you, projects, accounts, safe closing. Next, roughly in order:
 
-- Slack: who is waiting on a reply from you
-- Linear status kept in sync with sessions
 - A supervisor that handles the obvious "go on" for you, and suggests improvements you accept or reject
 - A phone app
 

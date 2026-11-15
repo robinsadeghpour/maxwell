@@ -17,11 +17,25 @@ final class Store {
     private var notifyAfter: Date?
     var onChange: ((AppState) -> Void)?
     var onViewerItem: ((SessionID, ViewerItem, Bool) -> Void)?
+    /// Plugins (docs/plugins.md). Started with the other live sources, after the window.
+    let plugins: PluginHost
+    var onPluginsChanged: (() -> Void)?
+    private var projects: Projects
+    private var pluginSyncQueued = false
     var onToast: ((String) -> Void)?
 
     init(config: Config) {
         self.config = config
         log = EventLog(url: Paths.eventLog)
+        projects = Projects(rules: config.projects)
+        let env = ProcessInfo.processInfo.environment
+        plugins = PluginHost(paths: .init(
+            user: env["MAXWELL_PLUGINS_DIR"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) } ?? Paths.configFile.deletingLastPathComponent().appendingPathComponent("plugins"),
+            bundled: Bundle.main.resourceURL?.appendingPathComponent("plugins"),
+            logs: Paths.stateDir.appendingPathComponent("plugins"),
+            data: Paths.stateDir.appendingPathComponent("plugins")),
+            secrets: KeychainSecrets(),
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")
         state = log.readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
     }
 
@@ -36,6 +50,12 @@ final class Store {
         transcripts = tw
         checkTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in self?.recheckAll() }
         recheckAll()
+        plugins.apply = { [weak self] in self?.apply($0) }
+        plugins.onChange = { [weak self] in self?.onPluginsChanged?() }
+        plugins.onNotify = { [weak self] title, body, sid in self?.post(title: title, subtitle: nil, body: body, session: sid) }
+        plugins.onOpen = { NSWorkspace.shared.open($0) }
+        plugins.reload(config)
+        syncPlugins()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             mark("notifications \(granted ? "allowed" : "not allowed")\(error.map { " (\($0.localizedDescription))" } ?? "")")
         }
@@ -56,7 +76,42 @@ final class Store {
             }
         }
         bringInQueued()
+        queuePluginSync()
         onChange?(state)
+    }
+
+    // MARK: plugins
+
+    /// One `sessions/changed` per run-loop turn, however many events came in it.
+    private func queuePluginSync() {
+        guard !pluginSyncQueued else { return }
+        pluginSyncQueued = true
+        DispatchQueue.main.async { [weak self] in
+            self?.pluginSyncQueued = false
+            self?.syncPlugins()
+        }
+    }
+
+    func syncPlugins() {
+        let now = Date(), rules = config.rules
+        plugins.sessionsChanged(state.sessions.values.filter { $0.phase != .ended }.map { s in
+            PluginHost.json(s, state: state, group: state.group(s, now: now, rules: rules), project: state.project(s, in: projects))
+        })
+    }
+
+    /// Plugins with a check on the session: the ones a close must hear from again.
+    func pluginsChecking(_ id: SessionID) -> [PluginID] {
+        (state.notes[id] ?? [:]).filter { !$0.value.checks.isEmpty }.map(\.key)
+    }
+
+    func runPluginAction(_ plugin: PluginID, _ action: String, session: SessionID?, item: String? = nil) {
+        plugins.run(plugin, action: action, session: session, item: item) { [weak self] r in
+            switch r {
+            case .success(let m?): self?.onToast?(m)
+            case .success(nil): break
+            case .failure(let e): self?.onToast?(e.message)
+            }
+        }
     }
 
     // MARK: bringing terminal sessions in
@@ -128,6 +183,7 @@ final class Store {
     func recheckAll() {
         for s in state.sessions.values where s.phase == .yourTurn { doneChecker.check(s) }
         scanHints()
+        syncPlugins()
     }
 
     /// Looks again (in the background) at where each live session's work goes.
@@ -141,6 +197,8 @@ final class Store {
     func reloadConfig(_ c: Config) {
         let accountsChanged = c.accounts.map(\.configDir) != config.accounts.map(\.configDir)
         config = c
+        projects = Projects(rules: c.projects)
+        plugins.reload(c)
         if accountsChanged {
             state = log.readNew().reduce(into: AppState(accounts: c.accounts)) { reduce(into: &$0, $1) }
             agents = AgentsProbe(accounts: c.accounts) { [weak self] in self?.apply([$0]) }
@@ -150,25 +208,32 @@ final class Store {
 
     private func notify(_ s: Session, question: String) {
         // The first listings after launch would re-announce every waiting session.
-        guard config.notify, let quiet = notifyAfter, Date() > quiet else { return }
-        let title = s.title, subtitle = "Needs you · \(state.account(s.accountId)?.name ?? s.accountId)"
+        guard let quiet = notifyAfter, Date() > quiet else { return }
+        post(title: s.title, subtitle: "Needs you · \(state.account(s.accountId)?.name ?? s.accountId)", body: question, session: s.id,
+             key: "needs-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))")
+    }
+
+    /// A macOS notification; clicking it opens the session. Off with `notify = false`.
+    func post(title: String, subtitle: String?, body: String, session: SessionID?, key: String = UUID().uuidString) {
+        guard config.notify else { return }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
                 // Until Maxwell is allowed in System Settings › Notifications, post through osascript.
                 let esc = { (x: String) in x.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-                let script = "display notification \"\(esc(question))\" with title \"\(esc(title))\" subtitle \"\(esc(subtitle))\" sound name \"Funk\""
+                let sub = subtitle.map { " subtitle \"\(esc($0))\"" } ?? ""
+                let script = "display notification \"\(esc(body))\" with title \"\(esc(title))\"\(sub) sound name \"Funk\""
                 DispatchQueue.global().async { ClaudeCLI.run("/usr/bin/osascript", ["-e", script], timeout: 5) }
-                mark("notified \(s.name) (osascript)")
+                mark("notified \(title) (osascript)")
                 return
             }
             let content = UNMutableNotificationContent()
             content.title = title
-            content.subtitle = subtitle
-            content.body = question
+            if let subtitle { content.subtitle = subtitle }
+            content.body = body
             content.sound = .default
-            content.userInfo = ["session": s.id]
-            let req = UNNotificationRequest(identifier: "needs-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))", content: content, trigger: nil)
-            UNUserNotificationCenter.current().add(req) { error in mark("notified \(s.name)\(error.map { ": \($0.localizedDescription)" } ?? "")") }
+            if let session { content.userInfo = ["session": session] }
+            let req = UNNotificationRequest(identifier: key, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(req) { error in mark("notified \(title)\(error.map { ": \($0.localizedDescription)" } ?? "")") }
         }
     }
 
@@ -285,7 +350,7 @@ final class Store {
                     guard let fresh else { return .skipped("gone from the session list") }
                     if fresh.lastMessage.map(Reply.hash) != item.hash { return .skipped("new reply since you confirmed") }
                     if let bad = self.checks(fresh).first(where: { $0.outcome != .pass }) {
-                        return .skipped("\(bad.kind.title): \(bad.detail)")
+                        return .skipped("\(bad.title): \(bad.detail)")
                     }
                     guard case .background = fresh.reach else { return .skipped("runs in another terminal; close it there") }
                     return nil
@@ -311,8 +376,19 @@ final class Store {
             self.apply([.agents(snap)])
             self.doneChecker.evaluateNow(cwd: s.cwd) { check in
                 self.apply([.doneCheck(s.id, check)])
-                let fresh = self.state.sessions[s.id]
-                then(fresh?.phase == .ended ? nil : fresh)
+                // Plugins with a check here look again too; one that doesn't answer leaves it unknown.
+                // Before asking, so this session's own latest state goes out, not the queued copy.
+                self.syncPlugins()
+                self.plugins.refresh(s.id, plugins: self.pluginsChecking(s.id)) { silent in
+                    // A plugin that didn't answer can't vouch now: its checks become unknown.
+                    for p in silent {
+                        guard var note = self.state.notes[s.id]?[p] else { continue }
+                        note.checks = note.checks.map { var c = $0; c.outcome = .unknown; c.detail = "didn't answer when closing"; return c }
+                        self.apply([.annotated(p, s.id, note)])
+                    }
+                    let fresh = self.state.sessions[s.id]
+                    then(fresh?.phase == .ended ? nil : fresh)
+                }
             }
         }
     }

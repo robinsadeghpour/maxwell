@@ -126,13 +126,13 @@ enum CheckLine {
         var x = r.minX
         x += Text.draw(mark(c.outcome), in: NSRect(x: x, y: r.minY, width: 12, height: lineH), color: color, font: small) + 6
         if stacked {
-            let kw = Text.draw(c.kind.title, in: NSRect(x: x, y: r.minY, width: r.maxX - x, height: lineH), color: t.fg2, font: small)
+            let kw = Text.draw(c.title, in: NSRect(x: x, y: r.minY, width: r.maxX - x, height: lineH), color: t.fg2, font: small)
             Text.draw(c.detail, in: NSRect(x: x + kw + 8, y: r.minY, width: max(0, r.maxX - x - kw - 8), height: lineH), color: t.fg, font: small)
             Text.draw(c.source, in: NSRect(x: x, y: r.minY + lineH - 2, width: r.maxX - x, height: lineH), color: t.fg3, font: small)
             return
         }
         let kindW: CGFloat = min(170, r.width * 0.3)
-        Text.draw(c.kind.title, in: NSRect(x: x, y: r.minY, width: kindW, height: r.height), color: t.fg2, font: small)
+        Text.draw(c.title, in: NSRect(x: x, y: r.minY, width: kindW, height: r.height), color: t.fg2, font: small)
         x += kindW + 6
         let srcW = min(Text.width(c.source, font: small), max(0, (r.maxX - x) * 0.4))
         Text.draw(c.detail, in: NSRect(x: x, y: r.minY, width: max(0, r.maxX - x - srcW - 8), height: r.height), color: t.fg, font: small)

@@ -1,7 +1,7 @@
 #!/bin/zsh
 # ./build.sh                  Maxwell Dev, build/Maxwell.app (its own app ID: never touches the released app)
 # ./build.sh release 0.1.7    the released Maxwell, build/release/Maxwell.app (use ./release.sh)
-# ./build.sh test             reducer and logo tests
+# ./build.sh test             reducer, logo and plugin tests
 # ./build.sh ghostty          (re)builds GhosttyKit at the pinned commit
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -27,7 +27,10 @@ ghostty() {
 if [[ ${1:-} == ghostty ]]; then ghostty; exit; fi
 if [[ ${1:-} == test ]]; then
   mkdir -p build
-  swiftc -swift-version 5 -o build/reducer-tests Sources/Model/*.swift Sources/UI/{ProjectLogo,Theme,IconArt}.swift Tests/*.swift
+  plugins/slack/build.sh test
+  swiftc -swift-version 5 -o build/linear-plugin plugins/sdk/MaxwellPlugin.swift plugins/linear/*.swift
+  swiftc -swift-version 5 -o build/reducer-tests Sources/Model/*.swift Sources/Plugins/*.swift Sources/UI/{ProjectLogo,Theme,IconArt}.swift \
+    plugins/linear/{LinearCore,LinearAPI}.swift Tests/*.swift
   exec build/reducer-tests fixtures/events
 fi
 
@@ -51,6 +54,11 @@ swiftc -O -swift-version 5 \
   -o "$APP/Contents/MacOS/Maxwell"
 
 cp -R Resources/web Resources/themes Resources/fonts "$APP/Contents/Resources/"
+# Plugins that ship with Maxwell: each is a folder with plugin.json and its program.
+mkdir -p "$APP/Contents/Resources/plugins/linear"
+cp plugins/linear/plugin.json "$APP/Contents/Resources/plugins/linear/"
+swiftc -O -swift-version 5 -target arm64-apple-macos14.0 -o "$APP/Contents/Resources/plugins/linear/linear" plugins/sdk/MaxwellPlugin.swift plugins/linear/*.swift
+cp -R "$(plugins/slack/build.sh)" "$APP/Contents/Resources/plugins/slack"
 # Ghostty finds its shell integration + terminfo next to the binary (Contents/Resources/{ghostty,terminfo}).
 cp -R vendor/ghostty/zig-out/share/ghostty "$APP/Contents/Resources/ghostty"
 cp -R vendor/ghostty/zig-out/share/terminfo "$APP/Contents/Resources/terminfo"

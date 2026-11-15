@@ -5,7 +5,7 @@ import CryptoKit
 /// passes; a check that could not find out is unknown, and unknown is never safe.
 struct Check: Equatable {
     enum Kind: String, CaseIterable {
-        case listed, idle, hooks, reply, quiet, worktree, pushed, pr, marked, judge
+        case listed, idle, hooks, reply, quiet, worktree, pushed, pr, marked, plugin, judge
         var title: String {
             switch self {
             case .listed: return "still running"
@@ -17,6 +17,7 @@ struct Check: Equatable {
             case .pushed: return "everything pushed"
             case .pr: return "PR merged or none"
             case .marked: return "not marked unsafe"
+            case .plugin: return "plugin check"
             case .judge: return "model read: finished"
             }
         }
@@ -27,6 +28,10 @@ struct Check: Equatable {
     var outcome: Outcome
     var detail: String    // what was found
     var source: String    // where it came from
+    /// A plugin check's own title ("Linear ticket done"); built-in checks use their kind's.
+    var name: String? = nil
+
+    var title: String { name ?? kind.title }
 
     static func allPass(_ checks: [Check]) -> Bool { checks.allSatisfy { $0.outcome == .pass } }
     /// Every check but the model read passes: the session may be worth a model read.
@@ -114,6 +119,8 @@ extension AppState {
         if let m = s.markedNotSafeAt, m >= s.lastEventAt {
             add(.marked, .fail, "you marked it not safe \(Reply.span(now.timeIntervalSince(m))) ago", "Not safe button")
         }
+
+        out += pluginChecks(s)
 
         let judgeSource = "claude -p --model haiku"
         if !rules.judge {

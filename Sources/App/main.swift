@@ -74,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }
+    func applicationWillTerminate(_ n: Notification) { store?.plugins.shutdownAll() }
     /// `open Maxwell.app` while a test run of the same bundle is up reopens that instance
     /// instead of launching a new one; you asked for the app, so it stays.
     func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows: Bool) -> Bool {

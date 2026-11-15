@@ -1,0 +1,15 @@
+{
+ "viewer": {
+  "name": "Sam Example"
+ },
+ "teams": {
+  "nodes": [
+   {
+    "key": "ENG"
+   },
+   {
+    "key": "OPS"
+   }
+  ]
+ }
+}

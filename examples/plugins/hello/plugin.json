@@ -1,0 +1,17 @@
+{
+  "id": "hello",
+  "name": "Hello",
+  "version": "1.0.0",
+  "description": "The smallest useful plugin: badges each session with its branch, lists branches in a panel.",
+  "protocol": 1,
+  "run": ["./hello.py"],
+  "settings": [
+    { "key": "greeting", "title": "Greeting", "type": "string", "default": "Hello" }
+  ],
+  "actions": [
+    { "id": "greet", "title": "Say Hello", "scope": "session", "shortcut": "cmd+shift+y" }
+  ],
+  "panels": [
+    { "id": "branches", "title": "Branches" }
+  ]
+}
