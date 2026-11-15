@@ -5,6 +5,31 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-panel-tabs-stay",
+    date: "2026-11-15",
+    versions: "0.1.42",
+    title: "Panel tabs stay on the edge",
+    figure: "",
+    body: `
+<p>Every panel now keeps its tab on the window's edge. An open panel's tab is lit. Click it to hide the panel, and click again to bring it back. Tabs no longer disappear when you open the panel they belong to.</p>`,
+    fixes: [
+      "Fixed the Viewer tab showing nothing when no file was open",
+    ],
+  },
+  {
+    slug: "2026-11-15-new-sessions-start-in-the-right-project",
+    date: "2026-11-15",
+    versions: "0.1.41",
+    title: "New sessions start in the right project",
+    figure: "",
+    body: `
+<p>${k("⌘N")} now starts with the project. Inside a project, it starts there and ${k("⏎")} goes. From All projects nothing is picked until you pick, so a session no longer lands in the folder of whatever you looked at last.</p>
+<p>Type a few letters to find any project: the folders your sessions used, and every git repo in the usual places such as <code>~/projects</code>, <code>~/Developer</code> and <code>~/Documents/GitHub</code>, even ones no session has opened yet. ${k("↑")} ${k("↓")} move, and ${k("⌘O")} still picks any folder.</p>`,
+    fixes: [
+      "Maxwell now warns before starting a session in your home folder or a folder outside any project, where Claude would see everything below it",
+    ],
+  },
+  {
     slug: "2026-11-15-groups-under-load",
     date: "2026-11-15",
     versions: "0.1.40",
