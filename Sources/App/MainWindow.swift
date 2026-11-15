@@ -1602,7 +1602,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "next-session", title: "Next Session", menu: "Session", shortcut: Shortcut("cmd+]")) { [weak self] in self?.step(1) },
             Action(id: "prev-session", title: "Previous Session", menu: "Session", shortcut: Shortcut("cmd+[")) { [weak self] in self?.step(-1) },
             Action(id: "next-needs-you", title: "Next Session That Needs You", menu: "Session", shortcut: Shortcut("cmd+j")) { [weak self] in self?.nextNeedsYou() },
-            Action(id: "reattach", title: "Reattach Terminal", menu: "Session", shortcut: Shortcut("cmd+r"), isEnabled: hasCurrent) { [weak self] in
+            Action(id: "reattach", title: "Resume Session", menu: "Session", shortcut: Shortcut("cmd+r"), isEnabled: hasCurrent) { [weak self] in
                 if let id = self?.current { self?.reattach(id) }
             },
             Action(id: "resume", title: "Resume When the Limit Resets", menu: "Session", shortcut: Shortcut("cmd+shift+r"), isEnabled: limited) { [weak self] in
