@@ -5,6 +5,22 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-settings-you-can-read",
+    date: "2026-11-15",
+    versions: "0.1.37",
+    title: "Settings you can read",
+    figure: "",
+    body: `
+<p>Every page in Settings has been rewritten in plain words. Each setting now says what it is and what it does for you, with its switch or choice on the right. They're grouped under headings that say what the group is for. "Fold into Idle", "Final model check" and "Glass tint" are now "Move quiet sessions to Idle after", "Check finished work with Haiku" (with what it costs and what turning it off means) and "Opacity".</p>
+<p>You can tell a setting's state at a glance. A switch that's off is an empty outline, and Reset shows only when you've changed a value. A theme fixed in your config file greys out the choices it overrides. Hooks are listed per account, and an account that shares another's settings.json says so. Plugins waiting for a key say "Not connected" and which key to paste.</p>
+<p>Keys has a filter (${k("⌘ F")}). Projects shows each project's logo next to its name. Uninstalling hooks now asks first.</p>`,
+    fixes: [
+      "Settings no longer shift sideways when a scrollbar appears",
+      "Install and uninstall hooks and Restart to Update no longer have a one-click Run button in Keys",
+      "Advanced › Open guide now opens the settings reference, and the raw config dump is gone",
+    ],
+  },
+  {
     slug: "2026-11-15-viewer-tabs",
     date: "2026-11-15",
     versions: "0.1.36",

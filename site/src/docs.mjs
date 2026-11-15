@@ -121,7 +121,7 @@ export const pages = {
 <h2>Rename a session</h2>
 <p>Right-click the row and choose <strong>Rename</strong>. Your name always wins. Maxwell never renames a session you named.</p>
 <h2>Name every session yourself</h2>
-<p>If you name your sessions yourself, turn off <strong>Settings › General › Sessions › Name sessions for me</strong>, or add this line to the config:</p>
+<p>If you name your sessions yourself, turn off <strong>Settings › General › Sessions › Name sessions automatically</strong>, or add this line to the config:</p>
 <pre><code>auto-titles = off</code></pre>
 <p>Each session then shows what Claude Code shows: the name you gave it with <code>/rename</code>, or its own title. Haiku never titles it, and Bring into Maxwell keeps its name.</p>
 <h2>See every title</h2>

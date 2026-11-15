@@ -1120,7 +1120,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     private var settingsModel: SettingsModel {
-        SettingsModel(config: store.config, hookStatus: hookStatus, accounts: store.state.accounts, projects: projectNames, projectRoots: projectRoots,
+        SettingsModel(config: store.config, hookStatus: hookStatus, hooks: hookStates, accounts: store.state.accounts, projects: projectNames, projectRoots: projectRoots,
                       actions: actions.map { ($0.id, $0.title, $0.menu, $0.shortcut?.display ?? "") }.sorted { $0.menu < $1.menu },
                       themeName: Look.theme.name, systemDark: SystemAppearance.isDark,
                       updateReady: updater.ready?.version, updateStatus: updateStatus, notificationsAllowed: notificationsAllowed,
@@ -1146,6 +1146,18 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             + ["\(name) \((url.path as NSString).abbreviatingWithTildeInPath)"]
         onConfigEdit?("account", lines.joined(separator: "\n") + "\n")
         toast("Added account \(name).")
+    }
+
+    /// Each account's settings.json and whether Maxwell's hooks are in it, for Settings › Advanced.
+    var hookStates: [(account: String, file: String?, installed: Bool, shared: Bool)] {
+        let files = store.config.accounts.map { a -> String? in
+            let f = a.configDir.appendingPathComponent("settings.json").resolvingSymlinksInPath()
+            return FileManager.default.fileExists(atPath: f.path) ? f.path : nil
+        }
+        return zip(store.config.accounts, files).map { a, f in
+            let installed = f.map { ((try? String(contentsOfFile: $0, encoding: .utf8)) ?? "").contains(HookInstaller.marker) } ?? false
+            return (a.name, f, installed, f != nil && files.filter { $0 == f }.count > 1)
+        }
     }
 
     var hookStatus: String {

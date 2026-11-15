@@ -6,6 +6,15 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Settings you can read</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-settings-you-can-read</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-settings-you-can-read</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Every page in Settings has been rewritten in plain words. Each setting now says what it is and what it does for you, with its switch or choice on the right. They're grouped under headings that say what the group is for. &quot;Fold into Idle&quot;, &quot;Final model check&quot; and &quot;Glass tint&quot; are now &quot;Move quiet sessions to Idle after&quot;, &quot;Check finished work with Haiku&quot; (with what it costs and what turning it off means) and &quot;Opacity&quot;.&lt;/p&gt;
+&lt;p&gt;You can tell a setting's state at a glance. A switch that's off is an empty outline, and Reset shows only when you've changed a value. A theme fixed in your config file greys out the choices it overrides. Hooks are listed per account, and an account that shares another's settings.json says so. Plugins waiting for a key say &quot;Not connected&quot; and which key to paste.&lt;/p&gt;
+&lt;p&gt;Keys has a filter (&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;F&lt;/kbd&gt;&lt;/span&gt;). Projects shows each project's logo next to its name. Uninstalling hooks now asks first.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Settings no longer shift sideways when a scrollbar appears&lt;/li&gt;&lt;li&gt;Install and uninstall hooks and Restart to Update no longer have a one-click Run button in Keys&lt;/li&gt;&lt;li&gt;Advanced › Open guide now opens the settings reference, and the raw config dump is gone&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>The viewer has tabs</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-viewer-tabs</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-viewer-tabs</guid>

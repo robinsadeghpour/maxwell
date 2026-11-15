@@ -37,6 +37,7 @@
 
 ## Changelog
 
+- [Settings you can read](https://www.runmaxwell.com/changelog/2026-11-15-settings-you-can-read) (2026-11-15, v0.1.37)
 - [The viewer has tabs](https://www.runmaxwell.com/changelog/2026-11-15-viewer-tabs) (2026-11-15, v0.1.36)
 - [Working, Needs you and Your turn you can trust](https://www.runmaxwell.com/changelog/2026-11-15-groups-you-can-trust) (2026-11-15, v0.1.35)
 - [See the agents a session runs](https://www.runmaxwell.com/changelog/2026-11-15-see-your-agents) (2026-11-15, v0.1.34)

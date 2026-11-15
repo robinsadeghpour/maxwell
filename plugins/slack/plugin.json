@@ -10,9 +10,9 @@
   "settings": [
     {
       "key": "user-token",
-      "title": "User OAuth Token",
+      "title": "User OAuth token",
       "type": "secret",
-      "help": "From ⌘K › Connect Slack…: the app's xoxp-… token."
+      "help": "Run Connect Slack… from All Actions (⌘K), then paste the xoxp-… token it gives you."
     },
     {
       "key": "days",

@@ -6,6 +6,9 @@ import UniformTypeIdentifiers
 struct SettingsModel {
     var config = Config()
     var hookStatus = ""
+    /// Per account: its settings.json (nil: none yet), whether Maxwell's hooks are in it, and
+    /// whether another account points at the same file.
+    var hooks: [(account: String, file: String?, installed: Bool, shared: Bool)] = []
     var accounts: [Account] = []
     var projects: [String] = []
     /// The folders each project's sessions run in, where its logo is searched.
@@ -41,6 +44,7 @@ enum SettingsSection: String, CaseIterable {
 /// On/off, drawn like the rest: a 26 × 14 track with a square knob, no circles.
 final class Switch: MXView {
     var isOn = false { didSet { needsDisplay = true } }
+    var isEnabled = true
     var onChange: ((Bool) -> Void)?
     private var hover = false
     override init(frame: NSRect) {
@@ -50,15 +54,18 @@ final class Switch: MXView {
     required init?(coder: NSCoder) { fatalError() }
     override func mouseEntered(with e: NSEvent) { hover = true; needsDisplay = true }
     override func mouseExited(with e: NSEvent) { hover = false; needsDisplay = true }
-    override func mouseDown(with e: NSEvent) { isOn.toggle(); onChange?(isOn) }
+    override func mouseDown(with e: NSEvent) { guard isEnabled else { return }; isOn.toggle(); onChange?(isOn) }
     override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    static let size = NSSize(width: 30, height: 18)
+    /// On is filled with the knob right; off is an empty outline with a dim knob left, so the
+    /// state reads without a second switch to compare against.
     override func draw(_ r: NSRect) {
-        let track = NSRect(x: 0.5, y: (bounds.height - 14) / 2 + 0.5, width: 26, height: 13)
-        let p = NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3)
-        (isOn ? t.sel : hover ? t.hover : t.hair2).setFill(); p.fill()
-        t.hair.setStroke(); p.lineWidth = 1; p.stroke()
-        let knob = NSRect(x: isOn ? track.maxX - 11.5 : track.minX + 1.5, y: track.minY + 1.5, width: 10, height: 10)
-        (isOn ? t.selFg : t.fg2).setFill()
+        let track = NSRect(x: 0.5, y: (bounds.height - 16) / 2 + 0.5, width: Self.size.width - 1, height: 15)
+        let p = NSBezierPath(roundedRect: track, xRadius: 3.5, yRadius: 3.5)
+        if isOn { (hover ? t.fg : t.sel).setFill(); p.fill() } else if hover { t.hover.setFill(); p.fill() }
+        (isOn ? (hover ? t.fg : t.sel) : hover ? t.fg3 : t.hair).setStroke(); p.lineWidth = 1; p.stroke()
+        let knob = NSRect(x: isOn ? track.maxX - 13 : track.minX + 2, y: track.minY + 2, width: 11, height: 11)
+        (isOn ? t.selFg : t.fg3).setFill()
         NSBezierPath(roundedRect: knob, xRadius: 2, yRadius: 2).fill()
     }
 }
@@ -161,6 +168,7 @@ final class Segmented: MXView {
     let options: [(value: String, title: String)]
     var current: String { didSet { needsDisplay = true } }
     var onPick: ((String) -> Void)?
+    var isEnabled = true
     private var hover: Int?
     private let font = Fonts.mono(Metrics.fontSize - 1)
 
@@ -196,11 +204,11 @@ final class Segmented: MXView {
     }
 
     private func index(_ e: NSEvent) -> Int? { let p = convert(e.locationInWindow, from: nil); return rects().firstIndex { $0.contains(p) } }
-    override func mouseMoved(with e: NSEvent) { let i = index(e); if i != hover { hover = i; needsDisplay = true } }
+    override func mouseMoved(with e: NSEvent) { let i = isEnabled ? index(e) : nil; if i != hover { hover = i; needsDisplay = true } }
     override func mouseExited(with e: NSEvent) { hover = nil; needsDisplay = true }
     override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
     override func mouseDown(with e: NSEvent) {
-        guard let i = index(e), options[i].value != current else { return }
+        guard isEnabled, let i = index(e), options[i].value != current else { return }
         current = options[i].value
         onPick?(current)
     }
@@ -208,51 +216,127 @@ final class Segmented: MXView {
 
 // MARK: form
 
-/// One section's rows on one grid: labels in a 200 pt column, controls from there, 30 pt rows.
-/// Notes wrap under their controls instead of being cut off.
+/// One section laid out the way Linear and macOS lay out preferences: groups with a heading
+/// and a line about them, each group a card of rows. A row says what the setting is and what
+/// it does for you on the left; its control sits on the right, so every switch lines up.
 final class FormView: MXView {
-    private struct Line { var y: CGFloat; var label: String; var note: String?; var noteH: CGFloat = 0; var header: Bool }
-    private var lines: [Line] = []
+    private enum Item {
+        case header(y: CGFloat, title: String, note: String?)
+        case row(y: CGFloat, h: CGFloat, textY: CGFloat, title: String, note: String?, textW: CGFloat, first: Bool, indent: CGFloat, strong: Bool, warn: Bool, enabled: Bool)
+        case footnote(y: CGFloat, text: String)
+    }
+    private var items: [Item] = []
+    private var cards: [NSRect] = []
+    private var cardTop: CGFloat?
     private(set) var cursor: CGFloat = 0
-    static let labelW: CGFloat = 200
-    static let rowH: CGFloat = 30
     static let x0: CGFloat = 24
-    /// Notes stop at a reading width, however wide the window is.
-    static let noteMax: CGFloat = 480
-    private static let noteFont = Fonts.mono(Metrics.fontSize - 2)
+    /// Rows stop at a reading width, however wide the window is.
+    static let maxW: CGFloat = 660
+    static let pad: CGFloat = 14
+    static let rowH: CGFloat = 30
+    static var titleFont: NSFont { Fonts.mono(Metrics.fontSize - 1) }
+    static var noteFont: NSFont { Fonts.mono(Metrics.fontSize - 2) }
 
-    private var noteWidth: CGFloat { max(160, min(Self.noteMax, bounds.width - Self.x0 * 2 - Self.labelW)) }
-    private static func noteAttrs(_ color: NSColor) -> [NSAttributedString.Key: Any] {
+    /// Measured from the scroll view, not the clip view: the cards keep their right edge
+    /// whether or not a scroller shows.
+    var contentW: CGFloat { max(380, min(Self.maxW, (enclosingScrollView?.frame.width ?? bounds.width) - Self.x0 * 2 - 14)) }
+    /// The width inside a card: what a control spanning a whole row gets.
+    var innerW: CGFloat { contentW - Self.pad * 2 }
+
+    private static func attrs(_ font: NSFont, _ color: NSColor) -> [NSAttributedString.Key: Any] {
         let p = NSMutableParagraphStyle(); p.lineSpacing = 2
-        return [.font: noteFont, .foregroundColor: color, .paragraphStyle: p]
+        return [.font: font, .foregroundColor: color, .paragraphStyle: p]
     }
-    private func noteHeight(_ s: String) -> CGFloat {
-        ceil((s as NSString).boundingRect(with: NSSize(width: noteWidth, height: 1000), options: [.usesLineFragmentOrigin], attributes: Self.noteAttrs(.black)).height)
-    }
-
-    func reset() { subviews.forEach { $0.removeFromSuperview() }; lines = []; cursor = 16; needsDisplay = true }
-
-    func header(_ s: String) {
-        if cursor > 16 { cursor += 14 }
-        lines.append(Line(y: cursor, label: s, note: nil, header: true))
-        cursor += 30
+    private func height(_ s: String, _ font: NSFont, width: CGFloat) -> CGFloat {
+        ceil((s as NSString).boundingRect(with: NSSize(width: width, height: 2000), options: [.usesLineFragmentOrigin], attributes: Self.attrs(font, .black)).height)
     }
 
-    /// A row: label on the left, the controls left to right with their own widths, an optional note under them.
-    /// A leading value label is only as wide as its text, so its buttons sit right after it;
-    /// later labels keep their width so columns of buttons line up.
-    func row(_ label: String, _ controls: [(NSView, CGFloat)], note: String? = nil, height: CGFloat = FormView.rowH) {
-        var x = Self.x0 + Self.labelW
-        for (i, (v, w)) in controls.enumerated() {
-            let h = v is MXButton || v is Segmented ? Metrics.control : v is KeyRecorder ? 22 : height
-            let w = i == 0 && controls.count > 1 ? (v as? Label).map { min(w, $0.textWidth + 2) } ?? w : w
-            v.frame = NSRect(x: x, y: cursor + (height - h) / 2, width: w, height: h)
-            addSubview(v)
-            x += w + (i == 0 && v is Label ? 12 : 6)
+    func reset() { subviews.forEach { $0.removeFromSuperview() }; items = []; cards = []; cardTop = nil; cursor = 12; needsDisplay = true }
+
+    private func openCard() { if cardTop == nil { cardTop = cursor } }
+    private func closeCard() {
+        guard let top = cardTop else { return }
+        cards.append(NSRect(x: Self.x0, y: top, width: contentW, height: cursor - top))
+        cardTop = nil
+    }
+
+    /// A group: its name, and when it needs one, a line on what the group is for.
+    func header(_ s: String, note: String? = nil) {
+        closeCard()
+        if cursor > 12 { cursor += 26 }
+        items.append(.header(y: cursor, title: s, note: note))
+        cursor += 20
+        if let note { cursor += 2 + height(note, Self.noteFont, width: contentW) }
+        cursor += 10
+    }
+
+    /// A line under a card: what holds for every row above it.
+    func paragraph(_ s: String) {
+        closeCard()
+        cursor += 8
+        items.append(.footnote(y: cursor, text: s))
+        cursor += height(s, Self.noteFont, width: contentW)
+    }
+
+    /// Ends the card here; the next row starts a new one.
+    func gap(_ h: CGFloat) { closeCard(); cursor += h }
+
+    private func controlHeight(_ v: NSView) -> CGFloat {
+        switch v {
+        case is MXButton, is Segmented: return Metrics.control
+        case is KeyRecorder: return 22
+        case is Switch: return 18
+        case is InputField: return 30
+        case is ProjectMark: return 26
+        case is Label: return 18
+        default: return 20
         }
-        let nh = note.map(noteHeight) ?? 0
-        lines.append(Line(y: cursor, label: label, note: note, noteH: nh, header: false))
-        cursor += height + (note == nil ? 2 : nh + 6)
+    }
+
+    /// A row: what it is and what it does on the left, the controls on the right, left to right.
+    /// `icon` sits before the title (a project's logo); `warn` marks a row that needs you with a
+    /// rule down its left edge; `enabled: false` greys the row and stops its controls.
+    func row(_ title: String, _ controls: [(NSView, CGFloat)], note: String? = nil, height minH: CGFloat = 0, padding pv: CGFloat = 11,
+             icon: NSView? = nil, warn: Bool = false, enabled: Bool = true) {
+        openCard()
+        let gap: CGFloat = 6
+        let cw = controls.reduce(0) { $0 + $1.1 } + CGFloat(max(0, controls.count - 1)) * gap
+        let indent: CGFloat = icon == nil ? 0 : 32
+        let textW = max(150, innerW - indent - cw - (controls.isEmpty ? 0 : 24))
+        let titleH: CGFloat = title.isEmpty ? 0 : 18
+        let noteH = note.map { height($0, Self.noteFont, width: textW) } ?? 0
+        let textH = titleH + (note == nil ? 0 : noteH + (title.isEmpty ? 0 : 2))
+        let ctlH = controls.map { controlHeight($0.0) }.max() ?? 0
+        let h = max(minH, max(textH, ctlH) + pv * 2)
+        var x = Self.x0 + contentW - Self.pad - cw
+        for (v, w) in controls {
+            let ch = controlHeight(v)
+            v.frame = NSRect(x: x, y: cursor + (h - ch) / 2, width: w, height: ch)
+            addSubview(v)
+            if !enabled { v.alphaValue = 0.4; (v as? Segmented)?.isEnabled = false; (v as? MXButton)?.isEnabled = false; (v as? Switch)?.isEnabled = false }
+            x += w + gap
+        }
+        if let icon {
+            icon.frame = NSRect(x: Self.x0 + Self.pad, y: cursor + (h - 24) / 2, width: 24, height: 24)
+            addSubview(icon)
+        }
+        items.append(.row(y: cursor, h: h, textY: cursor + (h - textH) / 2, title: title, note: note, textW: textW, first: cursor == cardTop,
+                          indent: indent, strong: false, warn: warn, enabled: enabled))
+        cursor += h
+    }
+
+    /// A row whose control needs the full width: the title and note on top, the view under them.
+    func wide(_ title: String, note: String? = nil, _ v: NSView, height vh: CGFloat, strong: Bool = false) {
+        openCard()
+        let pv: CGFloat = 12
+        let noteH = strong ? 0 : note.map { height($0, Self.noteFont, width: innerW) } ?? 0
+        let textH = 18 + (note == nil || strong ? 0 : noteH + 2)
+        let h = pv + textH + 10 + vh + pv
+        v.frame = NSRect(x: Self.x0 + Self.pad, y: cursor + pv + textH + 10, width: innerW, height: vh)
+        addSubview(v)
+        items.append(.row(y: cursor, h: h, textY: cursor + pv, title: title, note: note, textW: innerW, first: cursor == cardTop,
+                          indent: 0, strong: strong, warn: false, enabled: true))
+        cursor += h
     }
 
     /// Exclusive choice: one segmented control, the current option raised.
@@ -262,64 +346,84 @@ final class FormView: MXView {
         row(label, [(s, s.intrinsicContentSize.width)], note: note)
     }
 
-    /// A paragraph across the control column, with no label: what a group of rows is about.
-    func paragraph(_ s: String) {
-        let nh = noteHeight(s)
-        lines.append(Line(y: cursor - FormView.rowH + 2, label: "", note: s, noteH: nh, header: false))
-        cursor += nh + 10
-    }
-
-    /// Equal tiles, left to right, wrapping to the next line when the column is full.
+    /// Equal tiles, left to right, wrapping when the row is full.
     func grid(_ label: String, _ tiles: [NSView], size: NSSize, note: String? = nil) {
-        let gap: CGFloat = 6, avail = max(size.width, bounds.width - Self.x0 * 2 - Self.labelW)
-        let perRow = max(1, Int((avail + gap) / (size.width + gap)))
+        let gap: CGFloat = 6
+        let perRow = max(1, Int((innerW + gap) / (size.width + gap)))
         let rows = (tiles.count + perRow - 1) / perRow
+        let box = FlippedBox(frame: .zero)
         for (i, v) in tiles.enumerated() {
-            v.frame = NSRect(x: Self.x0 + Self.labelW + CGFloat(i % perRow) * (size.width + gap),
-                             y: cursor + 4 + CGFloat(i / perRow) * (size.height + gap), width: size.width, height: size.height)
-            addSubview(v)
+            v.frame = NSRect(x: CGFloat(i % perRow) * (size.width + gap), y: CGFloat(i / perRow) * (size.height + gap), width: size.width, height: size.height)
+            box.addSubview(v)
         }
-        let height = CGFloat(rows) * (size.height + gap) - gap + 8
-        lines.append(Line(y: cursor, label: label, note: nil, header: false))
-        cursor += height
-        if let note { paragraph(note) }
+        wide(label, note: note, box, height: CGFloat(rows) * (size.height + gap) - gap)
     }
 
-    func toggle(_ label: String, _ on: Bool, note: String? = nil, onChange: @escaping (Bool) -> Void) {
+    func toggle(_ label: String, _ on: Bool, note: String? = nil, extra: [(NSView, CGFloat)] = [], onChange: @escaping (Bool) -> Void) {
         let s = Switch(frame: .zero)
         s.isOn = on
         s.onChange = onChange
-        row(label, [(s, 30)], note: note)
+        row(label, extra + [(s, Switch.size.width)], note: note)
     }
 
+    /// A fact rather than a setting: its value on the right, in the secondary ink.
     func text(_ label: String, _ value: String, note: String? = nil) {
-        let l = Label(value, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg })
-        row(label, [(l, bounds.width - Self.x0 * 2 - Self.labelW)], note: note)
+        let font = Fonts.mono(Metrics.fontSize - 1)
+        let l = Label(value, font: font, color: { $0.fg2 })
+        l.align = .right
+        row(label, [(l, min(Text.width(value, font: font) + 4, innerW * 0.6))], note: note)
     }
-
-    /// Extra space between groups of rows.
-    func gap(_ h: CGFloat) { cursor += h }
 
     func finish() {
-        setFrameSize(NSSize(width: frame.width, height: max(cursor + 20, superview?.bounds.height ?? 0)))
+        closeCard()
+        setFrameSize(NSSize(width: frame.width, height: max(cursor + 28, superview?.bounds.height ?? 0)))
         needsDisplay = true
     }
 
+    /// Descriptions: the light themes' third ink is too faint for small text on a card.
+    private var noteColor: NSColor { t.dark ? t.fg3 : t.fg2.blended(withFraction: 0.35, of: t.fg3) ?? t.fg2 }
+
     override func draw(_ r: NSRect) {
-        for l in lines {
-            if l.header {
-                Text.draw(l.label.uppercased(), in: NSRect(x: Self.x0, y: l.y, width: 300, height: 20), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 2.5, .medium))
-                t.hair2.setFill(); NSRect(x: Self.x0, y: l.y + 21, width: bounds.width - Self.x0 * 2, height: 1).fill()
-            } else {
-                Text.draw(l.label, in: NSRect(x: Self.x0, y: l.y, width: Self.labelW - 12, height: FormView.rowH), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1))
-                if let n = l.note {
-                    (n as NSString).draw(with: NSRect(x: Self.x0 + Self.labelW, y: l.y + FormView.rowH - 2, width: noteWidth, height: l.noteH + 4),
-                                         options: [.usesLineFragmentOrigin], attributes: Self.noteAttrs(t.fg3))
+        for c in cards {
+            let p = NSBezierPath(roundedRect: c.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+            // A shade lighter than the page in both themes, so a card never reads as greyed out.
+            (t.dark ? t.fg.withAlphaComponent(0.03) : NSColor.white.withAlphaComponent(0.6)).setFill(); p.fill()
+            t.hair.setStroke(); p.lineWidth = 1; p.stroke()
+        }
+        for item in items {
+            switch item {
+            case let .header(y, title, note):
+                Text.draw(title, in: NSRect(x: Self.x0, y: y, width: contentW, height: 20), color: t.fg, font: Fonts.mono(Metrics.fontSize, .semibold))
+                if let note {
+                    (note as NSString).draw(with: NSRect(x: Self.x0, y: y + 22, width: contentW, height: 400), options: [.usesLineFragmentOrigin], attributes: Self.attrs(Self.noteFont, noteColor))
                 }
+            case let .row(y, h, textY, title, note, textW, first, indent, strong, warn, enabled):
+                if !first { t.hair2.setFill(); NSRect(x: Self.x0 + Self.pad, y: y, width: contentW - Self.pad * 2, height: 1).fill() }
+                if warn { t.on.setFill(); NSRect(x: Self.x0 + 1, y: y + 8, width: 2, height: h - 16).fill() }
+                let x = Self.x0 + Self.pad + indent
+                if strong {
+                    // A card's own header: its name one step up, the note beside it.
+                    let f = Fonts.mono(Metrics.fontSize, .semibold)
+                    let w = Text.width(title, font: f)
+                    Text.draw(title, in: NSRect(x: x, y: textY - 1, width: w + 2, height: 20), color: t.fg, font: f)
+                    if let note { Text.draw(note, in: NSRect(x: x + w + 12, y: textY, width: textW - w - 12, height: 18), color: noteColor, font: Self.noteFont) }
+                    continue
+                }
+                if !title.isEmpty {
+                    Text.draw(title, in: NSRect(x: x, y: textY, width: textW, height: 18), color: enabled ? t.fg : t.fg3, font: Self.titleFont)
+                }
+                if let note {
+                    (note as NSString).draw(with: NSRect(x: x, y: textY + (title.isEmpty ? 0 : 20), width: textW, height: 400), options: [.usesLineFragmentOrigin], attributes: Self.attrs(Self.noteFont, enabled ? noteColor : t.fg3.withAlphaComponent(0.6)))
+                }
+            case let .footnote(y, text):
+                (text as NSString).draw(with: NSRect(x: Self.x0, y: y, width: contentW, height: 400), options: [.usesLineFragmentOrigin], attributes: Self.attrs(Self.noteFont, noteColor))
             }
         }
     }
 }
+
+/// A plain flipped container, so tiles lay out top-down like the form around them.
+final class FlippedBox: MXView {}
 
 /// One app icon choice: the icon itself with its name under it, the current one outlined.
 final class IconTile: MXView, TipSource {
@@ -378,7 +482,7 @@ final class SectionList: MXView {
         for (i, s) in SettingsSection.allCases.enumerated() {
             let rr = rect(i)
             let sel = s == selected
-            if sel { t.rowSel.setFill(); NSBezierPath(roundedRect: rr, xRadius: 4, yRadius: 4).fill(); t.fg.setFill(); NSRect(x: rr.minX, y: rr.minY + 6, width: 2, height: rr.height - 12).fill() }
+            if sel { t.rowSel.setFill(); NSBezierPath(roundedRect: rr, xRadius: 4, yRadius: 4).fill() }
             else if hover == i { t.hover.setFill(); NSBezierPath(roundedRect: rr, xRadius: 4, yRadius: 4).fill() }
             Text.draw(s.rawValue, in: NSRect(x: rr.minX + 12, y: rr.minY, width: rr.width - 40, height: rr.height), color: sel ? t.fg : t.fg2)
             Text.draw("⌘\(i + 1)", in: NSRect(x: rr.maxX - 32, y: rr.minY, width: 26, height: rr.height), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 2.5), align: .right)
@@ -415,13 +519,17 @@ final class SettingsView: MXView {
     private let scroll = NSScrollView()
     private let form = FormView(frame: .zero)
     private let title = Label("", font: Fonts.mono(Metrics.fontSize + 1, .semibold))
+    /// Keys only: narrows the list as you type. ⌘F focuses it.
+    private let filter = InputField(value: "", placeholder: "Filter commands   ⌘F", secure: false)
+    private var keyFilter = ""
     static let sidebarW: CGFloat = 168
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         scroll.useThinScroller()
         scroll.documentView = form
-        [sections, title, scroll].forEach(addSubview)
+        [sections, title, scroll, filter].forEach(addSubview)
+        filter.onChange = { [weak self] in self?.keyFilter = $0.trimmingCharacters(in: .whitespaces); self?.rebuild() }
         sections.onSelect = { [weak self] in self?.section = $0 }
         NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: nil, queue: .main) { [weak self] _ in
             if self?.section == .accounts { self?.rebuild() }
@@ -433,6 +541,8 @@ final class SettingsView: MXView {
         super.layout()
         sections.frame = NSRect(x: 0, y: 0, width: Self.sidebarW, height: bounds.height)
         title.frame = NSRect(x: Self.sidebarW + FormView.x0, y: 10, width: 300, height: 30)
+        // Its right edge lines up with the cards'.
+        filter.frame = NSRect(x: Self.sidebarW + FormView.x0 + form.contentW - 220, y: 8, width: 220, height: 30)
         scroll.frame = NSRect(x: Self.sidebarW, y: 44, width: bounds.width - Self.sidebarW, height: bounds.height - 44)
         if form.frame.width != scroll.contentSize.width { form.frame.size.width = scroll.contentSize.width; rebuild() }
     }
@@ -446,6 +556,7 @@ final class SettingsView: MXView {
 
     func rebuild() {
         title.text = section.rawValue
+        filter.isHidden = section != .keys
         form.reset()
         switch section {
         case .general: general()
@@ -466,78 +577,88 @@ final class SettingsView: MXView {
     private func general() {
         form.header("Updates")
         if !Updater.isRelease {
-            form.text("Version", "Maxwell Dev \(Updater.current)", note: "Dev builds don't update. The released Maxwell does.")
+            form.text("Development build", Updater.current, note: "Development builds don't update themselves. The released Maxwell checks every 4 hours.")
         } else if let v = model.updateReady {
-            let go = MXButton("Restart to update", primary: true) { [weak self] in self?.onRunAction?("install-update") }
-            form.row("Version", [(Label("\(Updater.current)", font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 70), (go, go.intrinsicContentSize.width)],
-                     note: "v\(v) is downloaded. Sessions keep running through the restart.")
+            let go = MXButton("Restart to update", primary: true, small: true) { [weak self] in self?.onRunAction?("install-update") }
+            form.row("Maxwell \(v) is ready", [(go, go.intrinsicContentSize.width)],
+                     note: "You have \(Updater.current). Restarting installs it, and your sessions keep running.")
         } else {
-            let check = MXButton("Check now") { [weak self] in self?.onRunAction?("check-updates") }
-            form.row("Version", [(Label("\(Updater.current)", font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 70), (check, check.intrinsicContentSize.width)],
-                     note: model.updateStatus ?? "Checked every 4 hours. A new version waits for your click.")
+            let check = MXButton("Check now", small: true) { [weak self] in self?.onRunAction?("check-updates") }
+            form.row("Maxwell \(Updater.current)", [(check, check.intrinsicContentSize.width)],
+                     note: model.updateStatus ?? "Checks every 4 hours and downloads in the background. Nothing installs until you restart.")
         }
         notifications()
-        form.header("Viewer")
-        form.toggle("Open files automatically", c.autoOpen, note: "Markdown files a session writes or mentions open in the viewer.") { [weak self] in self?.set("auto-open", $0 ? "true" : "false") }
-        form.toggle("File tree", c.showTree, note: "Shows the session's folder above the viewer. ⇧⌘T toggles it.") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
+        form.header("Files", note: "Markdown files open in the viewer, the pane beside the session.")
+        form.toggle("Open files as sessions write them", c.autoOpen, note: "Also files a session mentions. ⌘-click any path in the terminal to open it yourself.") { [weak self] in self?.set("auto-open", $0 ? "true" : "false") }
+        form.toggle("Show the folder tree", c.showTree, note: "The session's folder, above the open file. ⇧⌘T") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
         form.header("Sessions")
-        form.toggle("Skip permission prompts", c.skipPermissions, note: "New and brought-in sessions run with --dangerously-skip-permissions. Off: Claude's own mode.") { [weak self] in self?.set("skip-permissions", $0 ? "on" : "off") }
-        form.toggle("Name sessions for me", c.autoTitles, note: "Titles sessions from what they work on, with Haiku when Claude's title says little. Off: a session keeps the name you give it (/rename or Rename…).") { [weak self] in self?.set("auto-titles", $0 ? "on" : "off") }
-        form.choice("Fold into Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter)) { [weak self] in self?.set("idle-after", $0) }
-        form.toggle("Final model check", c.judge, note: "Haiku reads the last reply once. If off, nothing is ever safe.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
-        form.choice("Rows", [("detail", "Two lines"), ("compact", "One line")], current: c.rowStyle) { [weak self] in self?.set("row-style", $0) }
+        form.toggle("Name sessions automatically", c.autoTitles, note: "Titles each session after what it's working on, with Haiku when Claude's own title says little. Off: a session keeps the name you give it (/rename or Rename…).") { [weak self] in self?.set("auto-titles", $0 ? "on" : "off") }
+        form.toggle("Skip permission prompts", c.skipPermissions, note: "Sessions Maxwell starts or brings in run with --dangerously-skip-permissions, so Claude edits files and runs commands without asking. Off: Claude asks as usual.") { [weak self] in self?.set("skip-permissions", $0 ? "on" : "off") }
+        form.choice("Move quiet sessions to Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter),
+                    note: "Idle is folded away at the bottom of the list. Nothing is stopped.") { [weak self] in self?.set("idle-after", $0) }
+        form.toggle("Check finished work with Haiku", c.judge, note: "Before a session counts as Safe to close, Haiku reads its last reply once, for about $0.0002 on the account with the most usage left. Off: no session is ever marked Safe to close.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
+        form.choice("Session list", [("compact", "One line"), ("detail", "Two lines")], current: c.rowStyle,
+                    note: "Two lines adds the account, branch and anything running under each title.") { [weak self] in self?.set("row-style", $0) }
     }
 
     private func notifications() {
-        form.header("Notifications")
-        let mono = Fonts.mono(Metrics.fontSize - 1)
-        switch model.notificationsAllowed {
-        case true?:
-            form.text("macOS", "Allowed")
-        case false?:
-            let open = MXButton("Open System Settings…", small: true) {
+        form.header("Notifications", note: "No alert for the session you're already looking at.")
+        if model.notificationsAllowed == false {
+            let open = MXButton("Open System Settings…", primary: true, small: true) {
                 let id = Bundle.main.bundleIdentifier ?? "dev.maxwell.app"
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") { NSWorkspace.shared.open(url) }
             }
-            form.row("macOS", [(Label("Not allowed", font: mono, color: { $0.fg2 }), Text.width("Not allowed", font: mono) + 12), (open, open.intrinsicContentSize.width)],
-                     note: "Until you allow Maxwell, its notifications show Script Editor's icon and clicking one doesn't open the session.")
-        case nil:
-            form.text("macOS", "Checking…")
+            form.row("Notifications are off for Maxwell in macOS", [(open, open.intrinsicContentSize.width)],
+                     note: "Until you turn them on, alerts show Script Editor's icon and clicking one doesn't open the session.", warn: true)
         }
-        form.toggle("Needs you", c.notify, note: "A session asks you something.") { [weak self] in self?.set("notify", $0 ? "true" : "false") }
-        soundRow(key: "notify-sound", current: c.notifySound)
-        form.toggle("Turn finished", c.notifyDone, note: "A session stopped and the next move is yours.") { [weak self] in self?.set("notify-done", $0 ? "true" : "false") }
-        soundRow(key: "notify-done-sound", current: c.notifyDoneSound)
-        form.paragraph("Neither one shows for the session you're looking at.")
+        form.toggle("When a session needs you", c.notify, note: "It asked you something or wants permission to go on.",
+                    extra: c.notify ? [soundMenu(key: "notify-sound", current: c.notifySound)] : []) { [weak self] in self?.set("notify", $0 ? "true" : "false") }
+        form.toggle("When a session finishes", c.notifyDone, note: "It stopped, and the next move is yours.",
+                    extra: c.notifyDone ? [soundMenu(key: "notify-done-sound", current: c.notifyDoneSound)] : []) { [weak self] in self?.set("notify-done", $0 ? "true" : "false") }
+    }
+
+    /// A button that opens a menu: the title on the left, ▾ at the right edge, as wide as `width`.
+    /// The font is monospaced, so padding with spaces puts the ▾ in the same column on every row.
+    static func popupTitle(_ title: String, width: CGFloat) -> String {
+        let cw = Text.width("x", font: Fonts.mono(Metrics.fontSize - 1))
+        let room = Int((width - 20) / max(1, cw)) - title.count - 1
+        return title + String(repeating: " ", count: max(2, room)) + "▾"
     }
 
     /// A menu of `Config.sounds`; picking one plays it.
-    private func soundRow(key: String, current: String) {
-        let pick = MXButton((current == "none" ? "None" : current) + "  ▾")
+    private func soundMenu(key: String, current: String) -> (NSView, CGFloat) {
+        let pick = MXButton(Self.popupTitle(current == "none" ? "No sound" : current, width: 120), small: true)
+        pick.tip = Tip("The sound it plays. Picking one plays it")
         pick.action = { [weak self, weak pick] in
             guard let self, let pick else { return }
             let m = NSMenu()
             for s in Config.sounds {
-                let i = MenuAction(s == "none" ? "None" : s) { [weak self] in Store.play(s); self?.set(key, s) }
+                let i = MenuAction(s == "none" ? "No sound" : s) { [weak self] in Store.play(s); self?.set(key, s) }
                 i.state = s == current ? .on : .off
                 m.addItem(i)
             }
             m.popUp(positioning: nil, at: NSPoint(x: 0, y: pick.bounds.height + 2), in: pick)
         }
-        form.row("  sound", [(pick, max(120, pick.intrinsicContentSize.width))])
+        return (pick, max(120, pick.intrinsicContentSize.width))
     }
 
     private func appearance() {
         form.header("Theme")
+        let free = c.themeOverride == nil
         if let o = c.themeOverride {
-            let clear = MXButton("Unlock") { [weak self] in self?.onAppearance?(self?.c.appearance ?? "system") }
-            form.row("Locked to", [(Label(Self.title(o), font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 90), (clear, clear.intrinsicContentSize.width)],
-                     note: "Set in your config file, so the choices below are ignored.")
+            let clear = MXButton("Use Settings instead", small: true) { [weak self] in self?.onAppearance?(self?.c.appearance ?? "system") }
+            form.row("Your config file sets the theme", [(clear, clear.intrinsicContentSize.width)],
+                     note: "theme = \(o) in ~/.config/maxwell/config. The choices below are ignored until you remove that line.", warn: true)
         }
-        form.choice("Appearance", [("system", "System"), ("light", "Light"), ("dark", "Dark")], current: c.appearance,
-                    note: "⇧⌘L switches between light and dark. Also in View › Appearance.") { [weak self] in self?.onAppearance?($0) }
-        form.choice("Light theme", Config.lightThemes.map { ($0, Self.title($0)) }, current: c.themeLight) { [weak self] in self?.set("theme-light", $0) }
-        form.choice("Dark theme", Config.darkThemes.map { ($0, Self.title($0)) }, current: c.themeDark) { [weak self] in self?.set("theme-dark", $0) }
+        func pick(_ label: String, _ options: [(value: String, title: String)], _ current: String, note: String? = nil, _ onPick: @escaping (String) -> Void) {
+            let seg = Segmented(options, current: current)
+            seg.onPick = onPick
+            form.row(label, [(seg, seg.intrinsicContentSize.width)], note: note, enabled: free)
+        }
+        pick("Mode", [("system", "System"), ("light", "Light"), ("dark", "Dark")], c.appearance,
+             note: free ? "System follows macOS. ⇧⌘L switches between light and dark." : "System follows macOS.") { [weak self] in self?.onAppearance?($0) }
+        pick("Light theme", Config.lightThemes.map { ($0, Self.themeTitle($0)) }, c.themeLight) { [weak self] in self?.set("theme-light", $0) }
+        pick("Dark theme", Config.darkThemes.map { ($0, Self.themeTitle($0)) }, c.themeDark) { [weak self] in self?.set("theme-dark", $0) }
         form.header("App icon")
         let current = IconArt.choices.contains { $0.value == c.appIcon } ? c.appIcon : "auto"
         let tiles = IconArt.choices.map { o -> NSView in
@@ -547,29 +668,40 @@ final class SettingsView: MXView {
             tile.onPick = { [weak self] in self?.set("app-icon", $0) }
             return tile
         }
-        form.grid("Dock and Finder", tiles, size: IconTile.size, note: "Also shown while Maxwell is closed.")
-        form.header("Glass")
+        form.grid("Icon in the Dock and Finder", tiles, size: IconTile.size, note: "Auto is Silver in light mode and Gunmetal in dark.")
+        form.header("Window glass", note: "How much of your desktop shows through Maxwell.")
         let theme = Theme.load(model.themeName)
-        let glass = Slider(c.backgroundOpacity ?? Double(theme.backgroundOpacity), 0.3...1) { "\(Int(($0 * 100).rounded()))%" }
+        let opacity = c.backgroundOpacity ?? Double(theme.backgroundOpacity)
+        let glass = Slider(opacity, 0.3...1) { "\(Int(($0 * 100).rounded()))%" }
         glass.onLive = { [weak self] in self?.onPreview?("background-opacity", $0) }
         glass.onCommit = { [weak self] in self?.set("background-opacity", String(format: "%.2f", $0)) }
-        let glassReset = MXButton("Theme", small: true) { [weak self] in self?.set("background-opacity", "") }
-        glassReset.isOn = c.backgroundOpacity == nil
-        glassReset.tip = Tip("Use the theme's own tint")
-        form.row("Tint", [(glass, 260), (glassReset, glassReset.intrinsicContentSize.width)], note: "Lower shows more of the desktop. Panes with text never go below 72%.")
+        var glassControls: [(NSView, CGFloat)] = [(glass, 220)]
+        if c.backgroundOpacity != nil {
+            let reset = MXButton("Reset", small: true) { [weak self] in self?.set("background-opacity", "") }
+            reset.tip = Tip("Back to the theme's \(Int((theme.backgroundOpacity * 100).rounded()))%")
+            glassControls.append((reset, reset.intrinsicContentSize.width))
+        }
+        form.row("Opacity", glassControls, note: c.backgroundOpacity == nil
+                 ? "The theme's own. Lower shows more desktop; panes with text stay at least 72% so they stay readable."
+                 : "Lower shows more desktop. Panes with text stay at least 72% so they stay readable.")
         let blurValue = c.backgroundBlur ?? theme.backgroundBlur.map(Double.init)
-        let blur = Slider(blurValue ?? 20, 0...64) { "\(Int($0)) pt" }
+        let blur = Slider(blurValue ?? 20, 0...64) { "\(Int($0))" }
         blur.onLive = { [weak self] in self?.onPreview?("background-blur", $0) }
         blur.onCommit = { [weak self] in self?.set("background-blur", "\(Int($0))") }
-        let system = MXButton("System", small: true) { [weak self] in self?.set("background-blur", "") }
-        system.isOn = blurValue == nil
-        system.tip = Tip("Use the macOS frost")
-        form.row("Blur", [(blur, 260), (system, system.intrinsicContentSize.width)], note: system.isOn ? "Using the macOS frost. Drag to set your own. 0 is clear." : "0 is clear glass, 64 is heavy frost. System uses the macOS frost.")
-        form.header("Type and motion")
-        stepper("Terminal text", key: "terminal-font-size", value: c.terminalFontSize, range: 8...28, actions: ("font-smaller", "font-bigger"))
-        stepper("Interface text", key: "font-size", value: c.fontSize, range: 10...20, note: "Lists, panels and the viewer.")
-        form.choice("Viewer text", [("mono", "Mono"), ("sans", "Sans")], current: c.viewerFont) { [weak self] in self?.set("viewer-font", $0) }
-        form.choice("Motion", [("on", "On"), ("off", "Off")], current: c.motion, note: "Always off while macOS Reduce Motion is on.") { [weak self] in self?.set("motion", $0) }
+        var blurControls: [(NSView, CGFloat)] = [(blur, 220)]
+        if c.backgroundBlur != nil {
+            let reset = MXButton("Reset", small: true) { [weak self] in self?.set("background-blur", "") }
+            reset.tip = Tip(theme.backgroundBlur == nil ? "Back to the macOS frost" : "Back to the theme's blur")
+            blurControls.append((reset, reset.intrinsicContentSize.width))
+        }
+        form.row("Blur", blurControls, note: blurValue == nil
+                 ? "Using the macOS frost. Drag to set your own: 0 is clear glass, 64 is heavy frost."
+                 : "0 is clear glass, 64 is heavy frost.")
+        form.header("Text and motion")
+        stepper("Terminal text size", key: "terminal-font-size", value: c.terminalFontSize, range: 8...28, actions: ("font-smaller", "font-bigger"), note: "The Claude session in the middle.")
+        stepper("Interface text size", key: "font-size", value: c.fontSize, range: 10...20, note: "The session list, panels and the viewer.")
+        form.choice("Viewer font", [("mono", "Mono"), ("sans", "Sans")], current: c.viewerFont, note: "For Markdown files in the viewer.") { [weak self] in self?.set("viewer-font", $0) }
+        form.choice("Animations", [("on", "On"), ("off", "Off")], current: c.motion, note: "Always off while Reduce Motion is on in macOS.") { [weak self] in self?.set("motion", $0) }
     }
 
     /// − and +, with the actions' live shortcuts as hints when the setting has them.
@@ -578,35 +710,40 @@ final class SettingsView: MXView {
         let bigger = MXButton("+", hint: actions.flatMap { Tooltips.shortcut($0.1) }) { [weak self] in self?.set(key, "\(Int(min(range.upperBound, value + 1)))") }
         smaller.tip = Tip("Smaller text", action: actions?.0)
         bigger.tip = Tip("Bigger text", action: actions?.1)
-        form.row(label, [(smaller, smaller.intrinsicContentSize.width), (Label("\(Int(value)) pt", font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 48), (bigger, bigger.intrinsicContentSize.width)], note: note)
+        smaller.isEnabled = value > range.lowerBound
+        bigger.isEnabled = value < range.upperBound
+        let size = Label("\(Int(value)) pt", font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg })
+        size.align = .center
+        form.row(label, [(smaller, smaller.intrinsicContentSize.width), (size, 44), (bigger, bigger.intrinsicContentSize.width)], note: note)
     }
 
     static func title(_ theme: String) -> String { theme.split(separator: "-").map { $0.capitalized }.joined(separator: " ") }
+    /// Under "Light theme" the "-light" in a name says nothing: silver-light shows as Silver.
+    static func themeTitle(_ theme: String) -> String { title(theme.hasSuffix("-light") ? String(theme.dropLast(6)) : theme) }
 
     private func accounts() {
-        form.header("Claude accounts")
+        form.header("Claude accounts", note: "Each account is a Claude Code config folder with its own login. ⌘N starts new sessions on the account with the most usage left.")
         let now = Date()
         let browsers = installedBrowsers ?? Browsers.installed()
         installedBrowsers = browsers
         for (i, a) in model.accounts.enumerated() {
             if i > 0 { form.gap(10) }
-            let usage = UsageRow(account: a, now: now)
-            form.row(a.name, [(usage, max(200, form.bounds.width - FormView.x0 * 2 - FormView.labelW))], note: (a.configDir.path as NSString).abbreviatingWithTildeInPath)
+            form.wide(a.name, note: (a.configDir.path as NSString).abbreviatingWithTildeInPath, UsageRow(account: a, now: now), height: 18, strong: true)
             claudeRow(a)
             let choice = c.browser(for: a.name)
-            let pick = MXButton(choice.title(profileName: { _ in Browsers.profileName(choice, in: browsers) }) + "  ▾")
+            let pick = MXButton(Self.popupTitle(choice.title(profileName: { _ in Browsers.profileName(choice, in: browsers) }), width: 180), small: true)
             pick.tip = Tip("Where this account's links open outside Maxwell")
             pick.action = { [weak self, weak pick] in if let pick { self?.browserMenu(for: a, browsers: browsers, under: pick) } }
-            form.row("  browser", [(pick, max(160, pick.intrinsicContentSize.width))],
-                     note: choice.kind == .container ? "Needs the “Open external links in a container” add-on in \(choice.title())." : nil)
+            form.row("Open links in", [(pick, max(180, pick.intrinsicContentSize.width))],
+                     note: choice.kind == .container ? "Needs the “Open external links in a container” add-on in \(choice.title())." : "The browser or profile for links from \(a.name) sessions.")
         }
-        let add = MXButton("Add account…") { [weak self] in self?.onAddAccount?() }
-        form.row("", [(add, add.intrinsicContentSize.width)], note: "Choose its config folder. New sessions go where usage is left.")
+        form.gap(10)
+        let add = MXButton("Add account…", small: true) { [weak self] in self?.onAddAccount?() }
+        form.row("Add another account", [(add, add.intrinsicContentSize.width)],
+                 note: "Choose its config folder, like ~/.claude-work. To make one, run CLAUDE_CONFIG_DIR=~/.claude-work claude and log in.")
         form.header("Artifacts")
-        form.choice("Open artifacts", [("viewer", "Beside the session"), ("browser", "In the account's browser")], current: c.artifacts,
-                    note: "claude.ai artifact links a session makes or you ⌘-click.") { [weak self] in self?.set("artifacts", $0) }
-        form.header("Usage source")
-        form.text("Status line", "Claude Code's status line, every 30 s per account", note: "Set up together with the hooks in Advanced.")
+        form.choice("Open claude.ai artifacts", [("viewer", "Beside the session"), ("browser", "In the browser")], current: c.artifacts,
+                    note: "Artifact links a session makes, or that you ⌘-click. In the browser uses each account's choice above.") { [weak self] in self?.set("artifacts", $0) }
     }
 
     /// Whether the account is signed in to claude.ai inside Maxwell, with Sign in or Sign out.
@@ -628,9 +765,11 @@ final class SettingsView: MXView {
             text = "Checking…"
             button = MXButton("Sign in…", small: true) { [weak self] in SignInWindow.show(a, near: self?.window) }
         }
-        let label = Label(text, font: Fonts.mono(Metrics.fontSize - 1), color: { status == .signedIn ? $0.fg : $0.fg2 })
-        form.row("  claude.ai", [(label, Text.width(text, font: Fonts.mono(Metrics.fontSize - 1)) + 12), (button, button.intrinsicContentSize.width)],
-                 note: status == .signedIn ? "Artifacts from \(a.name) sessions open signed in." : email.map { "Sign in as \($0) to see this account's artifacts." })
+        let font = Fonts.mono(Metrics.fontSize - 1)
+        let label = Label(text, font: font, color: { status == .signedIn ? $0.fg : $0.fg2 })
+        label.align = .right
+        form.row("claude.ai", [(label, Text.width(text, font: font) + 4), (button, button.intrinsicContentSize.width)],
+                 note: status == .signedIn ? "Artifacts from \(a.name) sessions open signed in." : "Sign in\(email.map { " as \($0)" } ?? "") so this account's artifact links open inside Maxwell.")
     }
 
     private func browserMenu(for a: Account, browsers: [Browsers.Installed], under v: NSView) {
@@ -669,62 +808,83 @@ final class SettingsView: MXView {
     }
 
     private func projects() {
-        form.header("Rail")
-        form.choice("Rail", [("auto", "Hide at the edge"), ("shown", "Always show")], current: c.rail) { [weak self] in self?.set("rail", $0) }
-        let delay = Slider(c.railDelay, 0...1) { String(format: "%.2f s", $0) }
-        delay.onCommit = { [weak self] in self?.set("rail-delay", String(format: "%.2f", $0)) }
-        form.row("Reveal delay", [(delay, 260)], note: "Hover time at the left edge before the rail appears.")
-        let pins = c.pinned.isEmpty ? model.projects : c.pinned
-        form.header("Logos")
-        form.choice("Style", [("engraved", "Engraved"), ("pixel", "Pixel"), ("monogram", "Initials")], current: c.logoStyle) { [weak self] in self?.set("project-logo-style", $0) }
-        var names = pins + model.projects.filter { !pins.contains($0) }
-        for n in c.logos.keys.sorted() where !names.contains(n) { names.append(n) }
-        for name in names { logoRow(name) }
-        form.header("Pinned, in rail order")
-        if c.pinned.isEmpty { form.text("", "Nothing pinned yet, so every project shows on the rail.") }
-        for (i, p) in pins.enumerated() {
-            let up = MXButton("↑", small: true) { [weak self] in self?.movePin(p, by: -1, in: pins) }
-            up.isEnabled = i > 0
-            up.tip = Tip("Move up the rail")
-            let down = MXButton("↓", small: true) { [weak self] in self?.movePin(p, by: 1, in: pins) }
-            down.isEnabled = i < pins.count - 1
-            down.tip = Tip("Move down the rail")
-            let remove = MXButton("Remove", small: true) { [weak self] in self?.set("project-pin", pins.filter { $0 != p }.joined(separator: "\n") + "\n") }
-            form.row("⌘\(i + 1)  \(p)", [(up, 24), (down, 24), (remove, remove.intrinsicContentSize.width)])
+        form.header("Project bar", note: "The column of project logos on the left edge of the main window. Click one to see only its sessions.")
+        form.choice("Show the bar", [("shown", "Always"), ("auto", "When I point at the edge")], current: c.rail) { [weak self] in self?.set("rail", $0) }
+        if c.rail == "auto" {
+            let delay = Slider(c.railDelay, 0...1) { String(format: "%.2f s", $0) }
+            delay.onCommit = { [weak self] in self?.set("rail-delay", String(format: "%.2f", $0)) }
+            form.row("Wait before showing it", [(delay, 220)], note: "How long the pointer rests at the edge before the bar slides out.")
         }
-        let unpinned = model.projects.filter { !pins.contains($0) }
-        if !unpinned.isEmpty {
-            form.header("Not pinned, shown only when they need you")
-            for p in unpinned {
-                let pin = MXButton("Keep in Rail", small: true) { [weak self] in self?.set("project-pin", (pins + [p]).joined(separator: "\n") + "\n") }
-                form.row(p, [(pin, pin.intrinsicContentSize.width)])
+        let pinned = c.pinned
+        if pinned.isEmpty {
+            form.header("Pinned projects", note: "Nothing is pinned, so every project shows on the bar. Pin the ones you work on to keep only those, plus any project where a session needs you.")
+            for p in model.projects {
+                let pin = MXButton("Pin", small: true) { [weak self] in self?.set("project-pin", p + "\n") }
+                form.row(p, [(pin, pin.intrinsicContentSize.width)], padding: 7, icon: mark(p))
+            }
+        } else {
+            form.header("Pinned projects", note: "Always on the bar, in this order. ⌘1 to ⌘9 jump to them.")
+            for (i, p) in pinned.enumerated() {
+                let key = Label(i < 9 ? "⌘\(i + 1)" : "", font: Fonts.mono(Metrics.fontSize - 2), color: { $0.fg3 })
+                key.align = .right
+                let up = MXButton("↑", small: true) { [weak self] in self?.movePin(p, by: -1, in: pinned) }
+                up.isEnabled = i > 0
+                up.tip = Tip("Move up the bar")
+                let down = MXButton("↓", small: true) { [weak self] in self?.movePin(p, by: 1, in: pinned) }
+                down.isEnabled = i < pinned.count - 1
+                down.tip = Tip("Move down the bar")
+                let unpin = MXButton("Unpin", small: true) { [weak self] in self?.set("project-pin", pinned.filter { $0 != p }.joined(separator: "\n") + "\n") }
+                unpin.tip = Tip("Show \(p) only when a session there needs you")
+                form.row(p, [(key, 28), (up, 24), (down, 24), (unpin, unpin.intrinsicContentSize.width)], padding: 7, icon: mark(p))
+            }
+            let others = model.projects.filter { !pinned.contains($0) }
+            form.paragraph("On the bar, right-click a logo and choose Keep in Rail to pin it, or drag it off to unpin.")
+            if !others.isEmpty {
+                form.header("Other projects", note: "On the bar only while a session there needs you.")
+                for p in others {
+                    let pin = MXButton("Pin", small: true) { [weak self] in self?.set("project-pin", (pinned + [p]).joined(separator: "\n") + "\n") }
+                    form.row(p, [(pin, pin.intrinsicContentSize.width)], padding: 7, icon: mark(p))
+                }
             }
         }
+        form.header("Logos", note: "Maxwell looks for a logo in each project's folder and redraws it in the theme's ink.")
+        form.choice("Style", [("engraved", "Engraved"), ("pixel", "Pixel"), ("monogram", "Initials")], current: c.logoStyle) { [weak self] in self?.set("project-logo-style", $0) }
+        var names = (pinned.isEmpty ? model.projects : pinned + model.projects.filter { !pinned.contains($0) })
+        for n in c.logos.keys.sorted() where !names.contains(n) { names.append(n) }
+        for name in names { logoRow(name) }
     }
 
-    /// A project's key, where its logo comes from, and Choose… / Reset for `project-logo`.
+    /// The project's logo as the bar draws it.
+    private func mark(_ name: String) -> ProjectMark {
+        let m = ProjectMark(frame: .zero)
+        m.project = name; m.roots = model.projectRoots[name] ?? []; m.monogram = String(name.prefix(2))
+        return m
+    }
+
+    /// A project's mark, where it comes from, and Choose… / Reset for `project-logo`.
     private func logoRow(_ name: String) {
         let roots = model.projectRoots[name] ?? []
         let key = ProjectMark(frame: .zero)
         key.project = name; key.roots = roots; key.monogram = String(name.prefix(2))
-        let source: String
-        if let o = c.logos[name] { source = o }
-        else if name == "Maxwell" { source = "The app icon" }
-        else if let m = ProjectLogos.shared.mark(name, roots: roots) { source = m.source }
-        else { source = roots.isEmpty ? "Initials until a session runs in it" : "Initials, no logo file found" }
-        // Inside the project's own folder the relative path says enough; the tooltip has all of it.
-        let root = roots.first { source.hasPrefix($0 + "/") }
-        let shown = root.map { ($0 as NSString).lastPathComponent + "/" + source.dropFirst($0.count + 1) } ?? (source as NSString).abbreviatingWithTildeInPath
-        let path = Label(shown, font: Fonts.mono(Metrics.fontSize - 2), color: { $0.fg2 })
-        path.tip = Tip((source as NSString).abbreviatingWithTildeInPath)
+        // Inside the project's own folder the path from there says enough.
+        func shown(_ path: String) -> String {
+            roots.first { path.hasPrefix($0 + "/") }.map { String(path.dropFirst($0.count + 1)) } ?? (path as NSString).abbreviatingWithTildeInPath
+        }
+        let note: String
+        if let o = c.logos[name] { note = "Your image, " + shown(o) }
+        else if name == "Maxwell" { note = "The app icon" }
+        else if let m = ProjectLogos.shared.mark(name, roots: roots) { note = "Found " + shown(m.source) }
+        else { note = roots.isEmpty ? "Initials until a session runs in it" : "No logo file found, so initials" }
         let choose = MXButton("Choose…", small: true) { [weak self] in self?.chooseLogo(name) }
-        let reset = MXButton("Reset", small: true) { [weak self] in self?.setLogo(name, nil) }
-        reset.isEnabled = c.logos[name] != nil
         choose.tip = Tip("Pick an image to use as this project's logo")
-        reset.tip = Tip(reset.isEnabled ? "Go back to the logo Maxwell found" : "Already using the logo Maxwell found")
-        let chooseW = choose.intrinsicContentSize.width + 16, resetW = reset.intrinsicContentSize.width + 16
-        let pathW = max(120, form.bounds.width - FormView.x0 * 2 - FormView.labelW - 26 - chooseW - resetW - 18)
-        form.row(name, [(key, 26), (path, pathW), (choose, chooseW), (reset, resetW)])
+        var controls: [(NSView, CGFloat)] = []
+        if c.logos[name] != nil {
+            let reset = MXButton("Reset", small: true) { [weak self] in self?.setLogo(name, nil) }
+            reset.tip = Tip("Go back to the logo Maxwell found")
+            controls.append((reset, reset.intrinsicContentSize.width))
+        }
+        controls += [(choose, choose.intrinsicContentSize.width), (key, 26)]
+        form.row(name, controls, note: note, padding: 8)
     }
 
     private func chooseLogo(_ name: String) {
@@ -753,16 +913,23 @@ final class SettingsView: MXView {
     }
 
     private func keys() {
+        form.paragraph("Click a shortcut, then press the new keys. Delete removes it, Esc cancels. Names match the menus.")
         var menu = ""
+        defer { if menu.isEmpty { form.paragraph("No command matches “\(keyFilter)”.") } }
         for a in model.actions {
-            if a.menu != menu { form.header(a.menu); menu = a.menu }
             let rec = KeyRecorder(a.shortcut)
             let id = a.id
             rec.onSet = { [weak self] spec in self?.setKey(id, spec) }
+            if !keyFilter.isEmpty, !a.title.localizedCaseInsensitiveContains(keyFilter), !a.menu.localizedCaseInsensitiveContains(keyFilter) { continue }
+            if a.menu != menu { form.header(a.menu); menu = a.menu }
+            // Running these from a list is one click from undoing setup or restarting the app.
+            let risky = ["uninstall-hooks", "install-hooks", "install-update"].contains(id)
             let run = MXButton("Run", small: true) { [weak self] in self?.onRunAction?(id) }
-            form.row(a.title, [(rec, 110), (run, run.intrinsicContentSize.width)], height: 26)
+            run.tip = Tip("Do it now")
+            run.alphaValue = risky ? 0 : 1
+            run.isEnabled = !risky
+            form.row(a.title, [(rec, 110), (run, run.intrinsicContentSize.width)], padding: 5)
         }
-        form.text("", "Click a shortcut and press the new keys. ⌫ removes it, Esc cancels.")
     }
 
     private func setKey(_ id: String, _ spec: String?) {
@@ -771,24 +938,17 @@ final class SettingsView: MXView {
         set("keybind", binds.sorted { $0.key < $1.key }.map { "\($0.value)=\($0.key)" }.joined(separator: "\n") + "\n")
     }
 
+    static let docs = "https://github.com/robinsadeghpour/maxwell/blob/v1/docs/"
+
     private func plugins() {
-        let w = max(200, form.bounds.width - FormView.x0 * 2 - FormView.labelW)
-        if model.plugins.isEmpty { form.text("", "No plugins installed.") }
+        let w = form.innerW
+        if model.plugins.isEmpty { form.paragraph("No plugins yet. Add one below.") }
         for p in model.plugins {
             let m = p.manifest
-            form.header("\(m.name)  ·  \(m.version)\(m.bundled ? "  ·  built in" : "")")
+            form.header(m.name, note: m.description)
             let on = c.pluginEnabled(m)
-            form.toggle("Enabled", on, note: m.description) { [weak self] in self?.set("\(m.id).enabled", $0 ? "true" : "false") }
+            form.toggle(m.name, on, note: "Version \(m.version)\(m.bundled ? ", comes with Maxwell" : "")") { [weak self] in self?.set("\(m.id).enabled", $0 ? "true" : "false") }
             guard on else { continue }
-            var buttons: [(NSView, CGFloat)] = [(Label(p.status.line, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), w - 190)]
-            let restart = MXButton("Restart", small: true) { [weak self] in self?.onPluginRestart?(m.id) }
-            restart.tip = Tip("Stop and start \(m.name) again")
-            let log = MXButton("Open Log", small: true) {
-                NSWorkspace.shared.open(Paths.stateDir.appendingPathComponent("plugins/\(m.id).log"))
-            }
-            log.tip = Tip("What \(m.name) wrote to stderr, and when it started and stopped")
-            buttons += [(restart, restart.intrinsicContentSize.width), (log, log.intrinsicContentSize.width)]
-            form.row("Status", buttons)
             for f in m.settings {
                 let value = c.plugins[m.id]?[f.key] ?? f.default ?? ""
                 let key = "\(m.id).\(f.key)"
@@ -801,57 +961,94 @@ final class SettingsView: MXView {
                     let field = InputField(value: value, placeholder: f.placeholder ?? "", secure: false)
                     field.onCommit = { [weak self] in self?.set(key, $0) }
                     // A number needs room for a few digits, not a sentence.
-                    form.row(f.title, [(field, Int(value) != nil ? 72 : min(w, 280))], note: f.help)
+                    form.row(f.title, [(field, Int(value) != nil ? 72 : min(w * 0.5, 260))], note: f.help)
                 case .secret:
                     let saved = p.secretsSet.contains(f.key)
                     let field = InputField(value: "", placeholder: saved ? "Saved in Keychain" : (f.placeholder ?? "Paste it here"), secure: true)
                     field.onCommit = { [weak self] v in if !v.isEmpty { self?.onPluginSecret?(m.id, f.key, v) } }
-                    var controls: [(NSView, CGFloat)] = [(field, min(w - 70, 280))]
+                    var controls: [(NSView, CGFloat)] = [(field, min(w * 0.45, 240))]
                     if saved {
                         let clear = MXButton("Remove", small: true) { [weak self] in self?.onPluginSecret?(m.id, f.key, nil) }
                         clear.tip = Tip("Delete it from the Keychain")
                         controls.append((clear, clear.intrinsicContentSize.width))
                     }
-                    form.row(f.title, controls, note: f.help ?? "Kept in the macOS Keychain, only \(m.name) can read it.")
+                    form.row(f.title, controls, note: f.help ?? "Kept in the macOS Keychain. Only \(m.name) can read it.")
                 }
             }
+            // A plugin waiting for a key isn't broken: say what it needs, not how to restart it.
+            if let need = m.settings.first(where: { $0.type == .secret && !p.secretsSet.contains($0.key) }), p.status.reported == .setup || p.status.reported == nil {
+                form.text("Status", "Not connected", note: "Paste the \(need.title) above.")
+                continue
+            }
+            let restart = MXButton("Restart", small: true) { [weak self] in self?.onPluginRestart?(m.id) }
+            restart.tip = Tip("Stop and start \(m.name) again")
+            let log = MXButton("Open log", small: true) {
+                NSWorkspace.shared.open(Paths.stateDir.appendingPathComponent("plugins/\(m.id).log"))
+            }
+            log.tip = Tip("What \(m.name) wrote to stderr, and when it started and stopped")
+            form.row("Status", [(restart, restart.intrinsicContentSize.width), (log, log.intrinsicContentSize.width)], note: p.status.line)
         }
         if !model.brokenPlugins.isEmpty {
-            form.header("Couldn't load")
-            for b in model.brokenPlugins { form.text(b.folder, b.why) }
+            form.header("Couldn't load", note: "Fix the plugin's folder and Maxwell tries again.")
+            for b in model.brokenPlugins { form.row(b.folder, [], note: b.why) }
         }
-        form.header("Install")
-        let reveal = MXButton("Reveal in Finder") { [weak self] in
+        form.header("Add a plugin")
+        let reveal = MXButton("Show folder", small: true) { [weak self] in
             guard let self else { return }
             let url = URL(fileURLWithPath: (self.model.pluginsFolder as NSString).expandingTildeInPath)
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             NSWorkspace.shared.activateFileViewerSelecting([url])
         }
-        form.row("Plugins folder", [(Label(model.pluginsFolder, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), min(w, 320))])
-        form.row("", [(reveal, reveal.intrinsicContentSize.width)], note: "Copy a plugin's folder in; Maxwell picks it up. docs/plugins.md shows how to write one.")
+        let guide = MXButton("How to write one", small: true) { if let u = URL(string: Self.docs + "plugins.md") { NSWorkspace.shared.open(u) } }
+        form.row("Plugins folder", [(guide, guide.intrinsicContentSize.width), (reveal, reveal.intrinsicContentSize.width)],
+                 note: "\(model.pluginsFolder). Copy a plugin's folder in and Maxwell loads it.")
+    }
+
+    private func confirmUninstall() {
+        guard let w = window else { return }
+        let a = NSAlert()
+        let n = model.hooks.filter(\.installed).count
+        a.messageText = "Uninstall hooks from \(n == 1 ? "1 account" : "\(n) accounts")?"
+        a.informativeText = "Maxwell won't see when sessions start, stop or need you until you install them again."
+        a.addButton(withTitle: "Uninstall")
+        a.addButton(withTitle: "Cancel")
+        a.buttons.first?.hasDestructiveAction = true
+        a.beginSheetModal(for: w) { [weak self] r in if r == .alertFirstButtonReturn { self?.onUninstallHooks?() } }
     }
 
     private func advanced() {
-        form.header("Hooks")
-        let install = MXButton("Install hooks", hint: "⇧⌘H") { [weak self] in self?.onInstallHooks?() }
-        let uninstall = MXButton("Uninstall", hint: "⇧⌘U") { [weak self] in self?.onUninstallHooks?() }
-        form.row("Status", [(Label(model.hookStatus, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 240)])
-        form.row("", [(install, install.intrinsicContentSize.width), (uninstall, uninstall.intrinsicContentSize.width)],
-                 note: "Backs up each account's settings.json first. Uninstall restores it.")
-        form.header("Config file")
-        let path = (Paths.configFile.path as NSString).abbreviatingWithTildeInPath
-        let reveal = MXButton("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Paths.configFile]) }
-        let open = MXButton("Open", hint: "⇧⌘,") { NSWorkspace.shared.open(Paths.configFile) }
-        form.row("Path", [(Label(path, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 260)])
-        form.row("", [(reveal, reveal.intrinsicContentSize.width), (open, open.intrinsicContentSize.width)], note: "Maxwell reloads it when you save. docs/config.md lists every setting.")
-        form.header("Current settings")
-        let text = (try? String(contentsOf: Paths.configFile, encoding: .utf8)) ?? Config.starter
-        for l in text.components(separatedBy: "\n") where !l.hasPrefix("#") && !l.trimmingCharacters(in: .whitespaces).isEmpty {
-            form.row("", [(Label(l, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg2 }), 420)], height: 18)
+        let missing = model.hooks.contains { !$0.installed }
+        form.header("Hooks", note: "Hooks tell Maxwell when a session starts, stops or needs you. Without them it can't tell. Maxwell also adds one line to your status-line script to read usage; your status line won't change.")
+        for h in model.hooks {
+            let state = h.file == nil ? "No settings.json" : h.installed ? "Installed" : "Not installed"
+            let font = Fonts.mono(Metrics.fontSize - 1)
+            let l = Label(state, font: font, color: { h.installed ? $0.fg2 : $0.on })
+            l.align = .right
+            form.row(h.account, [(l, Text.width(state, font: font) + 4)],
+                     note: h.file.map { f in
+                         let others = model.hooks.filter { $0.file == f && $0.account != h.account }.map(\.account)
+                         return (f as NSString).abbreviatingWithTildeInPath + (others.isEmpty ? "" : " (\(others.joined(separator: ", ")) uses it too)")
+                     } ?? "Run Claude Code once with this account to create it.", padding: 8, warn: h.file != nil && !h.installed)
         }
+        let uninstall = MXButton("Uninstall", small: true) { [weak self] in self?.confirmUninstall() }
+        uninstall.tip = Tip("Takes out everything Maxwell added. Sessions stop reporting to Maxwell")
+        var buttons: [(NSView, CGFloat)] = [(uninstall, uninstall.intrinsicContentSize.width)]
+        if missing {
+            let install = MXButton("Install hooks", primary: true, small: true) { [weak self] in self?.onInstallHooks?() }
+            buttons.append((install, install.intrinsicContentSize.width))
+        }
+        form.row("", buttons, note: "Each settings.json is backed up beside itself first. Uninstall takes out everything Maxwell added.")
+        form.header("Config file", note: "Everything in Settings is saved here as plain text. Edit it by hand and Maxwell reloads when you save.")
+        let path = (Paths.configFile.path as NSString).abbreviatingWithTildeInPath
+        let reveal = MXButton("Show in Finder", small: true) { NSWorkspace.shared.activateFileViewerSelecting([Paths.configFile]) }
+        let open = MXButton("Open", small: true) { NSWorkspace.shared.open(Paths.configFile) }
+        form.row(path, [(reveal, reveal.intrinsicContentSize.width), (open, open.intrinsicContentSize.width)], note: "⇧⌘, opens it from anywhere.")
+        let guide = MXButton("Open guide", small: true) { if let u = URL(string: Self.docs + "config.md") { NSWorkspace.shared.open(u) } }
+        form.row("Every setting, explained", [(guide, guide.intrinsicContentSize.width)], note: "Including the few only the file has, like grouping folders into one project.")
     }
 
     override func keyDown(with e: NSEvent) {
+        if section == .keys, e.modifierFlags.contains(.command), e.charactersIgnoringModifiers == "f" { filter.focus(); return }
         if e.modifierFlags.contains(.command), let n = Int(e.charactersIgnoringModifiers ?? ""), (1...SettingsSection.allCases.count).contains(n) {
             section = SettingsSection.allCases[n - 1]
         } else { super.keyDown(with: e) }
@@ -863,6 +1060,8 @@ final class SettingsView: MXView {
 final class InputField: MXView, NSTextFieldDelegate {
     private let field: NSTextField
     var onCommit: ((String) -> Void)?
+    /// Every keystroke, for fields that filter as you type.
+    var onChange: ((String) -> Void)?
     private var committed: String
 
     init(value: String, placeholder: String, secure: Bool) {
@@ -896,6 +1095,8 @@ final class InputField: MXView, NSTextFieldDelegate {
     }
     override func mouseDown(with e: NSEvent) { window?.makeFirstResponder(field) }
     func controlTextDidBeginEditing(_ n: Notification) { needsDisplay = true }
+    func controlTextDidChange(_ n: Notification) { onChange?(field.stringValue) }
+    func focus() { window?.makeFirstResponder(field) }
     func controlTextDidEndEditing(_ n: Notification) {
         needsDisplay = true
         let v = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -913,12 +1114,13 @@ final class UsageRow: MXView, TipSource {
     required init?(coder: NSCoder) { fatalError() }
     override func draw(_ r: NSRect) {
         let w = (bounds.width - 16) / 2
-        let small = Fonts.mono(Metrics.fontSize - 2.5, .medium)
+        let small = Fonts.mono(Metrics.fontSize - 2)
         let rw = Text.width("↻Sat 00:00", font: Fonts.mono(Metrics.fontSize - 2))
-        Text.draw("5H", in: NSRect(x: 0, y: 0, width: 24, height: bounds.height), color: t.fg3, font: small)
-        UsageBar.draw(account.fiveHour, in: NSRect(x: 24, y: 0, width: w - 24, height: bounds.height), now: now, theme: t, resetWidth: rw)
-        Text.draw("WK", in: NSRect(x: w + 16, y: 0, width: 24, height: bounds.height), color: t.fg3, font: small)
-        UsageBar.draw(account.week, in: NSRect(x: w + 40, y: 0, width: w - 24, height: bounds.height), now: now, theme: t, resetWidth: rw)
+        let lw = Text.width("Weekly", font: small) + 8
+        Text.draw("5-hour", in: NSRect(x: 0, y: 0, width: lw, height: bounds.height), color: t.fg3, font: small)
+        UsageBar.draw(account.fiveHour, in: NSRect(x: lw, y: 0, width: w - lw, height: bounds.height), now: now, theme: t, resetWidth: rw)
+        Text.draw("Weekly", in: NSRect(x: w + 16, y: 0, width: lw, height: bounds.height), color: t.fg3, font: small)
+        UsageBar.draw(account.week, in: NSRect(x: w + 16 + lw, y: 0, width: w - lw, height: bounds.height), now: now, theme: t, resetWidth: rw)
     }
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         let w = (bounds.width - 16) / 2, week = p.x >= w + 16

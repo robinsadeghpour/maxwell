@@ -2,7 +2,7 @@
   "id": "linear",
   "name": "Linear",
   "version": "0.1.0",
-  "description": "Each session's ticket and its status, \"ticket done\" in Safe to close, one-click status moves.",
+  "description": "Shows each session's Linear ticket and its status, and can move the ticket along as the session works.",
   "protocol": 1,
   "run": [
     "./linear"
@@ -13,7 +13,7 @@
       "title": "API key",
       "type": "secret",
       "placeholder": "lin_api_…",
-      "help": "Linear › Settings › Security & access › New API key."
+      "help": "Make one in Linear › Settings › Security & access."
     },
     {
       "key": "sync",
@@ -25,7 +25,7 @@
         "off"
       ],
       "default": "suggest",
-      "help": "Suggest asks first. Auto moves tickets on its own."
+      "help": "Suggest asks before moving a ticket. Auto moves it, and comments when a PR opens. Off never touches tickets."
     },
     {
       "key": "writes",
