@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Side panels open one at a time</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Panels on the same side now work like tabs. Opening the plugins panel closes the viewer beside it, and opening the viewer closes the plugins panel. The usage and system widgets at the bottom still sit side by side.&lt;/p&gt;</description>
+</item>
+<item>
 <title>Start a session from any terminal's folder</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-open-a-folder-with-maxwell</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-open-a-folder-with-maxwell</guid>
