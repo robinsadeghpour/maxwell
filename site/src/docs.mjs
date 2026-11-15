@@ -80,7 +80,7 @@ export const pages = {
 <h2>The rules</h2>
 <ol class="steps">
 <li><strong>Unknown is never safe.</strong> If Maxwell can't check something, the session isn't safe.</li>
-<li><strong>It needs proof of a finished task.</strong> Nothing is running, including background tasks and subagents. The session has been quiet for 2 hours. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.</li>
+<li><strong>It needs proof of a finished task.</strong> Nothing is running, including background tasks and subagents. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.</li>
 <li><strong>A final read by a small model.</strong> Only for sessions that passed everything else, Haiku reads the last message once and has to answer <code>finished</code>. Each read costs about $0.0002.</li>
 <li><strong>You see the evidence.</strong> Each safe session lists every check and where its result came from.</li>
 <li><strong>Checked again at the moment of closing.</strong> If anything changed, that session is skipped.</li>
@@ -95,8 +95,7 @@ export const pages = {
 <h2>Plugin checks</h2>
 <p>Plugins can add checks, and the same rules apply. A plugin that isn't running can't vouch, so its checks turn unknown. A check from before the session's last activity doesn't count. The Linear plugin adds "Linear ticket done". The Slack plugin adds "Replied on Slack" to sessions started from a message.</p>
 <h2>Tune it</h2>
-<pre><code>safe-after = 2h   <span class="c"># quiet time before a session can be safe</span>
-judge = on        <span class="c"># off skips the model read, so nothing is ever safe</span></code></pre>
+<pre><code>judge = on        <span class="c"># off skips the model read, so nothing is ever safe</span></code></pre>
 <p>Run <code>Maxwell state</code> in a terminal to audit every session and see which check holds each one back.</p>`,
   },
 
@@ -374,7 +373,6 @@ terminal-font-size = 12       <span class="c"># ⌘− and ⌘= change this one<
 account = work ~/.claude      <span class="c"># &lt;name&gt; &lt;CLAUDE_CONFIG_DIR&gt;, one line per account</span>
 project-pin = Acme            <span class="c"># projects kept on the rail, in order</span>
 rail = auto                   <span class="c"># auto slides in at the left edge, shown keeps it visible</span>
-safe-after = 2h               <span class="c"># quiet time before a session can be safe to close</span>
 idle-after = 24h              <span class="c"># quiet time before a stopped session folds into Idle</span>
 judge = on                    <span class="c"># off skips the model read, so nothing is ever safe</span>
 skip-permissions = on         <span class="c"># off keeps Claude's own permission mode</span>

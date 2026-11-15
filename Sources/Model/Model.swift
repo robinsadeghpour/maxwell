@@ -83,10 +83,9 @@ enum PhaseGroup: Int, CaseIterable {
     var folds: Bool { self == .idle || self == .recentlyClosed }
 }
 
-/// The clock-dependent thresholds the sidebar groups by (config: idle-after, safe-after, judge).
+/// The clock-dependent thresholds the sidebar groups by (config: idle-after, judge).
 struct GroupRules: Equatable {
     var idleAfter: TimeInterval = 24 * 3600
-    var safeAfter: TimeInterval = 2 * 3600
     /// Off: no model read, so no session is ever safe to close.
     var judge = true
     /// An agents listing older than this no longer proves the session is there and idle.

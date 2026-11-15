@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-cleaner-panels",
     date: "2026-11-15",
-    versions: "0.1.20 – 0.1.22",
+    versions: "0.1.20 – 0.1.23",
     title: "Quieter plugin lists and a tidier Settings",
     figure: fig.panels(),
     body: `
@@ -18,6 +18,7 @@ export default [
       "Plugin panel section titles now match the other panel headers",
       "Plugin keys no longer ask for Keychain access again after every update. Allow it once more after this update and it sticks",
       "New session now lists each project's folder instead of its worktrees, and skips folders that no longer exist",
+      "Safe to close no longer waits 2 hours. A finished session is safe as soon as every check passes, and the safe-after setting is gone",
     ],
   },
   {

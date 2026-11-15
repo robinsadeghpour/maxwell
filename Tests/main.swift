@@ -46,7 +46,7 @@ s = reduce(s, hook(.promptSubmitted(prompt: "no", title: nil), at: 5))
 s = reduce(s, hook(.stopped(lastMessage: "Fixed and pushed. PR #12 is merged."), at: 6))
 check(s.sessions["s1"]?.phase == .yourTurn, "stop without question -> says done")
 
-let rules = GroupRules(idleAfter: 86400, safeAfter: 7200)
+let rules = GroupRules(idleAfter: 86400)
 let pass = DoneCheck(at: t0.addingTimeInterval(8), repo: true, dirtyFiles: 0, unpushed: 0, pr: .merged(12), branch: "fix")
 /// Everything a stopped session needs to be safe at `at`: a fresh idle listing with no
 /// background tasks, a repo check after the last activity, and a "finished" model read.
@@ -75,8 +75,7 @@ var safe = evidence(s, "s1", at: later)
 check(groupOf(safe, "s1", at: later) == .safeToClose, "every check passing -> safe to close")
 check(verdictOf(safe, "s1", at: later).allSatisfy { !$0.source.isEmpty && !$0.detail.isEmpty }, "every check names what it found and where")
 check(Set(verdictOf(safe, "s1", at: later).map(\.kind)) == Set(Check.Kind.allCases).subtracting([.marked, .plugin, .wrap]), "the checklist has every check")
-check(groupOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180) == .yourTurn, "3 minutes after the reply is your turn, not safe")
-check(outcome(verdictOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180), .quiet) == .fail, "quiet fails before safe-after")
+check(groupOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180) == .safeToClose, "no waiting: 3 minutes after a finished reply is already safe")
 
 // Unknown is never safe.
 let notRepo = evidence(s, "s1", at: later, check: DoneCheck(at: t0, repo: false, dirtyFiles: nil, unpushed: nil, pr: .unknown("not checked"), branch: nil))
@@ -132,7 +131,7 @@ ledger.read(Data(#"{"type":"user","timestamp":"2026-11-13T15:00:00.000Z","toolUs
 check(ledger.running(since: processStart) == 1, "a new background shell runs")
 ledger.read(Data(#"{"type":"user","toolUseResult":{"message":"Successfully stopped task: bs1tbv9ag (npx expo start)","task_id":"bs1tbv9ag","task_type":"local_bash"}}"#.utf8))
 check(ledger.running(since: processStart) == 0, "TaskStop ends a task")
-check(safe.judgeCandidates(now: t0.addingTimeInterval(later), rules: GroupRules(idleAfter: 86400, safeAfter: 7200, judge: false)).isEmpty, "judge = off asks the model nothing")
+check(safe.judgeCandidates(now: t0.addingTimeInterval(later), rules: GroupRules(idleAfter: 86400, judge: false)).isEmpty, "judge = off asks the model nothing")
 
 // The model read: candidates only; anything but finished is not safe; off means never safe.
 for v in [Judgment.Verdict.pending, .unsure] {
@@ -140,7 +139,7 @@ for v in [Judgment.Verdict.pending, .unsure] {
 }
 let unread = evidence(s, "s1", at: later, verdict: nil)
 check(outcome(verdictOf(unread, "s1", at: later), .judge) == .unknown && Check.candidate(verdictOf(unread, "s1", at: later)), "an unread candidate waits for the model")
-check(groupOf(safe, "s1", at: later, GroupRules(idleAfter: 86400, safeAfter: 7200, judge: false)) == .yourTurn, "judge = off -> never safe")
+check(groupOf(safe, "s1", at: later, GroupRules(idleAfter: 86400, judge: false)) == .yourTurn, "judge = off -> never safe")
 let notRepoUnread = evidence(s, "s1", at: later, check: notRepo.sessions["s1"]!.doneCheck, verdict: nil)
 check(!Check.candidate(verdictOf(notRepoUnread, "s1", at: later)) && notRepoUnread.judgeCandidates(now: t0.addingTimeInterval(later), rules: rules).isEmpty, "a session failing other checks is not a candidate")
 check(unread.judgeCandidates(now: t0.addingTimeInterval(later), rules: rules).map(\.0.id) == ["s1"], "an unread session passing everything else is a candidate")
@@ -215,7 +214,7 @@ let g = idle.grouped(now: t0, rules: rules)
 check(g.map(\.0) == [.yourTurn, .working, .idle], "idle folds to the bottom; unchecked sessions are never safe")
 check(g.first { $0.0 == .idle }?.1.map(\.id) == ["old-done"], "says done quiet for more than the threshold is idle")
 check(g.first { $0.0 == .working }?.1.map(\.id) == ["old-working"], "only says done folds; a quiet working session stays working")
-check(idle.grouped(now: t0, rules: GroupRules(idleAfter: 7 * 86400, safeAfter: 7200)).contains { $0.0 == .idle } == false, "the threshold comes from config")
+check(idle.grouped(now: t0, rules: GroupRules(idleAfter: 7 * 86400)).contains { $0.0 == .idle } == false, "the threshold comes from config")
 check(Config.parse("idle-after = 2d").idleAfter == 2 * 86400 && Config.parse("idle-after = 36").idleAfter == 36 * 3600, "idle-after parses 2d and plain hours")
 
 check(Reply.classify("All green.\n\nWant me to open a PR?") == .question("Want me to open a PR?"), "question detection")
@@ -232,7 +231,7 @@ for handBack in [
     "Für TikTok ist die gleiche Datei direkt nutzbar. Gib Bescheid, wenn es online ist, dann mach ich den TikTok-Draft.",
 ] { check(Reply.classify(handBack) != .statement, "hand-back is not a finished report: \(handBack.prefix(40))") }
 check(Config.parse("project = Orbit ~/projects/orbit*").projects == [ProjectRule(name: "Orbit", glob: "~/projects/orbit*")], "project rules parse")
-check(Config.parse("safe-after = 90m").safeAfter == 5400 && Config().safeAfter == 7200, "safe-after parses, default 2h")
+check(Config.parse("safe-after = 90m\nidle-after = 2d").idleAfter == 2 * 86400, "an old safe-after line is ignored")
 check(Config().skipPermissions && Config.parse(Config.starter).skipPermissions && !Config.parse("skip-permissions = off").skipPermissions, "skip-permissions defaults on, off turns it off")
 check(Config().theme(systemDark: true) == "graphite" && Config().theme(systemDark: false) == "paper", "the pair follows the system")
 check(Config.parse("appearance = light").theme(systemDark: true) == "paper" && Config.parse("theme-dark = silver\nappearance = dark").theme(systemDark: false) == "silver", "appearance pins a side")

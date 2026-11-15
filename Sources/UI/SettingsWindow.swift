@@ -481,7 +481,6 @@ final class SettingsView: MXView {
         form.header("Sessions")
         form.toggle("Skip permission prompts", c.skipPermissions, note: "New and brought-in sessions run with --dangerously-skip-permissions. Off: Claude's own mode.") { [weak self] in self?.set("skip-permissions", $0 ? "on" : "off") }
         form.choice("Fold into Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter)) { [weak self] in self?.set("idle-after", $0) }
-        form.choice("Safe to close after", [("1h", "1h"), ("2h", "2h"), ("4h", "4h"), ("8h", "8h")], current: hours(c.safeAfter), note: "How long a session must be quiet. Every other check still has to pass.") { [weak self] in self?.set("safe-after", $0) }
         form.toggle("Final model check", c.judge, note: "Haiku reads the last reply once. If off, nothing is ever safe.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
         form.choice("Rows", [("detail", "Two lines"), ("compact", "One line")], current: c.rowStyle) { [weak self] in self?.set("row-style", $0) }
     }

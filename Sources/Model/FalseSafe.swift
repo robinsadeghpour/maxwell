@@ -31,7 +31,7 @@ enum FalseSafe {
         }
         if let m = s.lastMessage, let j = state.judgments[Reply.hash(m)] { facts["judgment"] = j.verdict.rawValue }
         return ["session": s.id, "title": s.title, "account": s.accountId, "cwd": s.cwd, "now": now.timeIntervalSince1970,
-                "safeAfter": rules.safeAfter, "hash": s.lastMessage.map(Reply.hash) ?? "", "facts": facts,
+                "hash": s.lastMessage.map(Reply.hash) ?? "", "facts": facts,
                 "checksSeen": state.checks(s, now: now, rules: rules).map(MaxwellRecord.encode)]
     }
 
@@ -75,7 +75,7 @@ enum FalseSafe {
             st.judgments[Reply.hash(m)] = Judgment(verdict: v, at: Date(timeIntervalSince1970: now), account: acct, costUSD: nil)
         }
         st.sessions[id] = s
-        let rules = GroupRules(idleAfter: 24 * 3600, safeAfter: (o["safeAfter"] as? NSNumber)?.doubleValue ?? 7200, judge: true)
+        let rules = GroupRules(idleAfter: 24 * 3600, judge: true)
         return (st, s, Date(timeIntervalSince1970: now), rules)
     }
 }

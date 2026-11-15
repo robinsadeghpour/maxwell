@@ -46,8 +46,6 @@ struct Config: Equatable {
     var viewerFont = "mono"
     /// "Says done" sessions quiet for longer than this fold into the Idle group.
     var idleAfter: TimeInterval = 24 * 3600
-    /// A stopped session must be quiet this long (plus every other check) to be safe to close.
-    var safeAfter: TimeInterval = 2 * 3600
     /// The final model read of a candidate's last reply. Off: nothing is ever safe to close.
     var judge = true
     /// Sessions are told to end each reply with a status line (Wrap.rule) that Maxwell reads.
@@ -88,7 +86,7 @@ struct Config: Equatable {
         }
     }
 
-    var rules: GroupRules { GroupRules(idleAfter: idleAfter, safeAfter: safeAfter, judge: judge) }
+    var rules: GroupRules { GroupRules(idleAfter: idleAfter, judge: judge) }
 
     static func load(from url: URL = Paths.configFile) -> Config {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return withDiscoveredAccounts(Config()) }
@@ -128,7 +126,6 @@ struct Config: Equatable {
                 if !name.isEmpty { c.logos[name] = Paths.normalize(String(value[value.index(after: sp)...])) }
             case "viewer-font": if ["mono", "sans"].contains(value) { c.viewerFont = value }
             case "idle-after": if let d = duration(value) { c.idleAfter = d }
-            case "safe-after": if let d = duration(value) { c.safeAfter = d }
             case "judge": c.judge = !["off", "false"].contains(value)
             case "wrap-line": c.wrapLine = !["off", "false"].contains(value)
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
@@ -242,8 +239,6 @@ struct Config: Equatable {
     # project-logo = Acme ~/projects/acme/apps/web/app/icon.png
     # "Says done" sessions quiet for longer than this fold into a collapsed Idle group.
     idle-after = 24h
-    # A stopped session counts as safe to close only after this long without activity.
-    safe-after = 2h
     # Last step before Safe to close: one small model read (claude -p, haiku, on the account
     # with the most 5-hour room) of the last reply. off = nothing is ever safe to close.
     judge = on

@@ -19,7 +19,6 @@ browser = work2 zen container Claude Tinkers 2   # <account> <browser> [profile|
 file-tree = false
 app-icon = auto               # auto | light | dark | paper | graphite | light-eyes | dark-eyes
 idle-after = 24h              # stopped sessions quiet this long fold into Idle (24h, 90m, 2d)
-safe-after = 2h               # quiet this long before a session can be safe to close
 judge = on                    # off: no model read, so nothing is ever safe to close
 account = work ~/.claude      # <name> <CLAUDE_CONFIG_DIR>, one line per account
 project = Orbit ~/projects/orbit*     # <name> <path glob>; default: the git repo, worktrees included

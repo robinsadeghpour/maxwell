@@ -69,7 +69,7 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 Closing a session that's still working, or that's waiting on you, costs you work. So Maxwell is strict:
 
 1. **Unknown is never safe.** If Maxwell can't check something, the session isn't safe.
-2. **It needs proof of a finished task.** Nothing is running, including background tasks and subagents. The session has been quiet for 2 hours. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.
+2. **It needs proof of a finished task.** Nothing is running, including background tasks and subagents. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.
 3. **The session says where it stands.** Every session is told to end each reply with one status line: **Safe to close**, **Not done** or **Needs you**, and a few words. Maxwell shows it on the session, and "Not done" or "Needs you" keeps it from being safe. `wrap-line = off` stops asking for it.
 4. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
 5. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" asks you to confirm and shows the list first.
@@ -160,7 +160,6 @@ account = work ~/.claude      # <name> <CLAUDE_CONFIG_DIR>, one line per account
 project-pin = Acme            # projects kept on the rail, in order
 rail = auto                   # auto slides in at the left edge, shown keeps it visible
 project-logo-style = engraved # engraved | pixel | monogram
-safe-after = 2h               # quiet time before a session can be safe to close
 idle-after = 24h              # quiet time before a stopped session folds into Idle
 judge = on                    # off skips the model read, so nothing is ever safe
 wrap-line = on                # sessions end each reply with a status line Maxwell reads
