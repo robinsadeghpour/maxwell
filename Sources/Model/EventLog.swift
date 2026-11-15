@@ -92,6 +92,15 @@ enum MaxwellRecord {
         ["type": "not-safe", "session": s.id, "hash": s.lastMessage.map(Reply.hash) ?? "", "checks": checks.map(encode)]
     }
 
+    /// nil `mark`: back to Maxwell's verdict.
+    static func marked(_ id: SessionID, as mark: Mark?) -> [String: Any] {
+        var f: [String: Any] = ["type": "marked", "session": id]
+        if let mark { f["as"] = mark.rawValue }
+        return f
+    }
+
+    static func pinned(_ id: SessionID, _ on: Bool) -> [String: Any] { ["type": "pinned", "session": id, "on": on] }
+
     /// nil `project`: back to the folder's project.
     static func moved(_ id: SessionID, to project: String?) -> [String: Any] {
         var f: [String: Any] = ["type": "moved", "session": id]
@@ -141,7 +150,9 @@ enum MaxwellRecord {
             s.phase = .ended
             return .closed(ClosedSession(at: at, session: s, checks: decode(m["checks"])))
         case "reopened": return .reopened(sid, at: at)
-        case "not-safe": return .markedNotSafe(sid, at: at)
+        case "not-safe": return .marked(sid, .yourTurn, at: at)
+        case "marked": return .marked(sid, (m["as"] as? String).flatMap(Mark.init), at: at)
+        case "pinned": return .pinned(sid, m["on"] as? Bool ?? false)
         case "moved": return .movedToProject(sid, m["project"] as? String)
         case "titled":
             guard let text = m["title"] as? String else { return nil }

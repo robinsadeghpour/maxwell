@@ -35,7 +35,7 @@ extension NSPasteboard.PasteboardType {
 /// close row expands (click, or →) to its checklist and a "Not safe" action; a Recently
 /// closed row reopens on click.
 final class SessionList: MXView, NSDraggingSource, TipSource {
-    enum Item { case shells(Int), shell(ShellRow), group(PhaseGroup, Int), session(Row), check(Check), notSafe(SessionID) }
+    enum Item { case shells(Int), shell(ShellRow), pinned(Int), group(PhaseGroup, Int), session(Row), check(Check), notSafe(SessionID) }
     private(set) var items: [Item] = []
     var current: SessionID? { didSet { if current != oldValue, current != nil { cursor = current }; needsDisplay = true } }
     var compact = false { didSet { relayout(); needsDisplay = true } }
@@ -93,10 +93,13 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     var idleExpanded: Bool { unfolded.contains(.idle) }
     var idleNote = "quiet 24h+"
     private var groups: [(PhaseGroup, [Row])] = []
+    /// Sessions you pinned, first under their own header; each keeps its group's glyph.
+    private var pinned: [Row] = []
 
-    func update(_ groups: [(PhaseGroup, [Row])]) {
+    func update(_ groups: [(PhaseGroup, [Row])], pinned: [Row] = []) {
         let now = Date()
-        for (g, rows) in groups {
+        self.pinned = pinned
+        for (g, rows) in groups + pinned.map({ ($0.group, [$0]) }) {
             for r in rows {
                 if let old = lastGroup[r.session.id], old != g { pulses[r.session.id] = now }
                 lastGroup[r.session.id] = g
@@ -112,7 +115,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         let safeIds = Set(groups.first { $0.0 == .safeToClose }?.1.map(\.session.id) ?? [])
         expanded.formIntersection(safeIds)
         let shellItems: [Item] = shells.isEmpty ? [] : [.shells(shells.count)] + shells.map(Item.shell)
-        items = shellItems + groups.flatMap { g, rows -> [Item] in
+        let pinnedItems: [Item] = pinned.isEmpty ? [] : [.pinned(pinned.count)] + pinned.map(Item.session)
+        items = shellItems + pinnedItems + groups.flatMap { g, rows -> [Item] in
             guard !g.folds || unfolded.contains(g) else { return [.group(g, rows.count)] }
             return [.group(g, rows.count)] + rows.flatMap { r -> [Item] in
                 guard expanded.contains(r.session.id) else { return [.session(r)] }
@@ -157,6 +161,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private static func key(_ it: Item) -> String {
         switch it {
         case .shells: return "gshells"
+        case .pinned: return "gpinned"
         case .shell(let r): return r.id
         case .group(let g, _): return "g\(g.rawValue)"
         case .session(let r): return r.session.id
@@ -180,7 +185,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         for (i, it) in items.enumerated() {
             let h: CGFloat
             switch it {
-            case .group, .shells: y += i == 0 ? 0 : 8; h = Self.groupHeight
+            case .group, .shells, .pinned: y += i == 0 ? 0 : 8; h = Self.groupHeight
             case .session, .shell: h = rowHeight
             case .check: h = Self.checkHeight
             case .notSafe: h = Self.notSafeHeight
@@ -272,6 +277,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             switch it {
             case .shells(let n):
                 drawHeader("Terminals", n, color: t.fg2, in: r)
+            case .pinned(let n):
+                drawHeader("Pinned", n, color: t.fg2, in: r)
             case .shell(let row):
                 drawShell(row, in: r, hovered: hoverIndex == i, cursor: focused && row.id == cursor)
             case .group(let g, let n):
@@ -281,7 +288,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             case .check(let c):
                 CheckLine.draw(c, in: NSRect(x: r.minX + 34, y: r.minY + 1, width: r.width - 44, height: r.height - 2), theme: t, stacked: true)
             case .notSafe:
-                let label = "Not safe · keep it open"
+                let label = "Not safe · keep it under Your turn"
                 let w = Text.width(label, font: Fonts.mono(Metrics.fontSize - 1)) + 16
                 let b = NSRect(x: r.minX + 34, y: r.minY + 4, width: w, height: r.height - 8)
                 (hoverIndex == i ? t.hover : t.hair2).setFill()
@@ -717,10 +724,10 @@ final class Sidebar: MXView, TipSource {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    func update(scope: String, groups: [(PhaseGroup, [Row])]) {
-        list.update(groups)
+    func update(scope: String, pinned: [Row] = [], groups: [(PhaseGroup, [Row])]) {
+        list.update(groups, pinned: pinned)
         title.text = scope
-        count.text = "\(groups.reduce(0) { $0 + $1.1.count })"
+        count.text = "\(groups.reduce(pinned.count) { $0 + $1.1.count })"
         needsLayout = true
     }
 

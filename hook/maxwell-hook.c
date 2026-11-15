@@ -1,7 +1,9 @@
 // maxwell-hook: appends one line to ~/.local/state/maxwell/events.jsonl.
 //
 //   maxwell-hook               Claude Code hook: stdin is the hook payload. On
-//                              SessionStart it also prints <state dir>/session-context.md.
+//                              SessionStart it also prints <state dir>/session-context.md,
+//                              and on a prompt in a session that never got it (started
+//                              before the file existed), prints it once then.
 //   maxwell-hook --statusline  status-line tap: stdin is the status-line JSON;
 //                              keeps rate_limits and context_window, at most once
 //                              per 30 s per account.
@@ -127,18 +129,48 @@ static int session_pid(void) {
     return 0;
 }
 
-// Claude Code adds SessionStart stdout to the session's context: Maxwell's rules for it.
-static void print_context(const char *dir) {
+// Claude Code adds SessionStart and UserPromptSubmit stdout to the session's context: Maxwell's
+// rules for it. Returns 1 if there was a rule to print.
+static int print_context(const char *dir) {
     char path[1100], buf[16384];
     snprintf(path, sizeof path, "%s/session-context.md", dir);
     int fd = open(path, O_RDONLY);
-    if (fd < 0) return;
+    if (fd < 0) return 0;
     ssize_t r;
     while ((r = read(fd, buf, sizeof buf)) > 0) {
         ssize_t wr = write(1, buf, (size_t)r);
         if (wr < 0) break;
     }
     close(fd);
+    return 1;
+}
+
+// <state dir>/briefed/<session id>: this session has the rules. Only ids made of letters,
+// digits and dashes name a file.
+static int briefed_path(const char *dir, char *out, size_t cap) {
+    const char *sid = 0;
+    size_t sl = 0;
+    if (!value_span(payload, "session_id", &sid, &sl) || sl < 3 || sl > 80 || sid[0] != '"') return 0;
+    for (size_t i = 1; i + 1 < sl; i++) {
+        char c = sid[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-')) return 0;
+    }
+    snprintf(out, cap, "%s/briefed/%.*s", dir, (int)sl - 2, sid + 1);
+    return 1;
+}
+
+static void mark_briefed(const char *dir, const char *path) {
+    char bdir[1100];
+    snprintf(bdir, sizeof bdir, "%s/briefed", dir);
+    ensure_dir(bdir);
+    int fd = open(path, O_WRONLY | O_CREAT, 0644);
+    if (fd >= 0) close(fd);
+}
+
+static int is_event(const char *name) {
+    const char *ev = 0;
+    size_t evl = 0, nl = strlen(name);
+    return value_span(payload, "hook_event_name", &ev, &evl) && evl == nl + 2 && memcmp(ev + 1, name, nl) == 0;
 }
 
 int main(int argc, char **argv) {
@@ -193,9 +225,13 @@ int main(int argc, char **argv) {
         close(fd);
     }
 
-    const char *ev = 0;
-    size_t evl = 0;
-    if (!statusline && value_span(payload, "hook_event_name", &ev, &evl) && evl == 14 && memcmp(ev, "\"SessionStart\"", 14) == 0)
-        print_context(dir);
+    if (statusline) return 0;
+    char briefed[1300];
+    int has_path = briefed_path(dir, briefed, sizeof briefed);
+    if (is_event("SessionStart")) {
+        if (print_context(dir) && has_path) mark_briefed(dir, briefed);
+    } else if (is_event("UserPromptSubmit") && has_path && access(briefed, F_OK) != 0) {
+        if (print_context(dir)) mark_briefed(dir, briefed);
+    }
     return 0;
 }

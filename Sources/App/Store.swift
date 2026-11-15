@@ -435,7 +435,8 @@ final class Store {
                 let outcome: CloseOutcome? = {
                     guard let fresh else { return .skipped("gone from the session list") }
                     if fresh.lastMessage.map(Reply.hash) != item.hash { return .skipped("new reply since you confirmed") }
-                    if let bad = self.checks(fresh).first(where: { $0.outcome != .pass }) {
+                    // Marked safe by you: your call stands over the checks it fails.
+                    if self.state.mark(fresh)?.mark != .safe, let bad = self.checks(fresh).first(where: { $0.outcome != .pass }) {
                         return .skipped("\(bad.title): \(bad.detail)")
                     }
                     guard case .background = fresh.reach else { return .skipped("runs in another terminal; close it there") }
@@ -534,10 +535,15 @@ final class Store {
 
     func dismissSuggestion(_ id: SessionID, _ project: String) { record(MaxwellRecord.dismissed(id, suggestion: project)) }
 
+    /// Puts a session in a group by hand until its next turn; nil hands it back to Maxwell's verdict.
+    func setMark(_ id: SessionID, _ mark: Mark?) { record(MaxwellRecord.marked(id, as: mark)) }
+
+    func setPinned(_ id: SessionID, _ on: Bool) { record(MaxwellRecord.pinned(id, on)) }
+
     /// Undo and Recently closed: the record goes; `claude attach` (the caller's terminal) starts it again.
     func reopened(_ id: SessionID) { record(MaxwellRecord.reopened(id)) }
 
-    /// "Not safe": out of Safe to close until new activity; the evidence goes to the event log and,
+    /// "Not safe": a Your turn mark, out of Safe to close until its next turn; the evidence goes to the event log and,
     /// as a replayable fixture, to Tests/fixtures/false-safe/. Returns the fixture path.
     @discardableResult
     func markNotSafe(_ id: SessionID) -> URL? {

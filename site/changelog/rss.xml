@@ -14,6 +14,15 @@
 &lt;p&gt;Replies without a status line still get the Haiku read.&lt;/p&gt;</description>
 </item>
 <item>
+<title>Pin sessions, and overrule a verdict</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-pin-and-mark-sessions</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-pin-and-mark-sessions</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Right-click a session and choose &lt;strong&gt;Pin to Top&lt;/strong&gt;. Pinned sessions are listed first, under Pinned, and Close all leaves them alone.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Mark As&lt;/strong&gt; puts a session under Your turn, Safe to close or Idle when you disagree with Maxwell. The mark holds until the session's next turn. A session you mark safe says which checks still fail.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⇧&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;X&lt;/kbd&gt;&lt;/span&gt; now closes only the safe sessions of the project you're in, so a session from another project never lands in the list.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Sessions that started before Maxwell asked for the status line now get the request with your next prompt&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Side panels open one at a time</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs</guid>

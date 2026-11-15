@@ -7,13 +7,28 @@ export default [
   {
     slug: "2026-11-15-safe-to-close-trusts-the-session",
     date: "2026-11-15",
-    versions: "0.1.46",
+    versions: "0.1.47",
     title: "Safe to close trusts the session's own word",
     figure: "",
     body: `
 <p>When a session ends its reply with <strong>Safe to close</strong> and every other check passes (nothing running, git clean and pushed, the PR merged), it now goes straight to Safe to close. Before, Haiku read the reply once more and could hold it back as <em>unsure</em> or <em>pending</em> over a caveat or a note, and it answered differently for the same reply.</p>
 <p>Replies without a status line still get the Haiku read.</p>`,
     fixes: [],
+    fixes: [],
+  },
+  {
+    slug: "2026-11-15-pin-and-mark-sessions",
+    date: "2026-11-15",
+    versions: "0.1.46",
+    title: "Pin sessions, and overrule a verdict",
+    figure: "",
+    body: `
+<p>Right-click a session and choose <strong>Pin to Top</strong>. Pinned sessions are listed first, under Pinned, and Close all leaves them alone.</p>
+<p><strong>Mark As</strong> puts a session under Your turn, Safe to close or Idle when you disagree with Maxwell. The mark holds until the session's next turn. A session you mark safe says which checks still fail.</p>
+<p>${k("⇧ ⌘ X")} now closes only the safe sessions of the project you're in, so a session from another project never lands in the list.</p>`,
+    fixes: [
+      "Sessions that started before Maxwell asked for the status line now get the request with your next prompt",
+    ],
   },
   {
     slug: "2026-11-15-side-panels-are-tabs",
