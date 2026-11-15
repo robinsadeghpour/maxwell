@@ -5,6 +5,16 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-open-a-folder-with-maxwell",
+    date: "2026-11-15",
+    versions: "0.1.44",
+    title: "Start a session from any terminal's folder",
+    figure: "",
+    body: `
+<p>Run <code>open -a Maxwell .</code> in any terminal, or drop a folder on Maxwell in the Dock, and the new-session panel opens with that folder picked. ${k("⏎")} starts the session there, so you don't need a terminal inside Maxwell to start in the right place.</p>`,
+    fixes: [],
+  },
+  {
     slug: "2026-11-15-claude-in-a-maxwell-terminal",
     date: "2026-11-15",
     versions: "0.1.43",

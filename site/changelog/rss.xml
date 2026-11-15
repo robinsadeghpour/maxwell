@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Start a session from any terminal's folder</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-open-a-folder-with-maxwell</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-open-a-folder-with-maxwell</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Run &lt;code&gt;open -a Maxwell .&lt;/code&gt; in any terminal, or drop a folder on Maxwell in the Dock, and the new-session panel opens with that folder picked. &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⏎&lt;/kbd&gt;&lt;/span&gt; starts the session there, so you don't need a terminal inside Maxwell to start in the right place.&lt;/p&gt;</description>
+</item>
+<item>
 <title>Claude in a Maxwell terminal is one row</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-claude-in-a-maxwell-terminal</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-claude-in-a-maxwell-terminal</guid>

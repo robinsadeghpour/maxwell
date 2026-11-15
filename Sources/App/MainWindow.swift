@@ -872,7 +872,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: new session
 
-    func showNewSession() {
+    /// `folder`: a folder handed to Maxwell (`open -a Maxwell .`), offered first and picked.
+    func showNewSession(folder: String? = nil) {
         dismissOverlays()
         let state = store.state
         // Home is never offered: a session there sees everything. ⌘O still reaches it, with a warning.
@@ -884,7 +885,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         folders = folders.filter { $0.path == here } + folders.filter { $0.path != here }
         if let scope { folders = folders.filter { $0.project == scope } + folders.filter { $0.project != scope } }
         // Inside a project, start in it. From All projects, pick: the last folder looked at is a guess.
-        let preselected = scope.flatMap { s in folders.first { $0.project == s }?.path }
+        if let f = folder.map(Paths.normalize) {
+            folders.removeAll { $0.path == f }
+            folders.insert(ProjectFolder(project: projects.name(for: f), path: f, lastUsed: nil), at: 0)
+        }
+        let preselected = folder.map(Paths.normalize) ?? scope.flatMap { s in folders.first { $0.project == s }?.path }
         newPanel.present(.init(accounts: state.accounts, defaultAccount: state.roomiest(now: Date())?.id, folders: folders,
                                preselected: preselected,
                                isProject: { [projects] in ProjectFolders.isProject($0, projects: projects) },

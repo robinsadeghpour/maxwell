@@ -70,6 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             self.store.start()
             self.main.refreshSetup()
             self.runTestHooks()
+            self.launched = true
+            if let f = self.pendingFolder { self.pendingFolder = nil; self.main.showNewSession(folder: f) }
             self.main.updater.start()
             if !Updater.isRelease { NSApp.dockTile.badgeLabel = "dev" }
         }
@@ -84,6 +86,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }
+
+    /// `open -a Maxwell .` in any terminal, or a folder dropped on the Dock icon: a new session there.
+    /// A folder that arrives with the launch waits until the window and sessions are up.
+    func application(_ app: NSApplication, open urls: [URL]) {
+        guard let dir = urls.first(where: { $0.hasDirectoryPath })?.path else { return }
+        guard launched, let main else { pendingFolder = dir; return }
+        main.showWindow(nil)
+        if !quietTest { NSApp.activate(ignoringOtherApps: true) }
+        main.showNewSession(folder: dir)
+    }
+    private var pendingFolder: String?
+    private var launched = false
     func applicationWillTerminate(_ n: Notification) { store?.plugins.shutdownAll() }
     /// `open Maxwell.app` while a test run of the same bundle is up reopens that instance
     /// instead of launching a new one; you asked for the app, so it stays.

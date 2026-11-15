@@ -349,7 +349,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⌘ J")}</td><td>Next session that needs you</td></tr>
 <tr><td>${k("⌘ T")}</td><td>New session in the open session's folder or project, on the account with the most room</td></tr>
 <tr><td>${k("⌥ ⌘ T")}</td><td>A new terminal at the top of the sidebar, in the current session's folder</td></tr>
-<tr><td>${k("⌘ N")}</td><td>New session: pick the project (search all your repos) and account</td></tr>
+<tr><td>${k("⌘ N")}</td><td>New session: pick the project (search all your repos) and account. From a terminal: <code>open -a Maxwell .</code></td></tr>
 <tr><td>${k("⇧ ⌘ ⌫")}</td><td>Close the session: at once when it's safe, otherwise after saying what's still open</td></tr>
 <tr><td>${k("⇧ ⌘ X")}</td><td>Close all safe (asks first)</td></tr>
 <tr><td>${k("⌘ Z")}</td><td>Undo the last close</td></tr>
