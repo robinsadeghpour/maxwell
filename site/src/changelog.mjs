@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-safe-to-close-trusts-the-session",
     date: "2026-11-15",
-    versions: "0.1.47",
+    versions: "0.1.48",
     title: "Safe to close trusts the session's own word",
     figure: "",
     body: `
@@ -15,6 +15,18 @@ export default [
 <p>Replies without a status line still get the Haiku read.</p>`,
     fixes: [],
     fixes: [],
+  },
+  {
+    slug: "2026-11-15-agents-waiting",
+    date: "2026-11-15",
+    versions: "0.1.47",
+    title: "Agents that wait still count",
+    figure: "",
+    body: `
+<p>A subagent can start a long command, end its turn and wait for it. Claude Code reports that as done for now, so Maxwell stopped counting the agent and the row lost its <em>agents</em> note while the agent was still at work. Maxwell now keeps counting it until the agent really finishes.</p>`,
+    fixes: [
+      "The header's agents button now stays at the right edge, so a long session title no longer hides it",
+    ],
   },
   {
     slug: "2026-11-15-pin-and-mark-sessions",

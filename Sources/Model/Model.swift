@@ -194,6 +194,9 @@ struct Session: Equatable {
     var runningTasks: [BackgroundTask]?
     /// The last hook event from this session: proof the Maxwell hooks run in it.
     var hookSeenAt: Date?
+    /// When Claude Code stopped this background session's process while it waited on you, to free
+    /// memory. The conversation is kept and attaching resumes it. Nil while its process runs.
+    var parkedAt: Date?
 }
 
 extension Session {
@@ -210,6 +213,15 @@ extension Session {
     var promptTitle: String? { firstPrompt.map(Titles.fromPrompt) }
     /// True when the title is only the generated name ("acme-75"), so it says nothing about the work.
     var untitled: Bool { named == nil && hookTitle == nil && tabTitle == nil && firstPrompt == nil }
+    /// A background session that leaves Claude Code's listing in one of these phases was stopped
+    /// while idle (it never stops a working one), not ended: it stays where it was, parked.
+    var parkable: Bool {
+        guard case .background = reach else { return false }
+        switch phase {
+        case .yourTurn, .needsYou, .limited: return true
+        case .working, .ended: return false
+        }
+    }
     /// The title says little about the work: none, a generated slug ("acme-75"), only generic
     /// words ("Continue Previous Task"), or the first words of the first prompt ("hi, do I need
     /// to do"). Such sessions get a model-written title.
@@ -291,8 +303,11 @@ struct AppState: Equatable {
         case .limited: return .limited
         case .ended: return closed[s.id].map { now.timeIntervalSince($0.at) < GroupRules.recentlyClosed } == true ? .recentlyClosed : nil
         case .yourTurn:
+            let quiet = now.timeIntervalSince(s.lastEventAt) > rules.idleAfter
+            // Stopped long ago: nothing runs and nothing new was said, so it folds away.
+            if quiet && s.parkedAt != nil { return .idle }
             if Check.allPass(checks(s, now: now, rules: rules)) { return .safeToClose }
-            return now.timeIntervalSince(s.lastEventAt) > rules.idleAfter ? .idle : .yourTurn
+            return quiet ? .idle : .yourTurn
         }
     }
 

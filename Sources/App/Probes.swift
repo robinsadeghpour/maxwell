@@ -288,14 +288,15 @@ enum Transcripts {
 
     struct TaskScan: Codable { var inode: UInt64; var offset: UInt64 = 0; var ledger = TaskLedger() }
 
-    /// ~/.local/state/maxwell/task-scans.json: where each transcript's scan stopped, so a launch
+    /// ~/.local/state/maxwell/task-scans-2.json: where each transcript's scan stopped, so a launch
     /// reads only what was written since. A cache: deleting it costs one full read, and a file
-    /// in an older shape fails to decode and is rebuilt the same way.
+    /// in an older shape fails to decode and is rebuilt the same way. The name changes when the
+    /// ledger starts reading notices differently, so scans made by the old rules aren't reused.
     final class TaskScans {
         static let shared = TaskScans()
         var scans: [String: TaskScan]
         var dirty = false
-        private let url = Paths.stateDir.appendingPathComponent("task-scans.json")
+        private let url = Paths.stateDir.appendingPathComponent("task-scans-2.json")
         private init() {
             scans = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([String: TaskScan].self, from: $0) } ?? [:]
         }

@@ -29,49 +29,7 @@ func reduce(into s: inout AppState, _ event: Event) {
         }
 
     case .agents(let snap):
-        let listed = Set(snap.entries.map(\.sessionId))
-        s.listedAt[snap.accountId] = snap.at
-        for e in snap.entries {
-            var session = s.sessions[e.sessionId] ?? Session(
-                id: e.sessionId, name: e.name, accountId: snap.accountId, cwd: e.cwd, at: e.startedAt,
-                origin: s.startedByMaxwell.contains(e.sessionId) ? .maxwell : .external, reach: e.reach)
-            session.name = e.name
-            session.cwd = e.cwd
-            session.reach = e.reach
-            session.accountId = snap.accountId
-            session.listedAt = snap.at
-            // A turn that began without a prompt hook (a background task's report, a wake) starts when the process goes busy.
-            if e.status == .busy, session.listedStatus != .busy {
-                let began = e.statusAt ?? snap.at
-                if session.turnAt.map({ began > $0 }) ?? true { session.turnAt = began }
-            }
-            session.listedStatus = e.status
-            session.statusAt = e.statusAt
-            session.job = e.job
-            session.unverified = e.unverified
-            session.runningTasks = e.runningTasks
-            if let pid = e.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
-            s.closed[e.sessionId] = nil
-            if let t = e.title { session.tabTitle = t }
-            if e.used { session.prompted = true }
-            if let m = e.lastMessage { session.lastMessage = m }
-            if session.firstPrompt == nil, let p = e.firstPrompt { session.firstPrompt = String(p.prefix(400)) }
-            // The transcript is written on every prompt and reply, including ones typed in another terminal.
-            if let active = e.lastActiveAt { session.lastEventAt = max(session.lastEventAt, active) }
-            if e.status == .busy { session.prompted = true }
-            // A hook newer than what this listing saw stands until a listing catches up with it.
-            if session.hookSeenAt.map({ Live.covers(session, $0) }) ?? true {
-                if session.phase == .ended { session.phase = .yourTurn }
-                Live.settle(&session, reset: s.account(snap.accountId)?.limitResetsAt(now: snap.at))
-            }
-            s.sessions[e.sessionId] = session
-        }
-        // A session of this account that is no longer listed has exited.
-        for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended {
-            s.sessions[id]?.phase = .ended
-            s.sessions[id]?.phaseSource = "no longer in claude agents --json"
-            s.sessions[id]?.waitingOn = nil
-        }
+        reduce(agents: snap, into: &s)
 
     case .doneCheck(let id, let check):
         guard var session = s.sessions[id] else { return }
@@ -143,6 +101,66 @@ func reduce(into s: inout AppState, _ event: Event) {
 }
 
 /// One hook: the session it names, then the phase it implies (see `applyHook`).
+/// One account's listing: what runs, what Claude Code stopped while it waited, and what ended.
+private func reduce(agents snap: AgentsSnapshot, into s: inout AppState) {
+    let listed = Set(snap.entries.map(\.sessionId))
+    s.listedAt[snap.accountId] = snap.at
+    for e in snap.entries {
+        var session = s.sessions[e.sessionId] ?? Session(
+            id: e.sessionId, name: e.name, accountId: snap.accountId, cwd: e.cwd, at: e.startedAt,
+            origin: s.startedByMaxwell.contains(e.sessionId) ? .maxwell : .external, reach: e.reach)
+        session.name = e.name
+        session.cwd = e.cwd
+        session.reach = e.reach
+        session.accountId = snap.accountId
+        session.listedAt = snap.at
+        if snap.stopped[e.sessionId] == nil { session.parkedAt = nil }
+        // A turn that began without a prompt hook (a background task's report, a wake) starts when the process goes busy.
+        if e.status == .busy, session.listedStatus != .busy {
+            let began = e.statusAt ?? snap.at
+            if session.turnAt.map({ began > $0 }) ?? true { session.turnAt = began }
+        }
+        session.listedStatus = e.status
+        session.statusAt = e.statusAt
+        session.job = e.job
+        session.unverified = e.unverified
+        session.runningTasks = e.runningTasks
+        if let pid = e.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
+        s.closed[e.sessionId] = nil
+        if let t = e.title { session.tabTitle = t }
+        if e.used { session.prompted = true }
+        if let m = e.lastMessage { session.lastMessage = m }
+        if session.firstPrompt == nil, let p = e.firstPrompt { session.firstPrompt = String(p.prefix(400)) }
+        // The transcript is written on every prompt and reply, including ones typed in another terminal.
+        if let active = e.lastActiveAt { session.lastEventAt = max(session.lastEventAt, active) }
+        if e.status == .busy { session.prompted = true }
+        // A hook newer than what this listing saw stands until a listing catches up with it.
+        if session.hookSeenAt.map({ Live.covers(session, $0) }) ?? true {
+            if session.phase == .ended { session.phase = .yourTurn }
+            Live.settle(&session, reset: s.account(snap.accountId)?.limitResetsAt(now: snap.at))
+        }
+        // Listed without a process: stopped while it waits on you.
+        if snap.stopped[e.sessionId] != nil, session.parkable { session.parkedAt = session.parkedAt ?? snap.at }
+        s.sessions[e.sessionId] = session
+    }
+    // Known to Maxwell from hooks alone (started in a terminal, or before a restart): the listing
+    // says it is a background session, so it can be parked and resumed below.
+    for (id, short) in snap.stopped where s.sessions[id]?.accountId == snap.accountId {
+        s.sessions[id]?.reach = .background(shortId: short)
+    }
+    // A session of this account that is no longer listed has exited, unless it was a background
+    // session waiting on you: Claude Code stops those when idle and keeps the conversation.
+    for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended {
+        if sess.parkable {
+            if sess.parkedAt == nil { s.sessions[id]?.parkedAt = snap.at }
+            continue
+        }
+        s.sessions[id]?.phase = .ended
+        s.sessions[id]?.phaseSource = "no longer in claude agents --json"
+        s.sessions[id]?.waitingOn = nil
+    }
+}
+
 private func reduce(hook h: Hook, into s: inout AppState) {
     guard let acct = s.accountId(forConfigDir: h.configDir) else { return }
     // Helper runs inside a config dir (e.g. a hook's own `claude -p`) are not work sessions.
@@ -155,6 +173,8 @@ private func reduce(hook h: Hook, into s: inout AppState) {
     if session.phase == .ended { guard case .sessionStart = h.kind else { return } }
     session.lastEventAt = max(session.lastEventAt, h.at)
     session.hookSeenAt = max(session.hookSeenAt ?? h.at, h.at)
+    // A hook comes from a running process: whatever stopped it, it runs again.
+    if let parked = session.parkedAt, h.at > parked { session.parkedAt = nil }
     if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
     if let t = h.transcriptPath { session.transcriptPath = t }
     if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }

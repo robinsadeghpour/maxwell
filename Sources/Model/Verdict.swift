@@ -76,6 +76,8 @@ extension AppState {
         let listing = "claude agents --json (\(acct))"
         if s.phase == .ended {
             add(.listed, .fail, "no longer listed", listing)
+        } else if let at = s.parkedAt {
+            add(.listed, .pass, "stopped while idle \(Reply.span(now.timeIntervalSince(at))) ago, conversation kept", listing)
         } else if let at = s.listedAt, at == listedAt[s.accountId] {
             let age = now.timeIntervalSince(at)
             if age > rules.listingFresh { add(.listed, .unknown, "last listing \(Reply.span(age)) old", listing) }
@@ -86,6 +88,7 @@ extension AppState {
 
         let busySource = "Claude Code status + transcript"
         switch (s.phase, s.listedStatus, s.runningTasks) {
+        case _ where s.parkedAt != nil: add(.idle, .pass, "not running: stopped while it waited", listing)
         case (.working, _, _), (_, .busy?, _): add(.idle, .fail, s.waitingOn ?? "working", busySource)
         case (_, .waiting(let why)?, _): add(.idle, .fail, "waiting: \(why)", busySource)
         case (_, .shell?, _): add(.idle, .fail, "background shell running", busySource)

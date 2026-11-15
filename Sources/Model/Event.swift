@@ -66,6 +66,9 @@ struct AgentsSnapshot: Equatable {
     var at: Date
     var accountId: AccountID
     var entries: [Entry]
+    /// Background sessions with no process, by short id: stopped, conversation kept; `claude attach`
+    /// resumes them. Ones waiting on you are entries too; finished ones only `--all` lists, as done.
+    var stopped: [SessionID: String] = [:]
 
     struct Entry: Equatable {
         var sessionId: SessionID
@@ -174,9 +177,18 @@ enum EventParser {
     /// Parses `claude agents --json` output for one account.
     static func parseAgents(_ data: Data, accountId: AccountID, at: Date) -> AgentsSnapshot? {
         guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
+        var stopped: [SessionID: String] = [:]
         let entries: [AgentsSnapshot.Entry] = arr.compactMap { a in
             guard let sid = a["sessionId"] as? String, let cwd = a["cwd"] as? String else { return nil }
             let kind = a["kind"] as? String
+            if kind == "background", a["pid"] == nil {
+                // No process. "stopped" (`claude stop`) and "failed" ended for good. Claude Code's idle
+                // stop leaves "done", which only `--all` lists, and keeps a waiting one listed as it was.
+                let state = a["state"] as? String
+                if state == "stopped" || state == "failed" { return nil }
+                stopped[sid] = a["id"] as? String ?? String(sid.prefix(8))
+                if state == "done" { return nil }
+            }
             let reach: Reach = kind == "background"
                 ? .background(shortId: a["id"] as? String ?? String(sid.prefix(8)))
                 : .elsewhere(pid: a["pid"] as? Int)
@@ -188,7 +200,7 @@ enum EventParser {
             return .init(sessionId: sid, name: a["name"] as? String ?? String(sid.prefix(8)), cwd: cwd,
                          startedAt: started, reach: reach, status: status, pid: (a["pid"] as? NSNumber)?.intValue)
         }
-        return AgentsSnapshot(at: at, accountId: accountId, entries: entries)
+        return AgentsSnapshot(at: at, accountId: accountId, entries: entries, stopped: stopped)
     }
 
     /// Claude Code's process status. `claude agents --json` folds "shell" into "busy";

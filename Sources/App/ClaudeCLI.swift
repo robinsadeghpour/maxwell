@@ -80,7 +80,7 @@ enum ClaudeCLI {
     static func agents(_ account: Account) -> Data? {
         // Test hook: a recorded listing, for screenshot runs on demo sessions.
         if let f = ProcessInfo.processInfo.environment["MAXWELL_AGENTS_FIXTURE"], !f.isEmpty { return try? Data(contentsOf: URL(fileURLWithPath: f)) }
-        let r = run(claudePath, ["agents", "--json"], env: env(for: account), timeout: 10)
+        let r = run(claudePath, ["agents", "--json", "--all"], env: env(for: account), timeout: 10)
         return r.status == 0 ? Data(r.out.utf8) : nil
     }
 
