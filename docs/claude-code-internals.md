@@ -16,7 +16,7 @@ Seen in Claude Code 2.1.3xx (2.1.325 on 2026-11-15). Code: `Sources/App/ClaudeCL
 | `claude --bg --name <n> [--model m] [prompt]` | The line containing `backgrounded`: `backgrounded · <shortId> · <name> (…)`. Field 2 is the short id. |
 | `claude --bg --resume <id> --name <n>` | Same line. `started a copy` in the output means Claude still saw the old process and made a copy. |
 | Either, in an untrusted folder | `Workspace not trusted` |
-| `claude agents --json` | The account's sessions. Maps `shell` to `busy`, and drops `needs`, `tempo` and `statusUpdatedAt`, so the state files below win. |
+| `claude agents --json --all` | The account's sessions. Maps `shell` to `busy`, and drops `needs`, `tempo` and `statusUpdatedAt`, so the state files below win. `--all` adds background sessions with no process (no `pid`): `done` after the idle stop below, `stopped` after `claude stop`, `failed` after a crash. A waiting session the idle stop ended stays in the plain listing without a `pid`. |
 | `claude attach <shortId>` | Run in a terminal pane. Ctrl+Z detaches and the session keeps running. |
 | `claude stop <shortId>` | Ends the process, keeps the conversation. Maxwell never runs `claude rm`. |
 
@@ -37,6 +37,8 @@ Hooks (session start, stop, notification, prompt submit) and the status-line tap
 `claude --bg` starts one `claude daemon run` per config folder if none is running. It owns every background session on that account (through `bg-pty-host` and pre-warmed `bg-spare` processes) and outlives Maxwell. Restarting Maxwell does not restart it.
 
 Known failure: after a Mac or login crash, the service can stay attached to the dead login session. Every session it runs then loses macOS services: `id -un` prints a number, `launchctl` says "141: Reentrancy avoided", audio and the iOS Simulator fail. The fix is to end that `claude daemon run` process and resume the sessions. Maxwell doesn't detect this yet (clean-up plan, step 5).
+
+The service stops an idle background session to free memory: one that is finished or waiting for your reply, has nothing running, and has had nothing attached for about an hour (sooner when memory runs low). Its log says `bg retire <shortId>: idle-prompt, idle 116m` or `settled`. A stopped session leaves `claude agents --json` and is listed only by `--all`, as `done`. `claude attach` resumes it, and `claude stop` on it exits 0. A session with a `claude attach` running is never stopped, so Maxwell lets go of terminals that have been off screen for 10 minutes (`TerminalRelease`), and keeps a session that leaves the listing while it waits on you where it was, parked, instead of ending it. Seen in 2.1.325.
 
 Processes a background session starts are their own "responsible process" for macOS privacy. They don't get the permissions you gave Warp or Terminal (Files & Folders, Automation, Accessibility). `osascript` to System Events fails with -1743.
 

@@ -5,6 +5,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
     private var terminals: [SessionID: TerminalView] = [:]
     private var detached = Set<SessionID>()
+    /// When each attached terminal was last on screen; off screen long enough, it is let go.
+    private var lastShown: [SessionID: Date] = [:]
+    /// Sessions you asked to resume: opening one attaches even though Claude Code stopped it.
+    private var resuming = Set<SessionID>()
     /// Plain terminals, listed above the sessions and shown in the session pane. They end with Maxwell.
     private var shells: [(id: String, view: TerminalView)] = []
     private var shellsMade = 0
@@ -90,6 +94,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         // Ages and the Idle fold move with the clock, not only with events.
         ageTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self else { return }
+            self.releaseHiddenTerminals()
             self.render(self.store.state)
         }
     }
@@ -198,6 +203,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     func render(_ state: AppState) {
         let now = Date(), rules = store.config.rules
+        if let c = current, terminals[c] != nil { lastShown[c] = now }
         if projects.rules != store.config.projects { projects = Projects(rules: store.config.projects) }
         followHostedTerminals(state)
         let all = state.grouped(now: now, rules: rules)
@@ -584,7 +590,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         visited.removeAll { $0 == id }
         visited.insert(id, at: 0)
         if visited.count > 8 { visited.removeLast() }
-        if case .background(let short) = s.reach, terminals[id] == nil, let a = store.state.account(s.accountId) {
+        // A session Claude Code stopped while idle starts again only when you ask (Resume, ⌘R),
+        // so moving through the list doesn't wake every session it passes.
+        let resume = resuming.remove(id) != nil
+        if case .background(let short) = s.reach, terminals[id] == nil, s.parkedAt == nil || resume, let a = store.state.account(s.accountId) {
             attach(s, short: short, account: a)
         }
         viewerForced = nil
@@ -607,7 +616,20 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         t.onOpenURL = { [weak self] url, cwd in self?.openURL(url, cwd: cwd, session: id) }
         t.claimsLink = { ArtifactLink.parse($0) != nil }
         terminals[id] = t
+        lastShown[id] = Date()
         detached.remove(id)
+    }
+
+    /// Lets go of terminals that have been off screen for a while, so Claude Code can stop their
+    /// sessions when they idle (it never stops an attached one). Opening a session attaches again.
+    private func releaseHiddenTerminals() {
+        let due = TerminalRelease.due(attached: Set(terminals.keys), lastShown: lastShown, onScreen: current, now: Date())
+        for id in due {
+            terminals.removeValue(forKey: id)?.removeFromSuperview()
+            lastShown[id] = nil
+            detached.remove(id)
+        }
+        if !due.isEmpty { mark("let go of \(due.count) terminal\(due.count == 1 ? "" : "s") off screen") }
     }
 
     /// A new terminal at the top of the sidebar, in the session's folder (or the one ⌘T would start in), opened in the pane.
@@ -671,6 +693,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func reattach(_ id: SessionID) {
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         detached.remove(id)
+        resuming.insert(id)
         open(id)
     }
 
@@ -1624,7 +1647,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "next-session", title: "Next Session", menu: "Session", shortcut: Shortcut("cmd+]")) { [weak self] in self?.step(1) },
             Action(id: "prev-session", title: "Previous Session", menu: "Session", shortcut: Shortcut("cmd+[")) { [weak self] in self?.step(-1) },
             Action(id: "next-needs-you", title: "Next Session That Needs You", menu: "Session", shortcut: Shortcut("cmd+j")) { [weak self] in self?.nextNeedsYou() },
-            Action(id: "reattach", title: "Reattach Terminal", menu: "Session", shortcut: Shortcut("cmd+r"), isEnabled: hasCurrent) { [weak self] in
+            Action(id: "reattach", title: "Resume Session", menu: "Session", shortcut: Shortcut("cmd+r"), isEnabled: hasCurrent) { [weak self] in
                 if let id = self?.current { self?.reattach(id) }
             },
             Action(id: "resume", title: "Resume When the Limit Resets", menu: "Session", shortcut: Shortcut("cmd+shift+r"), isEnabled: limited) { [weak self] in

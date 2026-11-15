@@ -104,6 +104,39 @@ check(outcome(verdictOf(safe, "s1", at: later + 600), .listed) == .unknown && gr
 var unlisted = safe
 unlisted.listedAt["work"] = t0.addingTimeInterval(later - 1)
 check(outcome(verdictOf(unlisted, "s1", at: later), .listed) == .unknown && groupOf(unlisted, "s1", at: later) == .yourTurn, "missing from the latest listing is unknown")
+
+// Claude Code stops an idle background session nothing is attached to; it leaves `claude agents
+// --json` (only `--all` lists it, as done) and attaching resumes it. Seen in 2.1.325.
+func emptyListing(_ st: AppState, at: Double) -> AppState { reduce(st, .agents(AgentsSnapshot(at: t0.addingTimeInterval(at), accountId: "work", entries: []))) }
+let parked = emptyListing(safe, at: later + 3600)
+check(parked.sessions["s1"]?.phase == .yourTurn && parked.sessions["s1"]?.parkedAt != nil, "a background session that leaves the listing while it waits is parked, not ended")
+check(outcome(verdictOf(parked, "s1", at: later + 3600), .listed) == .pass && outcome(verdictOf(parked, "s1", at: later + 3600), .idle) == .pass, "parked: known to run nothing")
+check(groupOf(parked, "s1", at: later + 3600) == .safeToClose, "a parked session passing every other check is safe to close")
+check(groupOf(parked, "s1", at: later + 2 * 86400) == .idle, "a session parked long ago folds into Idle, not Safe to close")
+check(evidence(parked, "s1", at: later + 3700).sessions["s1"]?.parkedAt == nil, "listed again: it runs again")
+let hooked = reduce(parked, hook(.promptSubmitted(prompt: "go on", title: nil), at: later + 3700))
+check(hooked.sessions["s1"]?.parkedAt == nil && hooked.sessions["s1"]?.phase == .working, "a hook from it means it runs again")
+let asking = emptyListing(reduce(safe, hook(.stopped(lastMessage: "Ship it now?"), at: later + 1)), at: later + 3600)
+check(asking.sessions["s1"]?.phase == .needsYou("Ship it now?") && asking.sessions["s1"]?.parkedAt != nil, "a question survives being parked")
+let gone = emptyListing(reduce(safe, hook(.promptSubmitted(prompt: "more", title: nil), at: later + 1)), at: later + 60)
+check(gone.sessions["s1"]?.phase == .ended, "a working session that leaves the listing has ended: Claude Code never stops a working one")
+let other = emptyListing(reduce(AppState(accounts: accounts), hook(.stopped(lastMessage: "Done."), "t1", at: 1)), at: 60)
+check(other.sessions["t1"]?.phase == .ended, "a session in another terminal that leaves the listing has ended")
+
+// `--all` lists a stopped background session without a pid. Shapes from 2.1.325.
+let allListing = #"[{"id":"ab12cd34","cwd":"/tmp/x","kind":"background","startedAt":1794665405519,"sessionId":"t2-0000","name":"mx-t2","state":"done"},{"id":"ef56ab78","pid":4242,"status":"idle","cwd":"/tmp/x","kind":"background","startedAt":1794665405519,"sessionId":"t3-0000","name":"mx-t3","state":"done"},{"pid":4286,"cwd":"/tmp/x","kind":"interactive","startedAt":1794776741357,"sessionId":"t4-0000","name":"mx-t4","status":"busy"},{"id":"99887766","cwd":"/tmp/x","kind":"background","startedAt":1794665405519,"sessionId":"t5-0000","name":"mx-t5","state":"stopped"}]"#
+let allSnap = EventParser.parseAgents(Data(allListing.utf8), accountId: "work", at: t0.addingTimeInterval(120))
+check(allSnap?.stopped == ["t2-0000": "ab12cd34"] && allSnap?.entries.map(\.sessionId) == ["t3-0000", "t4-0000"], "idle-stopped (done): stopped, not listed; claude stop (stopped): neither")
+// Known from hooks alone (started in a terminal, or before Maxwell restarted): the listing makes it a background session, parked.
+let hooksOnly = reduce(AppState(accounts: accounts), hook(.stopped(lastMessage: "Want me to ship it?"), "t2-0000", at: 1))
+let parkedAfterRestart = reduce(hooksOnly, .agents(allSnap!))
+check(parkedAfterRestart.sessions["t2-0000"]?.reach == .background(shortId: "ab12cd34") && parkedAfterRestart.sessions["t2-0000"]?.parkedAt != nil
+      && parkedAfterRestart.sessions["t2-0000"]?.phase == .needsYou("Want me to ship it?"), "a stopped session known from hooks is parked and can be resumed")
+
+// Terminals off screen are let go, so Claude Code can stop sessions that idle.
+let shownAt = ["a": t0, "b": t0.addingTimeInterval(-TerminalRelease.after), "c": t0.addingTimeInterval(60)]
+check(TerminalRelease.due(attached: ["a", "b", "c", "d"], lastShown: shownAt, onScreen: "b", now: t0.addingTimeInterval(TerminalRelease.after)) == ["a", "d"],
+      "let go: off screen for the whole wait, or never shown; never the one on screen")
 var noHooks = safe
 noHooks.sessions["s1"]!.hookSeenAt = nil
 check(outcome(verdictOf(noHooks, "s1", at: later), .hooks) == .unknown && groupOf(noHooks, "s1", at: later) == .yourTurn, "a session the hooks never reported is unknown")

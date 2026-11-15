@@ -105,9 +105,24 @@ final class SessionPane: MXView {
             } else {
                 banner.add(MXButton("Bring into Maxwell", primary: true) { [weak self] in self?.delegate?.bringIn(s.id, force: false) })
             }
+        } else if s.parkedAt != nil && terminal == nil {
+            empty.isHidden = true
+            message.scroll.isHidden = false
+            let asked: String? = { if case .needsYou(let q) = s.phase { return q }; return nil }()
+            let note = "This session isn't running: Claude Code stopped it while it waited. The conversation is kept; ⌘R resumes it."
+            if let reply = s.lastMessage ?? asked {
+                message.show(note: note, text: reply, asReply: true, quiet: group != .needsYou)
+            } else {
+                message.show(note: note, text: "Resume to see where it left off.")
+            }
+            banner.append(" · not running")
+            // Safe to close already offers Close as the one main action; elsewhere Resume is the next step.
+            if group != .safeToClose {
+                banner.add(MXButton("Resume", hint: "⌘R", primary: true) { [weak self] in self?.delegate?.reattach(s.id) })
+            }
         } else {
             empty.isHidden = terminal != nil
-            empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R reattaches."]
+            empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R resumes it here."]
         }
         needsLayout = true
     }
@@ -249,6 +264,12 @@ final class Banner: MXView, TipSource {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Adds to the line, after what the group says.
+    func append(_ more: String) {
+        label.text += more
+        needsLayout = true
+    }
+
     func configure(group: PhaseGroup, text: String, tint: @escaping (Theme) -> NSColor) {
         glyph.group = group
         label.text = text.replacingOccurrences(of: "\n", with: " ")
@@ -317,12 +338,20 @@ final class MessageView: NSObject {
         scroll.isHidden = true
     }
 
-    func show(note: String, text body: String) {
+    /// `asReply`: drawn like the end of Claude's transcript, behind ⏺ with wrapped lines indented.
+    /// `quiet`: a question keeps the body colour, for a session that no longer needs you.
+    func show(note: String, text body: String, asReply: Bool = false, quiet: Bool = false) {
         let t = Look.theme
+        let mark = "⏺ "
+        let indent = asReply ? (mark as NSString).size(withAttributes: [.font: Fonts.mono(Metrics.fontSize)]).width : 0
         let out = NSMutableAttributedString()
         let p = NSMutableParagraphStyle(); p.lineSpacing = 2; p.paragraphSpacing = 9
         let tight = NSMutableParagraphStyle(); tight.lineSpacing = 2; tight.paragraphSpacing = 2
-        out.append(NSAttributedString(string: note + "\n", attributes: [.font: Fonts.mono(Metrics.fontSize - 1), .foregroundColor: t.fg3, .paragraphStyle: p]))
+        for s in [p, tight] { s.headIndent = indent; s.firstLineHeadIndent = indent }
+        let first = NSMutableParagraphStyle(); first.setParagraphStyle(p); first.firstLineHeadIndent = 0
+        let noteStyle = NSMutableParagraphStyle(); noteStyle.lineSpacing = 2; noteStyle.paragraphSpacing = 9
+        out.append(NSAttributedString(string: note + "\n", attributes: [.font: Fonts.mono(Metrics.fontSize - 1), .foregroundColor: t.fg3, .paragraphStyle: noteStyle]))
+        var marked = !asReply
         // The hook keeps the last 2000 characters; say so when the start is cut.
         if body.count >= 2000 { out.append(NSAttributedString(string: "…\n", attributes: [.font: Fonts.mono(Metrics.fontSize), .foregroundColor: t.fg3, .paragraphStyle: tight])) }
         let link = try? NSRegularExpression(pattern: #"\[([^\]]+)\]\([^)]+\)"#)
@@ -337,10 +366,13 @@ final class MessageView: NSObject {
             let lead = line.trimmingCharacters(in: .whitespaces)
             let listItem = lead.hasPrefix("- ") || lead.first?.isNumber == true
             let nextIsList = lines.indices.contains(i + 1) && { let n = lines[i + 1].trimmingCharacters(in: .whitespaces); return n.hasPrefix("- ") || n.first?.isNumber == true }()
+            let asks = !quiet && (raw.hasSuffix("?") || raw.hasSuffix("?**"))
+            let style = !marked ? first : listItem && nextIsList ? tight : p
+            if !marked { line = mark + line; marked = true }
             out.append(NSAttributedString(string: line + "\n", attributes: [
                 .font: Fonts.mono(Metrics.fontSize, heading ? .semibold : .regular),
-                .foregroundColor: raw.hasSuffix("?") || raw.hasSuffix("?**") ? t.on : heading ? t.fg : t.fg.withAlphaComponent(0.9),
-                .paragraphStyle: listItem && nextIsList ? tight : p]))
+                .foregroundColor: asks ? t.on : heading ? t.fg : t.fg.withAlphaComponent(0.9),
+                .paragraphStyle: style]))
         }
         text.textStorage?.setAttributedString(out)
         text.scrollToBeginningOfDocument(nil)
