@@ -34,7 +34,18 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-tabs-that-keep-your-place">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-groups-under-load">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.40</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-groups-under-load">Groups hold up when sessions get busy</a></h2>
+    
+    <div class="prose"><p>Maxwell's groups now hold up when sessions run subagents, background shells and permission prompts. We ran scripted sessions through each case and compared Maxwell with Claude Code's own records every quarter second. Every group change now matches, and you get one notification per real change.</p>
+<p>If Maxwell can't read Claude Code's own status for a session, the bottom bar now says <strong>! unverified</strong> instead of quietly guessing. <code>Maxwell watch</code> prints every group change as it happens, with where it came from.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Fixed a "done" notification while a subagent or background shell was still running</span></li><li><span>Fixed the vaguer permission notification replacing the exact command a session asked to run</span></li><li><span>Fixed a finished session with a dev server left running staying in Working</span></li><li><span>Fixed file watchers counting as background work</span></li><li><span>Fixed a usage limit from an earlier turn sticking after a clean turn</span></li><li><span>A session that asks the same question again no longer notifies twice</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-tabs-that-keep-your-place">
   <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.39</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-15-tabs-that-keep-your-place">Viewer tabs that keep your place</a></h2>

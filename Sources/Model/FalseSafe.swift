@@ -19,6 +19,15 @@ enum FalseSafe {
         case .waiting(let w)?: facts["listedStatus"] = "waiting: " + w
         case nil: facts["listedStatus"] = NSNull()
         }
+        // What the phase rested on, so a rule added later can be checked against the same facts.
+        facts["statusAt"] = ts(s.statusAt)
+        facts["turnAt"] = ts(s.turnAt)
+        facts["stopFailure"] = s.stopFailure ?? NSNull()
+        facts["phaseSource"] = s.phaseSource
+        if let j = s.job {
+            facts["job"] = ["state": j.state, "tempo": j.tempo ?? NSNull(), "needs": j.needs ?? NSNull(), "detail": j.detail ?? NSNull(),
+                            "work": j.work, "updatedAt": ts(j.updatedAt)]
+        }
         if let c = s.doneCheck {
             var pr: [String: Any]
             switch c.pr {
@@ -62,6 +71,14 @@ enum FalseSafe {
         case "shell"?: s.listedStatus = .shell
         case let w? where w.hasPrefix("waiting: "): s.listedStatus = .waiting(String(w.dropFirst(9)))
         default: s.listedStatus = nil
+        }
+        s.statusAt = date(f["statusAt"])
+        s.turnAt = date(f["turnAt"])
+        s.stopFailure = f["stopFailure"] as? String
+        s.phaseSource = f["phaseSource"] as? String ?? ""
+        if let j = f["job"] as? [String: Any], let state = j["state"] as? String {
+            s.job = JobState(state: state, tempo: j["tempo"] as? String, needs: j["needs"] as? String, detail: j["detail"] as? String,
+                             work: (j["work"] as? NSNumber)?.intValue ?? 0, updatedAt: date(j["updatedAt"]))
         }
         if let c = f["doneCheck"] as? [String: Any], let at = date(c["at"]) {
             let pr = c["pr"] as? [String: Any] ?? [:]

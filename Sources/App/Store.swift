@@ -46,7 +46,7 @@ final class Store {
     /// Starts the live sources. Called once the window is on screen.
     func start() {
         notifyAfter = Date().addingTimeInterval(8)
-        log.tail { [weak self] in self?.apply($0); self?.confirmHooks($0) }
+        log.tail { [weak self] in self?.apply($0) }
         agents = AgentsProbe(accounts: config.accounts) { [weak self] in self?.apply([$0]) }
         let tw = TranscriptWatcher(accounts: config.accounts)
         tw.cwdFor = { [weak self] id in self?.state.sessions[id]?.cwd }
@@ -79,27 +79,14 @@ final class Store {
             let old = before.sessions[id]?.phase
             // A repo check older than the last activity is unknown; take a new one.
             if s.phase == .yourTurn, old != .yourTurn || (s.doneCheck.map { $0.at < s.lastEventAt } ?? true) { doneChecker.check(s) }
-            if case .needsYou(let q) = s.phase, !(old.map { if case .needsYou = $0 { return true }; return false } ?? false) {
-                notify(s, question: q)
+            if case .needsYou = s.phase, !(old.map { if case .needsYou = $0 { return true }; return false } ?? false) {
+                announceLater(id, needsYou: true)
             }
-            if s.phase == .yourTurn, old == .working { notifyDone(s) }
+            if s.phase == .yourTurn, old == .working { announceLater(id, needsYou: false) }
         }
         bringInQueued()
         queuePluginSync()
         onChange?(state)
-    }
-
-    /// A hook sets the phase at once; a listing a few seconds later (when it is allowed to
-    /// override the hook, see `Live.covers`) confirms or corrects it, e.g. a Stop while a subagent still runs.
-    /// The probe drops a refresh while one for the account is running, so these stay cheap.
-    private func confirmHooks(_ events: [Event]) {
-        let accounts = Set(events.compactMap { e -> AccountID? in
-            guard case .hook(let h) = e else { return nil }
-            return state.accountId(forConfigDir: h.configDir)
-        })
-        for a in accounts {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in self?.agents?.refresh(a) }
-        }
     }
 
     // MARK: plugins
@@ -243,8 +230,32 @@ final class Store {
         onChange?(state)
     }
 
+    /// Announces a change only once it has held for a moment: a hook and the listing after it can
+    /// disagree for a fraction of a second, and a banner for a state that is already gone costs trust.
+    private var pendingNotices: [SessionID: DispatchWorkItem] = [:]
+    static let settleDelay: TimeInterval = 1.5
+    private func announceLater(_ id: SessionID, needsYou: Bool) {
+        pendingNotices[id]?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, let s = self.state.sessions[id] else { return }
+            self.pendingNotices[id] = nil
+            switch s.phase {
+            case .needsYou(let q) where needsYou: self.notify(s, question: q)
+            case .yourTurn where !needsYou: self.notifyDone(s)
+            default: break
+            }
+        }
+        pendingNotices[id] = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.settleDelay, execute: item)
+    }
+
+    /// The last question announced per session. A session that asks the same thing again (a background
+    /// job reported back and it re-asked) has nothing new to say; a different question is news.
+    private var lastAsked: [SessionID: String] = [:]
+
     private func notify(_ s: Session, question: String) {
-        guard config.notify, announcing(s) else { return }
+        guard config.notify, announcing(s), lastAsked[s.id] != question else { return }
+        lastAsked[s.id] = question
         post(title: s.title, subtitle: "Needs you · \(state.account(s.accountId)?.name ?? s.accountId)", body: question, session: s.id,
              sound: config.notifySound, key: "needs-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))")
     }

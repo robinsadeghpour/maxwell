@@ -82,6 +82,9 @@ struct AgentsSnapshot: Equatable {
         var statusAt: Date? = nil
         /// Claude Code's own record of a background session's last turn (jobs/<id>/state.json).
         var job: JobState? = nil
+        /// Set when Claude Code's own files for this session could not be read: its group then rests
+        /// on the listing and the reply alone. Says which file.
+        var unverified: String? = nil
     }
 
     /// What the Claude Code process is doing, as it writes it in sessions/<pid>.json.
@@ -104,7 +107,7 @@ struct JobState: Equatable {
     var state: String
     /// active: a turn runs; idle; blocked: waits on the user.
     var tempo: String?
-    /// What it needs from the user, in its own words ("open the Sentry link, approve it, tell me").
+    /// What it needs from the user, in its own words ("approve the deploy in the dashboard, then tell me").
     var needs: String?
     /// One line on where it stands.
     var detail: String?
@@ -113,8 +116,6 @@ struct JobState: Equatable {
     var work: Int
     var updatedAt: Date?
 
-    /// Kinds of in-flight work that don't mean the session is busy.
-    static let passiveKinds: Set<String> = ["artifact_watch", "session_cron"]
 }
 
 // MARK: parsing (the only place raw JSON is trusted)
@@ -216,13 +217,20 @@ enum EventParser {
         }
         // An AskUserQuestion dialog says exactly what it asks.
         let question = ((j["block"] as? [String: Any])?["questions"] as? [[String: Any]])?.first.flatMap { text($0["question"]) }
+        // Real work (shells, agents, workflows, monitors) is listed in `fan` until it is done; file
+        // watchers are not, and are counted in `drainableMonitors` instead (records from 15 Nov 2026:
+        // {"tasks":2,"kinds":["artifact_watch"],"drainableMonitors":2}, fan empty). `kinds` lists each kind once.
         var work = 0
-        if let f = j["inFlight"] as? [String: Any] {
-            let kinds = (f["kinds"] as? [String]) ?? []
+        let f = j["inFlight"] as? [String: Any]
+        if let fan = j["fan"] as? [[String: Any]], !fan.isEmpty {
+            work = fan.filter { $0["doneAt"] == nil || $0["doneAt"] is NSNull }.count
+        } else if let f {
             let tasks = (f["tasks"] as? NSNumber)?.intValue ?? 0
-            // `tasks` counts every kind; take the passive ones off (one each, as listed).
-            work = max(0, tasks - kinds.filter(JobState.passiveKinds.contains).count)
+            let watchers = (f["drainableMonitors"] as? NSNumber)?.intValue ?? 0
+            let crons = ((f["kinds"] as? [String]) ?? []).contains("session_cron") ? 1 : 0
+            work = max(0, tasks - watchers - crons)
         }
+        if (f?["tasks"] as? NSNumber)?.intValue == 0 { work = 0 }
         let updated = (j["updatedAt"] as? String).flatMap { iso.date(from: $0) ?? isoPlain.date(from: $0) }
         return JobState(state: state, tempo: j["tempo"] as? String, needs: question ?? text(j["needs"]),
                         detail: text(j["detail"]), work: work, updatedAt: updated)

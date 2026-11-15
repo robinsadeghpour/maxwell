@@ -13,12 +13,16 @@ import Foundation
 /// replaces it. Each verdict keeps a few words on where it came from (`Session.phaseSource`).
 enum Live {
     /// True when the latest listing already reflects a hook at `t`: Claude Code changed the
-    /// status with it, or the listing is a few seconds younger than it.
+    /// status with it (it writes the status a moment before a Stop hook runs, hence the small slack),
+    /// or the listing is a few seconds younger than it.
     static func covers(_ s: Session, _ t: Date) -> Bool {
         guard let listed = s.listedAt, s.listedStatus != nil else { return false }
-        if let at = s.statusAt, at >= t.addingTimeInterval(-1) { return true }
+        if let at = s.statusAt, at >= t.addingTimeInterval(-0.3) { return true }
         return listed >= t.addingTimeInterval(3)
     }
+
+    /// How long after a turn ends Maxwell waits for Claude Code's verdict on it before reading the reply itself.
+    static let verdictWait: TimeInterval = 8
 
     /// Sets the phase from the listing's facts. `reset` is when the account's limit ends, if it is at one.
     static func settle(_ s: inout Session, reset: Date?) {
@@ -27,11 +31,12 @@ enum Live {
         s.waitingOn = nil
         switch status {
         case .waiting(let what):
-            // A permission hook says which tool; keep its words over the bare "permission prompt".
-            if case .needsYou(let q) = was, !q.isEmpty, s.phaseSource.hasPrefix("hook: ") || s.phaseSource.hasPrefix("Claude Code: waiting") {
-                s.phase = .needsYou(q)
-            } else if let needs = s.job?.needs, s.job?.tempo == "blocked" {
+            // Best words first: Claude Code's own ("approve Bash: curl …", the question asked), then a
+            // permission hook's ("Claude needs your permission to use Bash"), then the bare kind of wait.
+            if let needs = s.job?.needs, s.job?.tempo == "blocked" {
                 s.phase = .needsYou(needs)
+            } else if case .needsYou(let q) = was, !q.isEmpty, s.phaseSource.hasPrefix("hook: ") || s.phaseSource == "Claude Code: waiting for \(what)" {
+                s.phase = .needsYou(q)
             } else {
                 s.phase = .needsYou(describe(waitingFor: what))
             }
@@ -39,11 +44,25 @@ enum Live {
         case .busy:
             s.phase = .working
             s.phaseSource = "Claude Code: turn running"
+            s.stopFailure = nil
         case .idle, .shell:
-            let (phase, source) = Outcome.of(s, reset: reset, job: s.job)
+            // A background session's verdict on the turn is written a moment after it ends. Until it is
+            // (and only for a few seconds), stay Working rather than guess from the reply and announce
+            // "done", then "needs you", for one turn. The session's own status line needs no wait.
+            let current = Outcome.jobIsCurrent(s)
+            if case .background = s.reach, s.stopFailure == nil, s.lastMessage.flatMap(Wrap.parse) == nil, !current,
+               let listed = s.listedAt, let ended = s.statusAt, listed.timeIntervalSince(ended) < verdictWait {
+                s.phase = .working
+                s.phaseSource = "Claude Code: turn over, its verdict not written yet"
+                break
+            }
+            let (phase, source) = Outcome.of(s, reset: reset, job: current ? s.job : nil)
             s.phase = phase
             s.phaseSource = source
             guard phase == .yourTurn else { break }
+            // A turn that says it is finished stays Your turn while a server or watcher it left runs;
+            // the not-busy check still keeps it out of Safe to close.
+            if source == "session's status line: Safe to close" || source == "Claude Code: done" { break }
             // The turn is over and asks nothing; work it started in the background may still report back.
             // Claude Code's job record counts it for background sessions; without one, and without the
             // process's own status, the transcript's ledger is all there is.
@@ -74,7 +93,7 @@ enum Live {
     }
 }
 
-/// What a finished turn leaves for Robin.
+/// What a finished turn leaves for you.
 enum Outcome {
     /// The phase after a turn and where it came from, best evidence first: how the turn stopped,
     /// the session's own status line, Claude Code's verdict on the turn, then the reply's wording.
@@ -88,7 +107,7 @@ enum Outcome {
             return (.yourTurn, "no reply yet")
         }
         if case .limitHit = Reply.classify(m) { return (.limited(reset), "reply is the usage-limit line") }
-        // The session was told to end with this line, so it gets the last word on whether it needs Robin.
+        // The session was told to end with this line, so it gets the last word on whether it needs you.
         if let w = Wrap.parse(m) {
             if w.state == .needsYou { return (.needsYou(w.note.isEmpty ? "Needs you" : w.note), "session's status line: Needs you") }
             return (.yourTurn, "session's status line: \(w.state.rawValue)")
@@ -96,6 +115,13 @@ enum Outcome {
         if let j = job, let verdict = jobVerdict(j) { return verdict }
         if case .question(let q) = Reply.classify(m) { return (.needsYou(q), "reply asks a question") }
         return (.yourTurn, "reply asks nothing")
+    }
+
+    /// True when the job record was written for the current turn, not left from an earlier one.
+    static func jobIsCurrent(_ s: Session) -> Bool {
+        guard let j = s.job, j.tempo != "active" else { return false }
+        guard let written = j.updatedAt, let turn = s.turnAt else { return true }
+        return written >= turn.addingTimeInterval(-0.5)
     }
 
     /// Claude Code's verdict, once it has settled (it writes it a moment after the turn ends).

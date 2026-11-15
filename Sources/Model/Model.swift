@@ -159,7 +159,12 @@ struct Session: Equatable {
     var statusAt: Date?
     /// Claude Code's own verdict on the last turn (background sessions only).
     var job: JobState?
-    /// The error a turn stopped on (StopFailure), until the next prompt.
+    /// Why the latest listing could not check the group against Claude Code's own files; nil when it could.
+    var unverified: String?
+    /// When the latest turn began (a prompt hook, or the listing going busy): a job record older
+    /// than this is about an earlier turn.
+    var turnAt: Date?
+    /// The error a turn stopped on (StopFailure), until the next turn.
     var stopFailure: String?
     /// Set while the phase is working although the turn is over: the background work it waits for.
     var waitingOn: String?

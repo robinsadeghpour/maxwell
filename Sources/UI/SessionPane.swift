@@ -140,7 +140,7 @@ final class SessionPane: MXView {
         let now = Date()
         banner.buttons.forEach { $0.removeFromSuperview() }
         banner.buttons = []
-        banner.source = s.phaseSource
+        banner.source = s.phaseSource + (s.unverified.map { " · unverified: \($0)" } ?? "")
         switch group {
         case .needsYou:
             if case .needsYou(let q) = s.phase { banner.configure(group: group, text: q, tint: { $0.on }) }

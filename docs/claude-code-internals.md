@@ -23,7 +23,7 @@ Seen in Claude Code 2.1.3xx (2.1.325 on 2026-11-15). Code: `Sources/App/ClaudeCL
 ## Files, per account config folder
 
 - **`sessions/<pid>.json`** (interactive and background): `sessionId`, `kind` (`interactive` …), `pid`, `status` = `busy` | `idle` | `waiting` | `shell` (turn over, only background shells running), `waitingFor` (permission prompt, input needed, worker request, sandbox request, dialog open, goal proposal), `statusUpdatedAt`.
-- **`jobs/<shortId>/state.json`** (background only): `state` = `working` | `blocked` | `done` | `failed` | `stopped`, `tempo` = `active` | `idle` | `blocked`, `needs` (what it needs from the user, in its words), `detail`, `block.questions` (AskUserQuestion), `inFlight.tasks` and `kinds`. `artifact_watch` and `session_cron` are passive kinds. `timeline.jsonl` sits beside it.
+- **`jobs/<shortId>/state.json`** (background only): `state` = `working` | `blocked` | `done` | `failed` | `stopped`, `tempo` = `active` | `idle` | `blocked`, `needs` (what it needs from the user, in its words), `detail`, `block.questions` (AskUserQuestion), `inFlight.tasks`, `kinds` (each kind once, not once per task) and `drainableMonitors` (file watchers such as `artifact_watch`), `fan` (one entry per shell, agent, workflow or monitor, with `doneAt` once finished; watchers are not in it), and `updatedAt`. Real background work is the `fan` entries without `doneAt`; without `fan`, `tasks − drainableMonitors`. The verdict is written a moment after the turn ends (seen within the same 0.25 s poll in 2.1.325, Nov 2026); until then `tempo` stays `active`. A record older than the current turn is the previous turn's. `timeline.jsonl` sits beside it.
 - **`projects/<cwd with non-alphanumerics as "-">/<sessionId>.jsonl`**: the transcript. Maxwell reads the last reply, running tasks, the first prompt, and links to files and artifacts. Subagent transcripts are under `…/subagents/` and are ignored.
 - **`.claude.json`** (`~/.claude.json` for the default account): `projects[<path>].hasTrustDialogAccepted`. Maxwell writes it to trust a folder. Claude Code writes the same file, so Maxwell re-reads and retries; this is a known race (clean-up plan, step 4).
 - **`settings.json`**: Maxwell's hook and status-line tap are merged in by `Sources/Install/HookInstaller.swift`, keeping key order.
@@ -39,3 +39,10 @@ Hooks (session start, stop, notification, prompt submit) and the status-line tap
 Known failure: after a Mac or login crash, the service can stay attached to the dead login session. Every session it runs then loses macOS services: `id -un` prints a number, `launchctl` says "141: Reentrancy avoided", audio and the iOS Simulator fail. The fix is to end that `claude daemon run` process and resume the sessions. Maxwell doesn't detect this yet (clean-up plan, step 5).
 
 Processes a background session starts are their own "responsible process" for macOS privacy. They don't get the permissions you gave Warp or Terminal (Files & Folders, Automation, Accessibility). `osascript` to System Events fails with -1743.
+
+## Timing seen in a soak test (2.1.325, 15 Nov 2026)
+
+- `sessions/<pid>.json` changes status within about 0.1 s of the event. The Stop hook runs a moment after `status` turns idle.
+- The `permission_prompt` Notification hook arrives about 6 s after `status` turns `waiting`, with vaguer text ("Claude needs your permission") than `jobs/<id>/state.json`'s `needs` ("approve Bash: curl …").
+- Esc ends a turn with no Stop hook; only `status` changes.
+- Stop fires while a background subagent or shell still runs; `status` stays `busy` (subagent) or becomes `shell`.

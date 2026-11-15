@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Groups hold up when sessions get busy</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-groups-under-load</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-groups-under-load</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Maxwell's groups now hold up when sessions run subagents, background shells and permission prompts. We ran scripted sessions through each case and compared Maxwell with Claude Code's own records every quarter second. Every group change now matches, and you get one notification per real change.&lt;/p&gt;
+&lt;p&gt;If Maxwell can't read Claude Code's own status for a session, the bottom bar now says &lt;strong&gt;! unverified&lt;/strong&gt; instead of quietly guessing. &lt;code&gt;Maxwell watch&lt;/code&gt; prints every group change as it happens, with where it came from.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed a &quot;done&quot; notification while a subagent or background shell was still running&lt;/li&gt;&lt;li&gt;Fixed the vaguer permission notification replacing the exact command a session asked to run&lt;/li&gt;&lt;li&gt;Fixed a finished session with a dev server left running staying in Working&lt;/li&gt;&lt;li&gt;Fixed file watchers counting as background work&lt;/li&gt;&lt;li&gt;Fixed a usage limit from an earlier turn sticking after a clean turn&lt;/li&gt;&lt;li&gt;A session that asks the same question again no longer notifies twice&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Viewer tabs that keep your place</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-tabs-that-keep-your-place</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-tabs-that-keep-your-place</guid>

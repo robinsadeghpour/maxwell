@@ -258,6 +258,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.usage.counts = perAccount
         root.sidebar.list.current = current
         root.status.counts = PhaseGroup.allCases.map { g in (g, all.first { $0.0 == g }?.1.count ?? 0) }
+        root.status.warning = unverifiedWarning(state)
         root.titleBar.tabs = visited.compactMap { id in state.sessions[id].map { TitleBar.Tab(id: id, title: $0.title, group: state.group($0, now: now, rules: rules) ?? .idle) } }
         root.titleBar.current = current
         let s = current.flatMap { state.sessions[$0] ?? state.closed[$0]?.session }
@@ -276,6 +277,16 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// Plugin badges for a row, plugin by plugin in name order.
+    /// "! 2 unverified" when Claude Code's own files couldn't be read for some sessions: their groups
+    /// then rest on weaker evidence, and a Claude Code update is the likely cause.
+    private func unverifiedWarning(_ state: AppState) -> (text: String, tip: Tip)? {
+        let lines = state.sessions.values.filter { $0.phase != .ended }.compactMap { s in s.unverified.map { "\(s.title): \($0)" } }.sorted()
+        guard let first = lines.first else { return nil }
+        let tip = Tip("Maxwell can't read Claude Code's own status for \(lines.count == 1 ? "1 session" : "\(lines.count) sessions"), so its group may be off")
+            .adding(first + (lines.count > 1 ? " (and \(lines.count - 1) more)" : "") + ". A Claude Code update may have changed the file.")
+        return ("! \(lines.count) unverified", tip)
+    }
+
     private func badges(_ s: Session, state: AppState) -> [RowBadge] {
         (state.notes[s.id] ?? [:]).sorted { $0.key < $1.key }.flatMap { pid, note in
             note.badges.map { b in
