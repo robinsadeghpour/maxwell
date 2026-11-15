@@ -36,11 +36,15 @@ Reconciling showed public was already a superset: every private-only line was an
 
 ### 2. Beta and Stable
 
+Issue [#11](https://github.com/robinsadeghpour/maxwell/issues/11).
+
 Releases go to a Beta channel first (Robin and anyone who opts in, in Settings › General). Stable gets a build once it has run 24 hours on Beta without a new crash group in Sentry. The updater reads the channel; the release workflow publishes Beta, and a second workflow promotes a Beta to Stable.
 
 - **Done when** a release doesn't reach Stable users the day it is built, and promotion is one command that checks Sentry first.
 
 ### 3. A smoke test of the real app, and the harness out of the app
+
+Issue [#12](https://github.com/robinsadeghpour/maxwell/issues/12).
 
 Move the flags from `main.swift` into `Sources/Harness/`, driven by a small script of steps that each wait for a state, not for seconds ("start session", "until Your turn", "kill Maxwell", "relaunch", "until attached"). Run it against the `demo/` world with its stand-in `claude`, so it needs no account and runs in CI on every release.
 
@@ -50,6 +54,8 @@ Move the flags from `main.swift` into `Sources/Harness/`, driven by a small scri
 
 ### 4. Claude Code behind one adapter, checked against the installed version
 
+Issue [#13](https://github.com/robinsadeghpour/maxwell/issues/13).
+
 Move everything that reads Claude Code into `Sources/ClaudeCode/`: commands and their output (`Run.swift`, `Background.swift`), state files (`SessionFiles.swift`, `JobState.swift`), transcripts (`Transcript.swift`), trust (`Trust.swift`). Parse the `backgrounded` line once (it is parsed twice today). Unknown values become an explicit `unknown` case, shown as unknown.
 
 - Add a contract check: when the installed `claude --version` changes, Maxwell runs a short self-test (start a haiku background session in a temp folder, read its state files, stop it) and shows "Claude Code changed: some states may be wrong" if an assumption fails. The same test runs in the smoke suite.
@@ -57,6 +63,8 @@ Move everything that reads Claude Code into `Sources/ClaudeCode/`: commands and 
 - **Done when** `claude-code-internals` in the baseline is 0 outside `Sources/ClaudeCode/`, and a changed format shows a notice instead of wrong states.
 
 ### 5. Health checks that fix what they find
+
+Issue [#14](https://github.com/robinsadeghpour/maxwell/issues/14).
 
 One "Health" section in Settings › General, with a banner in the main window when something is wrong. Each check has a one-click fix:
 
@@ -67,12 +75,16 @@ One "Health" section in Settings › General, with a banner in the main window w
 
 ### 6. Split the big files
 
+Issue [#15](https://github.com/robinsadeghpour/maxwell/issues/15).
+
 In this order, because sessions touch them most: `MainWindow` (actions, wiring and rendering into their own files; `makeActions` 128 lines, `wire` 98, `render` 83), `SettingsWindow` (one file per section), `Reducer.reduce` (one function per event kind; the fixtures keep it safe), `Layout`, `Sidebar`, `Terminal`, `Store`, `ArtifactView`, `Probes` (most of it moves in step 4).
 
 - Pure moves first, in their own PRs, with no behaviour change, verified by `./build.sh test` and the smoke test.
 - **Done when** `file-lines` and `function-lines` in the baseline are empty.
 
 ### 7. Layers and small hazards
+
+Issue [#16](https://github.com/robinsadeghpour/maxwell/issues/16).
 
 - `Sources/UI/Remembered.swift` with typed keys for the 15 `UserDefaults` uses.
 - The 13 file and process calls in `Sources/UI` move to the Store or an App service (`ProjectLogo` has 5).
