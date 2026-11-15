@@ -4,10 +4,26 @@ import Foundation
 /// environment: no CLAUDE_CODE_* markers (they turn off transcript saving) and the
 /// account's CLAUDE_CONFIG_DIR only when it is not the default account.
 enum ClaudeCLI {
-    static let claudePath: String = {
-        let candidates = [Paths.home.appendingPathComponent(".local/bin/claude").path, "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "claude"
+    private static let usualClaude = [Paths.home.appendingPathComponent(".local/bin/claude").path, "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+        .first { FileManager.default.isExecutableFile(atPath: $0) }
+
+    /// npm (nvm, Volta), bun and other installs put `claude` where only the user's shell setup
+    /// knows, and an npm `claude` also needs that PATH to find `node`. Asked once, and only when
+    /// `claude` is not in one of the usual places.
+    private static let loginShell: (claude: String?, path: String?) = {
+        guard usualClaude == nil else { return (nil, nil) }
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let r = run(shell, ["-ilc", #"printf '\n@maxwell@%s@%s@\n' "$(command -v claude)" "$PATH""#], timeout: 8)
+        guard let line = r.out.components(separatedBy: "\n").last(where: { $0.hasPrefix("@maxwell@") }) else { return (nil, nil) }
+        let f = line.components(separatedBy: "@")
+        guard f.count >= 4 else { return (nil, nil) }
+        return (FileManager.default.isExecutableFile(atPath: f[2]) ? f[2] : nil, f[3].isEmpty ? nil : f[3])
     }()
+
+    static let claudePath: String = usualClaude ?? loginShell.claude ?? "claude"
+
+    /// False when no `claude` was found: nothing can be listed or started.
+    static var claudeFound: Bool { FileManager.default.isExecutableFile(atPath: claudePath) }
 
     static let ghPath: String = [Paths.home.appendingPathComponent(".local/bin/gh").path, "/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
         .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/false"
@@ -19,6 +35,7 @@ enum ClaudeCLI {
         // Finder launches get a minimal PATH; claude, git and gh live in these.
         let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
         let extra = [Paths.home.appendingPathComponent(".local/bin").path, "/opt/homebrew/bin", "/usr/local/bin"]
+            + (loginShell.path?.components(separatedBy: ":") ?? [])
         setenv("PATH", (extra.filter { !path.contains($0) } + [path]).joined(separator: ":"), 1)
     }
 

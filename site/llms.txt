@@ -37,6 +37,7 @@
 
 ## Changelog
 
+- [A plain terminal, one key away](https://www.runmaxwell.com/changelog/2026-11-15-terminal-window) (2026-11-15, v0.1.27)
 - [Pick a sound for each notification](https://www.runmaxwell.com/changelog/2026-11-15-notification-sounds) (2026-11-15, v0.1.26)
 - [Terminal sessions move into Maxwell](https://www.runmaxwell.com/changelog/2026-11-15-bring-in-for-real) (2026-11-15, v0.1.24 – 0.1.25)
 - [Quieter plugin lists and a tidier Settings](https://www.runmaxwell.com/changelog/2026-11-15-cleaner-panels) (2026-11-15, v0.1.20 – 0.1.23)

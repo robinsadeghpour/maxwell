@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-terminal-window",
+    date: "2026-11-15",
+    versions: "0.1.27",
+    title: "A plain terminal, one key away",
+    figure: "",
+    body: `
+<p>${k("⌥ ⌘ T")} opens a plain terminal in its own window, in the folder of the session you're looking at. It's in the ${k("⌘ K")} actions and the Session menu as <strong>New Terminal Window</strong>. Right-click any session and choose <strong>Open Terminal Here</strong> to open one in that session's folder. The window follows Maxwell's theme and closes when the shell exits.</p>
+<p>Maxwell now finds <code>claude</code> wherever your shell does. Installs through npm, nvm, Volta or bun keep it outside the usual folders, and Maxwell then listed no background sessions. It now asks your login shell once. If it still can't find <code>claude</code>, it says so when it opens.</p>`,
+    fixes: [
+      "Fixed sessions missing from the list when claude was installed with npm, nvm, Volta or bun",
+      "Maxwell state now prints the claude it uses and any account whose listing failed",
+    ],
+  },
+  {
     slug: "2026-11-15-notification-sounds",
     date: "2026-11-15",
     versions: "0.1.26",

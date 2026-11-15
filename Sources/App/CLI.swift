@@ -40,6 +40,9 @@ func runCLI(_ args: [String]) -> Int32? {
         case "state":
             // The audit: what the sidebar would show now, from the event log, live listings, repo
             // checks and model reads (made here for candidates without one), with every check.
+            ClaudeCLI.scrubOwnEnvironment()
+            print("claude: \(ClaudeCLI.claudeFound ? ClaudeCLI.claudePath : "not found (sessions can't be listed)")")
+            for a in config.accounts where ClaudeCLI.agents(a) == nil { print("! claude agents --json failed on \(a.id) (\(a.configDir.path))") }
             let log = EventLog(url: Paths.eventLog)
             var state = log.readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
             for a in config.accounts { if let snap = AgentsProbe.snapshot(a) { state = reduce(state, .agents(snap)) } }

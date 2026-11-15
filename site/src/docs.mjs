@@ -323,6 +323,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("J")} ${k("K")}, ${k("⏎")}</td><td>Move through sessions, open one</td></tr>
 <tr><td>${k("⌘ J")}</td><td>Next session that needs you</td></tr>
 <tr><td>${k("⌘ T")}</td><td>New session in the current folder, on the account with the most room</td></tr>
+<tr><td>${k("⌥ ⌘ T")}</td><td>A plain terminal window in the current session's folder</td></tr>
 <tr><td>${k("⌘ N")}</td><td>New session, choosing folder and account</td></tr>
 <tr><td>${k("⇧ ⌘ ⌫")}</td><td>Close the session: at once when it's safe, otherwise after saying what's still open</td></tr>
 <tr><td>${k("⇧ ⌘ X")}</td><td>Close all safe (asks first)</td></tr>

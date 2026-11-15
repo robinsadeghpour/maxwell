@@ -8,6 +8,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
     private var terminals: [SessionID: TerminalView] = [:]
     private var detached = Set<SessionID>()
+    /// Plain shells, each in its own window, for work that isn't a Claude session.
+    private var shells: [NSWindow] = []
     private var visited: [SessionID] = []
     private(set) var current: SessionID?
     private var viewers: [SessionID: ViewerState] = [:]
@@ -298,6 +300,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         move.submenu = sub
         move.isEnabled = sub.numberOfItems > 0
         m.addItem(move)
+        m.addItem(MenuAction("Open Terminal Here") { [weak self] in self?.openShell(in: s.cwd) })
         if current != home { m.addItem(MenuAction("Move back to \(home)") { [weak self] in self?.store.moveProject(s.id, to: nil) }) }
         m.addItem(.separator())
         if case .elsewhere = s.reach {
@@ -516,6 +519,37 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         t.onOpenURL = { [weak self] url, cwd in self?.openURL(url, cwd: cwd, session: id) }
         terminals[id] = t
         detached.remove(id)
+    }
+
+    /// A plain shell in its own window: in the session's folder, or the folder ⌘T would start in.
+    func openShell(in folder: String? = nil) {
+        dismissOverlays()
+        let state = store.state
+        let fallback = current.flatMap { state.sessions[$0]?.cwd }.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } ?? folderHere(state)
+        let dir = folder.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } ?? fallback ?? Paths.home.path
+        let t = TerminalView(frame: NSRect(x: 0, y: 0, width: 860, height: 540), workingDirectory: dir)
+        let w = NSWindow(contentRect: t.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        w.title = (dir as NSString).abbreviatingWithTildeInPath
+        w.appearance = window?.appearance
+        w.isReleasedWhenClosed = false
+        w.contentView = t
+        w.setFrameTopLeftPoint(shells.last.map { w.cascadeTopLeft(from: NSPoint(x: $0.frame.minX, y: $0.frame.maxY)) }
+                               ?? NSPoint(x: (window?.frame.midX ?? 400) - 430, y: (window?.frame.midY ?? 600) + 270))
+        t.onExit = { [weak w] in w?.close() }
+        t.onOpenURL = { raw, cwd in
+            if raw.hasPrefix("http://") || raw.hasPrefix("https://") { if let u = URL(string: raw) { NSWorkspace.shared.open(u) }; return }
+            var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
+            if let r = path.range(of: #":\d+(:\d+)?$"#, options: .regularExpression) { path.removeSubrange(r) }
+            path = (path as NSString).expandingTildeInPath
+            if !path.hasPrefix("/") { path = ((cwd ?? dir) as NSString).appendingPathComponent(path) }
+            if FileManager.default.fileExists(atPath: path) { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+        }
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] n in
+            self?.shells.removeAll { $0 === n.object as? NSWindow }
+        }
+        shells.append(w)
+        w.makeKeyAndOrderFront(nil)
+        w.makeFirstResponder(t)
     }
 
     func reattach(_ id: SessionID) {
@@ -1237,7 +1271,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         window?.appearance = theme.appearance
         root.viewerPane.viewer.setTheme(theme, fontSize: Metrics.fontSize, prose: c.viewerFont)
         root.viewerPane.showTree = c.showTree
-        GhosttyRuntime.shared.update(configText: Self.ghosttyConfig(theme, fontSize: CGFloat(c.terminalFontSize)), surfaces: Array(terminals.values))
+        GhosttyRuntime.shared.update(configText: Self.ghosttyConfig(theme, fontSize: CGFloat(c.terminalFontSize)), surfaces: Array(terminals.values) + shells.compactMap { $0.contentView as? TerminalView })
+        shells.forEach { $0.appearance = theme.appearance }
         root.needsLayout = true
         root.needsDisplay = true
         render(store.state)
@@ -1265,6 +1300,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         var list: [Action] = [
             Action(id: "new-session", title: "New Session…", menu: "Session", shortcut: Shortcut("cmd+n")) { [weak self] in self?.showNewSession() },
             Action(id: "new-session-here", title: "New Session Here", menu: "Session", shortcut: Shortcut("cmd+t")) { [weak self] in self?.newSessionHere() },
+            Action(id: "new-terminal", title: "New Terminal Window", menu: "Session", shortcut: Shortcut("cmd+alt+t")) { [weak self] in self?.openShell() },
             Action(id: "search", title: "Search Everywhere…", menu: "View", shortcut: Shortcut("cmd+p")) { [weak self] in self?.showSearch() },
             Action(id: "palette", title: "All Actions…", menu: "View", shortcut: Shortcut("cmd+k")) { [weak self] in self?.showPalette() },
             Action(id: "next-session", title: "Next Session", menu: "Session", shortcut: Shortcut("cmd+]")) { [weak self] in self?.step(1) },

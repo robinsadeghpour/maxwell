@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return self.main.current == id
         }
         NSApp.mainMenu = MenuBuilder.build(main.actions)
+        if !ClaudeCLI.claudeFound { main.toast("Maxwell can't find claude, so it can't list or start sessions. Put claude on your shell's PATH and reopen Maxwell.") }
         main.window?.appearance = theme.appearance
         main.root.viewerPane.viewer.setTheme(theme, fontSize: Metrics.fontSize, prose: config.viewerFont)
         main.root.viewerPane.showTree = config.showTree
@@ -246,6 +247,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 mark("typed")
             }
         }
+        if let text = arg("--type-shell") {
+            // Types into the newest plain terminal window (New Terminal Window), never into a session.
+            DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--type-after") ?? "4") ?? 4)) {
+                let shell = NSApp.windows.last { $0.isVisible && $0.contentView is TerminalView }
+                (shell?.contentView as? TerminalView)?.sendLine(text)
+                mark(shell == nil ? "no terminal window" : "typed in terminal window")
+            }
+        }
         if let spec = arg("--start") {
             // --start <account|roomiest>:<folder>:<name>: the ⌘N panel's Start, without the panel.
             // Test sessions run on haiku (--model overrides).
@@ -401,7 +410,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     /// Captures Maxwell's own window (no screen-recording permission needed for own windows).
     private func snapshot(to path: String) {
-        let target = arg("--settings") != nil ? NSApp.windows.first { $0.title == "Maxwell Settings" && $0.isVisible } : main.window
+        let target = arg("--settings") != nil ? NSApp.windows.first { $0.title == "Maxwell Settings" && $0.isVisible }
+            : arg("--type-shell") != nil ? NSApp.windows.last { $0.isVisible && $0.contentView is TerminalView } : main.window
         guard let w = target else { return mark("snapshot failed") }
         // With the screen locked the window server hands back a blank image; render the layer tree instead.
         let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true
