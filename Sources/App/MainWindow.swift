@@ -42,6 +42,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.backgroundColor = .clear
         w.toolbar = NSToolbar()
         w.toolbarStyle = .unifiedCompact
+        w.collectionBehavior.insert(.fullScreenPrimary)
         w.minSize = NSSize(width: 900, height: 480)
         // Glass behind everything; the root view's tint sits on it.
         // With `background-blur` set, the material steps aside for a window blur of that radius.
@@ -381,6 +382,18 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     func windowDidMove(_ n: Notification) { if let w = window { WindowPlacement.save(w) } }
     func windowDidChangeScreen(_ n: Notification) { loadPanelLayout() }
+
+    // The empty toolbar only sizes the titlebar for the traffic lights. In full screen macOS draws it
+    // as an opaque strip over our own title bar, so it goes away there and comes back on exit.
+    func windowWillEnterFullScreen(_ n: Notification) {
+        window?.toolbar = nil
+        root.titleBar.fullScreen = true
+    }
+    func windowDidExitFullScreen(_ n: Notification) {
+        window?.toolbar = NSToolbar()
+        window?.toolbarStyle = .unifiedCompact
+        root.titleBar.fullScreen = false
+    }
 
     // MARK: panels
 

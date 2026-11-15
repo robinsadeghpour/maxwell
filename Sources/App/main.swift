@@ -141,6 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             w.setFrame(NSRect(x: w.frame.minX, y: w.frame.maxY - size[1], width: size[0], height: size[1]), display: true)
             mark("window frame \(NSStringFromRect(w.frame)) on \(w.screen?.localizedName ?? "?")")
         }
+        if CommandLine.arguments.contains("--fullscreen") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { NSApp.activate(ignoringOtherApps: true); self.main.window?.toggleFullScreen(nil) }
+        }
         if let p = arg("--project") { main.setScope(p == "all" ? nil : p) }
         if let name = arg("--select") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {

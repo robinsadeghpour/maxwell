@@ -130,7 +130,9 @@ final class TitleBar: MXView, TipSource {
     let palette = IconButton(.search, tip: Tip("Search sessions, projects and actions", action: "search"))
     let gear = IconButton(.gear, tip: Tip("Settings", action: "settings"))
     private var hoverTab: Int?
-    static let leftInset: CGFloat = 84
+    /// Room for the traffic lights; full screen hides them, so the tabs start at the edge.
+    var fullScreen = false { didSet { needsDisplay = true } }
+    private var leftInset: CGFloat { fullScreen ? 8 : 84 }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -148,10 +150,10 @@ final class TitleBar: MXView, TipSource {
     }
 
     private func tabRects() -> [NSRect] {
-        let avail = bounds.width - Self.leftInset - 100
+        let avail = bounds.width - leftInset - 100
         guard !tabs.isEmpty, avail > 0 else { return [] }
         let w = min(220, avail / CGFloat(tabs.count))
-        return tabs.indices.map { NSRect(x: Self.leftInset + CGFloat($0) * w, y: 0, width: w, height: bounds.height - 1) }
+        return tabs.indices.map { NSRect(x: leftInset + CGFloat($0) * w, y: 0, width: w, height: bounds.height - 1) }
     }
 
     override func draw(_ r: NSRect) {
