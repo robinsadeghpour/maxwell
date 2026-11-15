@@ -76,7 +76,7 @@ struct AgentsSnapshot: Equatable {
         var lastActiveAt: Date?   // last prompt or reply in the transcript
         var firstPrompt: String?  // for sessions that predate the hooks and have no title
         var used = false          // has a transcript, so someone prompted it
-        var runningTasks: Int?    // background tasks started since startedAt and not reported done; nil: no transcript
+        var runningTasks: [BackgroundTask]?    // background tasks started since startedAt and not reported done; nil: no transcript
     }
 
     enum Status: Equatable {

@@ -230,7 +230,7 @@ enum Transcripts {
     /// Background shells and async subagents still running (see `TaskLedger`). Reads only the
     /// bytes added since the last scan, 4 MB at a time (a first read can be a 160 MB transcript).
     /// Scans persist across launches, keyed by path and inode; nil when there is no transcript.
-    static func runningTasks(_ path: String, since: Date) -> Int? {
+    static func runningTasks(_ path: String, since: Date) -> [BackgroundTask]? {
         guard let h = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? h.close() }
         let inode = ((try? FileManager.default.attributesOfItem(atPath: path))?[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
@@ -260,7 +260,8 @@ enum Transcripts {
     struct TaskScan: Codable { var inode: UInt64; var offset: UInt64 = 0; var ledger = TaskLedger() }
 
     /// ~/.local/state/maxwell/task-scans.json: where each transcript's scan stopped, so a launch
-    /// reads only what was written since. A cache: deleting it costs one full read.
+    /// reads only what was written since. A cache: deleting it costs one full read, and a file
+    /// in an older shape fails to decode and is rebuilt the same way.
     final class TaskScans {
         static let shared = TaskScans()
         var scans: [String: TaskScan]

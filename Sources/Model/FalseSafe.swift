@@ -9,7 +9,8 @@ enum FalseSafe {
         var facts: [String: Any] = [
             "prompted": s.prompted, "lastMessage": s.lastMessage ?? NSNull(), "lastEventAt": ts(s.lastEventAt),
             "listedAt": ts(s.listedAt), "accountListedAt": ts(state.listedAt[s.accountId]),
-            "runningTasks": s.runningTasks ?? NSNull(), "hookSeenAt": ts(s.hookSeenAt),
+            "runningTasks": s.runningTasks.map { $0.map { t -> [String: Any] in ["id": t.id, "kind": t.kind.rawValue, "label": t.label ?? NSNull(), "startedAt": ts(t.startedAt)] } } ?? NSNull(),
+            "hookSeenAt": ts(s.hookSeenAt),
         ]
         switch s.listedStatus {
         case .busy?: facts["listedStatus"] = "busy"
@@ -47,7 +48,12 @@ enum FalseSafe {
         s.lastMessage = f["lastMessage"] as? String
         s.phase = .yourTurn
         s.listedAt = date(f["listedAt"])
-        s.runningTasks = (f["runningTasks"] as? NSNumber)?.intValue
+        s.runningTasks = (f["runningTasks"] as? [[String: Any]])?.map {
+            BackgroundTask(id: $0["id"] as? String ?? "", kind: BackgroundTask.Kind(rawValue: $0["kind"] as? String ?? "") ?? .shell,
+                           label: $0["label"] as? String, startedAt: date($0["startedAt"]) ?? .distantPast)
+        }
+        // Fixtures written before tasks had kinds hold only a count.
+        ?? (f["runningTasks"] as? NSNumber).map { n in (0..<n.intValue).map { BackgroundTask(id: "\($0)", kind: .shell, startedAt: .distantPast) } }
         s.hookSeenAt = date(f["hookSeenAt"])
         switch f["listedStatus"] as? String {
         case "busy"?: s.listedStatus = .busy

@@ -90,7 +90,10 @@ extension AppState {
         case (_, .waiting(let why)?, _): add(.idle, .fail, "waiting: \(why)", busySource)
         case (_, nil, _): add(.idle, .unknown, "no status from a listing", busySource)
         case (_, _, nil): add(.idle, .unknown, "transcript not readable for background tasks", busySource)
-        case (_, _, let n?) where n > 0: add(.idle, .fail, "\(n) background task\(n == 1 ? "" : "s") or subagent\(n == 1 ? "" : "s") running", busySource)
+        case (_, _, let tasks?) where !tasks.isEmpty:
+            let a = tasks.agents.count, sh = tasks.count - a
+            let what = [a > 0 ? "\(a) subagent\(a == 1 ? "" : "s")" : nil, sh > 0 ? "\(sh) background shell\(sh == 1 ? "" : "s")" : nil]
+            add(.idle, .fail, what.compactMap { $0 }.joined(separator: " and ") + " running", busySource)
         default: add(.idle, .pass, "idle, no background tasks", busySource)
         }
 

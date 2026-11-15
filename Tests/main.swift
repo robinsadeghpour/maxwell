@@ -52,7 +52,7 @@ let rules = GroupRules(idleAfter: 86400)
 let pass = DoneCheck(at: t0.addingTimeInterval(8), repo: true, dirtyFiles: 0, unpushed: 0, pr: .merged(12), branch: "fix")
 /// Everything a stopped session needs to be safe at `at`: a fresh idle listing with no
 /// background tasks, a repo check after the last activity, and a "finished" model read.
-func evidence(_ st: AppState, _ id: String, at: Double, status: AgentsSnapshot.Status = .idle, tasks: Int? = 0, check: DoneCheck? = nil, verdict: Judgment.Verdict? = .finished) -> AppState {
+func evidence(_ st: AppState, _ id: String, at: Double, status: AgentsSnapshot.Status = .idle, tasks: [BackgroundTask]? = [], check: DoneCheck? = nil, verdict: Judgment.Verdict? = .finished) -> AppState {
     var st = st
     let sess = st.sessions[id]!
     let snapAt = t0.addingTimeInterval(at - 10)
@@ -117,8 +117,11 @@ check(outcome(verdictOf(evidence(s, "s1", at: later, check: DoneCheck(at: t0, re
 let busy = evidence(s, "s1", at: later, status: .busy)
 check(busy.sessions["s1"]?.phase == .working && groupOf(busy, "s1", at: later) == .working, "listed busy -> working")
 check(outcome(verdictOf(busy, "s1", at: later), .idle) == .fail, "busy fails the idle check")
-let bgTask = evidence(s, "s1", at: later, tasks: 2)
+let bgTask = evidence(s, "s1", at: later, tasks: [BackgroundTask(id: "a1", kind: .agent, label: "Review", startedAt: t0),
+                                                  BackgroundTask(id: "a2", kind: .agent, startedAt: t0), BackgroundTask(id: "b1", kind: .shell, startedAt: t0)])
 check(outcome(verdictOf(bgTask, "s1", at: later), .idle) == .fail && groupOf(bgTask, "s1", at: later) == .yourTurn, "a running background task keeps it out of safe")
+check(verdictOf(bgTask, "s1", at: later).first { $0.kind == .idle }?.detail == "2 subagents and 1 background shell running", "the idle check names what runs")
+check(bgTask.sessions["s1"]?.runningTasks?.summary == "2 agents · 1 shell" && [BackgroundTask]().summary.isEmpty, "summary counts agents and shells")
 
 // Background tasks from transcript lines (shapes copied from a real transcript, 13 Nov).
 var ledger = TaskLedger()
@@ -132,13 +135,26 @@ for line in [
     #"{"type":"user","message":{"content":"<task-notification>\n<task-id>a8a3e6eb0e6f425c3</task-id>\n<status>running</status>\n</task-notification>"}}"#,
 ] { ledger.read(Data(line.utf8)) }
 let processStart = ISO8601DateFormatter().date(from: "2026-11-13T14:00:00Z")!
-check(ledger.running(since: processStart) == 2, "two async subagents still running; the finished shell and the pre-restart task are not")
+check(ledger.running(since: processStart).count == 2, "two async subagents still running; the finished shell and the pre-restart task are not")
 ledger.read(Data(#"{"type":"user","message":{"content":"<task-notification><task-id>a8a3e6eb0e6f425c3</task-id><status>completed</status></task-notification> <task-notification><task-id>add5cc1ffefedfd53</task-id><status>killed</status></task-notification>"}}"#.utf8))
-check(ledger.running(since: processStart) == 0, "completed and killed notifications end their tasks")
+check(ledger.running(since: processStart).count == 0, "completed and killed notifications end their tasks")
 ledger.read(Data(#"{"type":"user","timestamp":"2026-11-13T15:00:00.000Z","toolUseResult":{"backgroundTaskId":"bs1tbv9ag"}}"#.utf8))
-check(ledger.running(since: processStart) == 1, "a new background shell runs")
+check(ledger.running(since: processStart).count == 1, "a new background shell runs")
 ledger.read(Data(#"{"type":"user","toolUseResult":{"message":"Successfully stopped task: bs1tbv9ag (npx expo start)","task_id":"bs1tbv9ag","task_type":"local_bash"}}"#.utf8))
-check(ledger.running(since: processStart) == 0, "TaskStop ends a task")
+check(ledger.running(since: processStart).count == 0, "TaskStop ends a task")
+var kinds = TaskLedger()
+for line in [
+    #"{"type":"user","timestamp":"2026-11-15T10:00:00.000Z","toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a14a","description":"Sleep 400 seconds, reply done 1","resolvedModel":"claude-haiku-5-5"}}"#,
+    #"{"type":"user","timestamp":"2026-11-15T10:01:00.000Z","toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"a15b","description":"Review the diff"}}"#,
+    #"{"type":"user","timestamp":"2026-11-15T10:02:00.000Z","toolUseResult":{"stdout":"","backgroundTaskId":"b5zcokrb2"}}"#,
+    #"{"type":"user","message":{"content":"<task-notification>\n<task-id>a15b</task-id>\n<status>completed</status>\n</task-notification>"}}"#,
+] { kinds.read(Data(line.utf8)) }
+let kindsRun = kinds.running(since: processStart)
+check(kindsRun.map(\.kind) == [.agent, .shell] && kindsRun.map(\.label) == ["Sleep 400 seconds, reply done 1", nil] && kindsRun.map(\.id) == ["a14a", "b5zcokrb2"],
+      "running tasks keep their kind and the agent's description, oldest first")
+check(kindsRun.summary == "1 agent · 1 shell", "one agent and one shell")
+check((try? JSONDecoder().decode(TaskLedger.self, from: Data(#"{"started":{"a1":721000000},"finished":[]}"#.utf8))) == nil,
+      "a scan saved before tasks had kinds fails to decode, so task-scans.json resets and rescans")
 check(safe.judgeCandidates(now: t0.addingTimeInterval(later), rules: GroupRules(idleAfter: 86400, judge: false)).isEmpty, "judge = off asks the model nothing")
 
 // The model read: candidates only; anything but finished is not safe; off means never safe.
@@ -369,7 +385,7 @@ func billingAt(_ st: AppState, _ later: TimeInterval) -> AppState {
     let at = stoppedAt.addingTimeInterval(later)
     st = reduce(st, .agents(AgentsSnapshot(at: at.addingTimeInterval(-10), accountId: "work", entries: [
         .init(sessionId: billing, name: "billing", cwd: "/Users/me/projects/meta-agent-tool", startedAt: stoppedAt.addingTimeInterval(-3600),
-              reach: .elsewhere(pid: 1), status: .idle, runningTasks: 0),
+              reach: .elsewhere(pid: 1), status: .idle, runningTasks: []),
     ])))
     // The real folder: meta-agent-tool is not a git repo.
     st = reduce(st, .doneCheck(billing, DoneCheck(at: at.addingTimeInterval(-5), repo: false, dirtyFiles: nil, unpushed: nil, pr: .unknown("not checked"), branch: nil)))

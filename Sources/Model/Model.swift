@@ -157,7 +157,7 @@ struct Session: Equatable {
     var listedStatus: AgentsSnapshot.Status?
     /// Background shells and async subagents started since the process started and not yet
     /// reported done in the transcript; nil when the transcript could not be read.
-    var runningTasks: Int?
+    var runningTasks: [BackgroundTask]?
     /// The last hook event from this session: proof the Maxwell hooks run in it.
     var hookSeenAt: Date?
     /// You pressed "Not safe": it stays out of Safe to close until new activity.
