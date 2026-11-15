@@ -1,7 +1,7 @@
 import AppKit
 
-/// ⌘N: project, account (default: most room), name. ⏎ starts `claude --bg` in the project's
-/// folder and attaches. The project comes first because the folder decides what Claude sees:
+/// ⌘N: project, account (default: most room), where, name. ⏎ starts `claude --bg` in the project's
+/// folder and attaches; with Cloud, `claude --cloud "<task>"` from the branch's last push instead. The project comes first because the folder decides what Claude sees:
 /// inside a project the panel opens on it; from All projects nothing is picked until you pick.
 final class NewSessionPanel: MXView, NSTextFieldDelegate {
     struct Choice {
@@ -15,8 +15,20 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         var isProject: (String) -> Bool
         /// The project a folder picked with ⌘O belongs to.
         var projectName: (String) -> String
+        /// Whether a folder builds for macOS (an Xcode project or Swift package), which a cloud machine can't.
+        var buildsOnMac: (String) -> Bool = { _ in false }
+        /// What a cloud session would start from in a folder (git, so the App answers).
+        var cloudCheck: (String) -> CloudCheck = { _ in CloudCheck(branch: nil, note: nil, blocks: false) }
+        /// Open on Cloud (Start in Cloud) instead of This Mac.
+        var cloud = false
     }
+    struct CloudCheck { var branch: String?; var note: String?; var blocks: Bool }
+    /// The picked folder's check, while Cloud is on.
+    private var check: CloudCheck?
     private var choice = Choice(accounts: [], defaultAccount: nil, folders: [], preselected: nil, isProject: { _ in true }, projectName: { $0 })
+    private var cloud = false
+    private let here = MXButton("This Mac", hint: "⌥⌘↓")
+    private let there = MXButton("Cloud", hint: "⌥⌘↑")
     private var shown: [ProjectFolder] = []
     private var index: Int?
     private var account: AccountID?
@@ -29,13 +41,15 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
     private var accountButtons: [MXButton] = []
     private var message: String?
     var onStart: ((Account, String, String) -> Void)?
+    /// Account, folder, task.
+    var onStartCloud: ((Account, String, String) -> Void)?
     var onClose: (() -> Void)?
     static let width: CGFloat = 600
     private let maxRows = 7
     private static let header: CGFloat = 36
     private var listTop: CGFloat { Self.header + 36 }
     private var listBottom: CGFloat { listTop + CGFloat(maxRows) * Metrics.row }
-    private var height: CGFloat { listBottom + 30 + 24 + 34 + 34 + 46 }
+    private var height: CGFloat { listBottom + 30 + 24 + 34 + 34 + 34 + 46 }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -45,7 +59,9 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         folderButton.action = { [weak self] in self?.chooseFolder() }
         start.action = { [weak self] in self?.submit() }
         cancel.action = { [weak self] in self?.dismiss() }
-        [query, name, folderButton, start, cancel].forEach(addSubview)
+        here.action = { [weak self] in self?.setCloud(false) }
+        there.action = { [weak self] in self?.setCloud(true) }
+        [query, name, folderButton, start, cancel, here, there].forEach(addSubview)
         lookChanged()
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -55,6 +71,21 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         query.textColor = t.fg
         name.textColor = t.fg
         PlainField.placeholder(query, "Type to find a project…", color: t.fg3)
+        PlainField.placeholder(name, cloud ? "What it should do. It starts from the branch's last push." : "", color: t.fg3)
+    }
+
+    /// This Mac or Cloud. In the cloud the name row asks for the task, which `claude --cloud` needs.
+    private func setCloud(_ on: Bool) {
+        cloud = on
+        recheck()
+        here.isOn = !on
+        there.isOn = on
+        if on, !nameEdited { name.stringValue = "" }
+        if !on, !nameEdited { name.stringValue = suggestedName() }
+        lookChanged()
+        message = nil
+        needsDisplay = true
+        if on { window?.makeFirstResponder(name) }
     }
 
     func present(_ c: Choice, in host: NSView) {
@@ -67,6 +98,7 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         filter()
         index = c.preselected.flatMap { p in shown.firstIndex { $0.path == p } }
         selectionChanged()
+        setCloud(c.cloud)
         frame = NSRect(x: (host.bounds.width - Self.width) / 2, y: 64, width: Self.width, height: height)
         host.addSubview(self)
         Motion.appear(self)
@@ -98,15 +130,23 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
     }
 
     private func selectionChanged() {
-        if !nameEdited { name.stringValue = suggestedName() }
-        start.isEnabled = folder != nil
+        if !nameEdited, !cloud { name.stringValue = suggestedName() }
+        recheck()
         message = nil
         needsDisplay = true
+    }
+
+    private func recheck() {
+        check = cloud ? folder.map(choice.cloudCheck) : nil
+        let task = !name.stringValue.trimmingCharacters(in: .whitespaces).isEmpty
+        start.isEnabled = folder != nil && (!cloud || (task && check?.blocks != true))
     }
 
     /// What to say about the picked folder: nothing for a project, a warning for anything else.
     private var warning: String? {
         guard let folder else { return shown.isEmpty ? "No project matches. ⌘O picks any folder." : "Pick the project this session works on." }
+        if cloud, choice.buildsOnMac(folder) { return "This builds for macOS. A cloud machine runs Linux, so it can't build or run it." }
+        if cloud, let note = check?.note { return note }
         guard !choice.isProject(folder) else { return nil }
         return folder == Paths.home.path
             ? "This is your home folder, not a project: Claude would see all of it."
@@ -151,6 +191,10 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         guard let folder else { return show(error: "Pick a project first.") }
         guard let a = choice.accounts.first(where: { $0.id == account }) else { return }
         let n = name.stringValue.trimmingCharacters(in: .whitespaces)
+        if cloud {
+            guard !n.isEmpty else { window?.makeFirstResponder(name); return show(error: "Say what the cloud session should do.") }
+            return (onStartCloud ?? { _, _, _ in })(a, folder, n)
+        }
         onStart?(a, folder, n.isEmpty ? suggestedName() : n)
     }
 
@@ -160,7 +204,7 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
     }
 
     func controlTextDidChange(_ n: Notification) {
-        if (n.object as? NSTextField) === name { nameEdited = !name.stringValue.isEmpty; return }
+        if (n.object as? NSTextField) === name { nameEdited = !name.stringValue.isEmpty; recheck(); return }
         filter()
         index = shown.isEmpty ? nil : 0
         selectionChanged()
@@ -195,6 +239,8 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
     override func performKeyEquivalent(with e: NSEvent) -> Bool {
         guard e.modifierFlags.contains(.command), let k = e.charactersIgnoringModifiers else { return false }
         if k == "o" { chooseFolder(); return true }
+        if e.modifierFlags.contains(.option), e.keyCode == 126 { setCloud(true); return true }
+        if e.modifierFlags.contains(.option), e.keyCode == 125 { setCloud(false); return true }
         if let n = Int(k), (1...choice.accounts.count).contains(n) { account = choice.accounts[n - 1].id; refreshAccounts(); return true }
         return false
     }
@@ -214,6 +260,10 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
             x += s.width + 6
         }
         y += 34
+        let hs = here.intrinsicContentSize, ts = there.intrinsicContentSize
+        here.frame = NSRect(x: x0, y: y + 6, width: hs.width, height: hs.height)
+        there.frame = NSRect(x: x0 + hs.width + 6, y: y + 6, width: ts.width, height: ts.height)
+        y += 34
         name.frame = NSRect(x: x0, y: y + 6, width: bounds.width - x0 - 14, height: 20)
         let ss = start.intrinsicContentSize, cs = cancel.intrinsicContentSize
         start.frame = NSRect(x: bounds.width - 14 - ss.width, y: bounds.height - 12 - ss.height, width: ss.width, height: ss.height)
@@ -225,7 +275,12 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         t.hair.setStroke()
         let border = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8); border.lineWidth = 1; border.stroke()
         Text.draw("New session", in: NSRect(x: 14, y: 6, width: 200, height: 24), color: t.fg, font: Fonts.mono(Metrics.fontSize, .semibold))
-        let place = folder.map { "claude --bg in " + ($0 as NSString).abbreviatingWithTildeInPath } ?? "claude --bg, attached here"
+        let place: String
+        if cloud {
+            place = folder.map { "claude --cloud · " + ($0 as NSString).lastPathComponent + (check?.branch.map { " @ " + $0 } ?? "") } ?? "claude --cloud, shown here"
+        } else {
+            place = folder.map { "claude --bg in " + ($0 as NSString).abbreviatingWithTildeInPath } ?? "claude --bg, attached here"
+        }
         Text.draw(place, in: NSRect(x: 150, y: 6, width: bounds.width - 164, height: 24), color: t.fg3, align: .right)
         t.hair2.setFill(); NSRect(x: 0, y: Self.header - 1, width: bounds.width, height: 1).fill()
         Text.draw("project", in: NSRect(x: 14, y: Self.header, width: 80, height: 36), color: t.fg2)
@@ -237,7 +292,9 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         var y = listBottom + 30 + 24
         Text.draw("account", in: NSRect(x: 14, y: y, width: 80, height: 34), color: t.fg2)
         y += 34
-        Text.draw("name", in: NSRect(x: 14, y: y, width: 80, height: 32), color: t.fg2)
+        Text.draw("where", in: NSRect(x: 14, y: y, width: 80, height: 34), color: t.fg2)
+        y += 34
+        Text.draw(cloud ? "task" : "name", in: NSRect(x: 14, y: y, width: 80, height: 32), color: t.fg2)
         t.hair.setFill(); NSRect(x: 94, y: y + 28, width: bounds.width - 108, height: 1).fill()
         if let message {
             Text.draw(message, in: NSRect(x: 14, y: bounds.height - 34, width: bounds.width - 200, height: 22), color: t.on)

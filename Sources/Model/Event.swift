@@ -8,6 +8,13 @@ enum Event: Equatable {
     case hook(Hook)
     case usage(UsageSample)
     case agents(AgentsSnapshot)
+    /// One account's cloud sessions (`GET /v1/sessions`). In memory only.
+    case cloud(CloudSnapshot)
+    /// Maxwell started a cloud session from `cwd`; `from`: the local session it was sent from.
+    case cloudStarted(SessionID, AccountID, title: String, cwd: String, from: SessionID?, at: Date)
+    /// Maxwell started it just now: a Working row until the account's next listing has it. In memory only,
+    /// so replaying the log never brings back old starts.
+    case cloudStarting(SessionID, AccountID, title: String, cwd: String, at: Date)
     case doneCheck(SessionID, DoneCheck)
     case started(SessionID, AccountID, name: String, cwd: String, shortId: String, at: Date)
     case judged(hash: String, Judgment)

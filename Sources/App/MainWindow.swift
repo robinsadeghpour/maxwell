@@ -32,7 +32,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private var doubleShift: DoubleShift?
     private var overlayMonitor: Any?
     let updater = Updater()
-    private let newPanel = NewSessionPanel(frame: .zero)
+    let newPanel = NewSessionPanel(frame: .zero)
     let closeSheet = CloseSheet(frame: .zero)
     private lazy var settings = SettingsWindowController()
     private(set) var actions: [Action] = []
@@ -196,6 +196,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         updater.onInstallFailed = { [weak self] m in self?.toast(m) }
         newPanel.onClose = { [weak self] in self?.focusMain() }
         newPanel.onStart = { [weak self] a, f, n in self?.startSession(account: a, folder: f, name: n) }
+        newPanel.onStartCloud = { [weak self] a, f, task in self?.startCloudSession(account: a, folder: f, task: task) }
+        root.sessionPane.cloudPage.onOpenExternal = { [weak self] url, a in self?.openExternally(url, account: a) }
+        root.sessionPane.cloudPage.onState = { mark("cloud page: \($0)") }
         TerminalView.isAppShortcut = { [weak self] e in self?.actions.contains { $0.shortcut?.matches(e) == true } ?? false }
     }
 
@@ -449,6 +452,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if let tasks = s.runningTasks, !tasks.isEmpty { parts.append(tasks.summary) }
         // Started outside Maxwell and still there: say where, so an unfamiliar row explains itself.
         if case .elsewhere = s.reach, hosted[s.id] == nil { parts.append("in a terminal") }
+        if s.isCloud { parts.append("cloud") }
         return parts.joined(separator: " · ")
     }
 
@@ -633,7 +637,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// A new terminal at the top of the sidebar, in the session's folder (or the one ⌘T would start in), opened in the pane.
-    func openShell(in folder: String? = nil) {
+    /// `command`: run first in the new terminal's shell, which stays open after it.
+    func openShell(in folder: String? = nil, command: String? = nil) {
         dismissOverlays()
         let state = store.state
         let here = current.flatMap { state.sessions[$0]?.cwd } ?? shell(current)?.cwd
@@ -642,8 +647,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let size = root.sessionPane.content.bounds.size
         shellsMade += 1
         let id = "shell-\(shellsMade)"
+        let shellThen = command.map { "/bin/zsh -lc " + Self.shellQuote($0 + "; exec /bin/zsh -l") }
         let t = TerminalView(frame: NSRect(origin: .zero, size: size == .zero ? NSSize(width: 800, height: 600) : size), workingDirectory: dir,
-                             env: [TerminalHosts.envKey: TerminalHosts.tag(id)])
+                             command: shellThen, env: [TerminalHosts.envKey: TerminalHosts.tag(id)])
         t.onExit = { [weak self] in self?.closeShell(id) }
         t.onCwd = { [weak self] in if let self { self.render(self.store.state) } }
         t.onOpenURL = { raw, cwd in
@@ -790,7 +796,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// Types a line into the session's terminal, attaching first if needed.
-    private func send(_ line: String, to id: SessionID) {
+    func send(_ line: String, to id: SessionID) {
         if terminals[id] == nil || detached.contains(id) { reattach(id) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.terminals[id]?.sendLine(line) }
     }
@@ -828,6 +834,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func close(_ id: SessionID) {
         guard let s = store.state.sessions[id], s.phase != .ended else { return }
         if case .elsewhere = s.reach { return toast("“\(s.title)” runs in another terminal. Bring it into Maxwell first, or close it there.") }
+        if s.isCloud { return closeCloud(id) }
         let open = store.checks(s).filter { $0.outcome != .pass }
         guard !open.isEmpty, let w = window else { return closeNow(s) }
         let a = NSAlert()
@@ -941,7 +948,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     // MARK: new session
 
     /// `folder`: a folder handed to Maxwell (`open -a Maxwell .`), offered first and picked.
-    func showNewSession(folder: String? = nil) {
+    func showNewSession(folder: String? = nil, cloud: Bool = false) {
         dismissOverlays()
         let state = store.state
         // Home is never offered: a session there sees everything. ⌘O still reaches it, with a warning.
@@ -961,7 +968,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         newPanel.present(.init(accounts: state.accounts, defaultAccount: state.roomiest(now: Date())?.id, folders: folders,
                                preselected: preselected,
                                isProject: { [projects] in ProjectFolders.isProject($0, projects: projects) },
-                               projectName: { [projects] in projects.name(for: $0) }), in: root)
+                               projectName: { [projects] in projects.name(for: $0) }, buildsOnMac: Self.buildsOnMac, cloudCheck: Self.cloudCheck, cloud: cloud), in: root)
     }
 
     /// Where a new session for a session's folder starts: the project's main checkout, never a
@@ -1110,6 +1117,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func openInBrowser() {
+        if currentIsCloud, let id = current { return openCloud(id) }
         guard let id = current, let link = viewers[id]?.item?.artifact, let a = account(of: id) else { return toast("No artifact open.") }
         openExternally(link.url, account: a)
     }
@@ -1488,7 +1496,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// Claude Code starts background sessions only in folders it has been told it may work in.
     /// Asks the question its own terminal prompt asks, saves the answer where Claude Code keeps
     /// it, then tries again.
-    private func askToTrust(_ folder: String, account: Account, retry: @escaping () -> Void, cancelled: @escaping () -> Void) {
+    func askToTrust(_ folder: String, account: Account, retry: @escaping () -> Void, cancelled: @escaping () -> Void) {
         let path = (folder as NSString).abbreviatingWithTildeInPath
         let a = NSAlert()
         a.messageText = "Let Claude work in \(path)?"
@@ -1632,7 +1640,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let hasCurrent: () -> Bool = { [weak self] in self?.current != nil }
         let hasArtifact: () -> Bool = { [weak self] in
             guard let self, let id = self.current else { return false }
-            return self.viewers[id]?.item?.artifact != nil
+            return self.viewers[id]?.item?.artifact != nil || self.currentIsCloud
         }
         let limited: () -> Bool = { [weak self] in
             guard let self, let id = self.current, case .limited = self.store.state.sessions[id]?.phase else { return false }
@@ -1642,6 +1650,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "new-session", title: "New Session…", menu: "Session", shortcut: Shortcut("cmd+n")) { [weak self] in self?.showNewSession() },
             Action(id: "new-session-here", title: "New Session Here", menu: "Session", shortcut: Shortcut("cmd+t")) { [weak self] in self?.newSessionHere() },
             Action(id: "new-terminal", title: "New Terminal", menu: "Session", shortcut: Shortcut("cmd+alt+t")) { [weak self] in self?.openShell() },
+            Action(id: "new-cloud-session", title: "New Cloud Session…", menu: "Session", shortcut: Shortcut("cmd+alt+n")) { [weak self] in self?.showNewSession(cloud: true) },
+            Action(id: "send-to-cloud", title: "Send to Cloud…", menu: "Session", shortcut: Shortcut("cmd+alt+up"), isEnabled: { [weak self] in self?.canSendToCloud ?? false }) { [weak self] in
+                if let id = self?.current { self?.sendToCloud(id) }
+            },
+            Action(id: "bring-to-mac", title: "Bring to Mac", menu: "Session", shortcut: Shortcut("cmd+alt+down"), isEnabled: { [weak self] in self?.currentIsCloud ?? false }) { [weak self] in
+                if let id = self?.current { self?.bringToMac(id) }
+            },
             Action(id: "search", title: "Search Everywhere…", menu: "View", shortcut: Shortcut("cmd+p")) { [weak self] in self?.showSearch() },
             Action(id: "palette", title: "All Actions…", menu: "View", shortcut: Shortcut("cmd+k")) { [weak self] in self?.showPalette() },
             Action(id: "next-session", title: "Next Session", menu: "Session", shortcut: Shortcut("cmd+]")) { [weak self] in self?.step(1) },
@@ -1696,7 +1711,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             },
             Action(id: "pin", title: "Keep Viewer Tab Open", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
             Action(id: "reload-artifact", title: "Reload Artifact", menu: "View", shortcut: Shortcut("cmd+alt+r"), isEnabled: hasArtifact) { [weak self] in self?.reloadArtifact() },
-            Action(id: "open-in-browser", title: "Open Artifact in Browser", menu: "View", shortcut: Shortcut("cmd+shift+o"), isEnabled: hasArtifact) { [weak self] in self?.openInBrowser() },
+            Action(id: "open-in-browser", title: "Open in Browser", menu: "View", shortcut: Shortcut("cmd+shift+o"), isEnabled: hasArtifact) { [weak self] in self?.openInBrowser() },
             Action(id: "toggle-tree", title: "Show or Hide File Tree", menu: "View", shortcut: Shortcut("cmd+shift+t")) { [weak self] in self?.toggleTree() },
             Action(id: "font-bigger", title: "Bigger Terminal Text", menu: "View", shortcut: Shortcut("cmd+=")) { [weak self] in
                 guard let self else { return }; self.onConfigEdit?("terminal-font-size", "\(Int(min(28, self.store.config.terminalFontSize + 1)))")

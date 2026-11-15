@@ -31,6 +31,14 @@ func reduce(into s: inout AppState, _ event: Event) {
     case .agents(let snap):
         reduce(agents: snap, into: &s)
 
+    case .cloud(let snap):
+        reduce(cloud: snap, into: &s)
+
+    case .cloudStarted(let id, _, _, let cwd, let from, _):
+        s.startedByMaxwell.insert(id); s.cloudFolders[id] = cwd; s.cloudFrom[id] = from ?? s.cloudFrom[id]
+    case .cloudStarting(let id, let acct, let title, let cwd, let at):
+        reduceCloudStart(id, acct, title: title, cwd: cwd, at: at, into: &s)
+
     case .doneCheck(let id, let check):
         guard var session = s.sessions[id] else { return }
         session.doneCheck = check
@@ -101,6 +109,43 @@ func reduce(into s: inout AppState, _ event: Event) {
 }
 
 /// One hook: the session it names, then the phase it implies (see `applyHook`).
+/// Maxwell just started a cloud session: it shows as Working until the first listing has it.
+private func reduceCloudStart(_ id: SessionID, _ acct: AccountID, title: String, cwd: String, at: Date, into s: inout AppState) {
+    guard s.sessions[id] == nil else { return }
+    var session = Session(id: id, name: title, accountId: acct, cwd: cwd, at: at, origin: .maxwell, reach: .cloud(url: "https://claude.ai/code/\(id)"))
+    session.phase = .working
+    session.phaseSource = "started in the cloud"
+    session.prompted = true
+    s.sessions[id] = session
+}
+
+/// One account's cloud sessions. Archived ones Maxwell knows end; archived ones it never saw stay out.
+private func reduce(cloud snap: CloudSnapshot, into s: inout AppState) {
+    let listed = Set(snap.sessions.map(\.id))
+    for c in snap.sessions {
+        if c.status == .archived && s.sessions[c.id] == nil { continue }
+        var session = s.sessions[c.id] ?? Session(
+            id: c.id, name: c.title, accountId: snap.accountId, cwd: s.cloudFolders[c.id] ?? c.folder ?? "", at: c.createdAt,
+            origin: s.startedByMaxwell.contains(c.id) ? .maxwell : .external, reach: .cloud(url: c.url))
+        session.reach = .cloud(url: c.url)
+        session.accountId = snap.accountId
+        session.hookTitle = c.title
+        if let b = c.branch { session.branch = b }
+        if session.cwd.isEmpty, let f = c.folder { session.cwd = f }
+        session.prompted = true
+        session.listedAt = snap.at
+        session.lastEventAt = max(session.lastEventAt, c.updatedAt)
+        session.phase = c.phase
+        session.phaseSource = c.phaseSource
+        if let d = c.summary?.detail, !d.isEmpty { session.lastMessage = d }
+        s.sessions[c.id] = session
+    }
+    // Deleted, or beyond the listing's page: nothing more to show.
+    for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended {
+        if case .cloud = sess.reach { s.sessions[id]?.phase = .ended }
+    }
+}
+
 /// One account's listing: what runs, what Claude Code stopped while it waited, and what ended.
 private func reduce(agents snap: AgentsSnapshot, into s: inout AppState) {
     let listed = Set(snap.entries.map(\.sessionId))
@@ -150,7 +195,7 @@ private func reduce(agents snap: AgentsSnapshot, into s: inout AppState) {
     }
     // A session of this account that is no longer listed has exited, unless it was a background
     // session waiting on you: Claude Code stops those when idle and keeps the conversation.
-    for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended {
+    for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended && !sess.isCloud {
         if sess.parkable {
             if sess.parkedAt == nil { s.sessions[id]?.parkedAt = snap.at }
             continue
@@ -242,7 +287,8 @@ private func syncNamed(_ s: inout AppState, _ event: Event) {
     switch event {
     case .hook(let h): ids = [h.sessionId]
     case .agents(let snap): ids = snap.entries.map(\.sessionId)
-    case .started(let id, _, _, _, _, _), .reopened(let id, _), .titled(let id, _): ids = [id]
+    case .started(let id, _, _, _, _, _), .reopened(let id, _), .titled(let id, _), .cloudStarted(let id, _, _, _, _, _), .cloudStarting(let id, _, _, _, _): ids = [id]
+    case .cloud(let snap): ids = snap.sessions.map(\.id)
     case .closed(let c): ids = [c.session.id]
     default: return
     }
