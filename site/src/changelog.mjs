@@ -5,6 +5,23 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-groups-you-can-trust",
+    date: "2026-11-15",
+    versions: "0.1.35",
+    title: "Working, Needs you and Your turn you can trust",
+    figure: "",
+    body: `
+<p>Maxwell now takes each session's group from Claude Code itself. It reads what the process is doing and, for background sessions, how Claude Code says the last turn ended. Before, a session that had asked you to approve something stayed in <strong>Working</strong> for as long as a background shell it started kept running. It now shows in <strong>Needs you</strong>, in Claude Code's words: "open the Sentry sign-in link above, approve it, then tell me".</p>
+<p>A session whose turn is over but whose background work is still running stays in Working. A line under its title says what it waits for. Hover that line on any session to see where its group came from. <code>Maxwell state</code> prints the same for every session.</p>`,
+    fixes: [
+      "Fixed idle sessions showing as Working when Claude Code expected more work later",
+      "Fixed questions in a reply's body, such as an Open questions list, putting a session in Needs you when its status line said Safe to close or Not done",
+      "Needs you now clears when the prompt is answered or the turn ends, even without a hook",
+      "A turn that ends without a Stop hook (Esc, a queued prompt) no longer stays in Working",
+      "Sessions in a repo's main checkout no longer fail worktree clean because of other sessions' worktrees in .claude/worktrees",
+    ],
+  },
+  {
     slug: "2026-11-15-see-your-agents",
     date: "2026-11-15",
     versions: "0.1.34",

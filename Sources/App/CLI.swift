@@ -60,6 +60,10 @@ func runCLI(_ args: [String]) -> Int32? {
                 print("## \(g.title) \(items.count)")
                 for s in items {
                     print("  \(s.id.prefix(8))  \(s.accountId)\t\(state.project(s, in: projects))\t\(s.title)\t\(Reply.span(now.timeIntervalSince(s.lastEventAt)))")
+                    // What the group rests on, and what it shows: the question, or the work it waits for.
+                    var why = "      ← \(s.phaseSource.isEmpty ? "hooks" : s.phaseSource)"
+                    if case .needsYou(let q) = s.phase { why += " · \(q.prefix(100))" }
+                    print(why)
                     guard g != .working else { continue }
                     let checks = state.checks(s, now: now, rules: rules)
                     for c in checks where g == .safeToClose || c.outcome != .pass {

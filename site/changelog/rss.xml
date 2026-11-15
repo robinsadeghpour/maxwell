@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Working, Needs you and Your turn you can trust</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-groups-you-can-trust</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-groups-you-can-trust</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Maxwell now takes each session's group from Claude Code itself. It reads what the process is doing and, for background sessions, how Claude Code says the last turn ended. Before, a session that had asked you to approve something stayed in &lt;strong&gt;Working&lt;/strong&gt; for as long as a background shell it started kept running. It now shows in &lt;strong&gt;Needs you&lt;/strong&gt;, in Claude Code's words: &quot;open the Sentry sign-in link above, approve it, then tell me&quot;.&lt;/p&gt;
+&lt;p&gt;A session whose turn is over but whose background work is still running stays in Working. A line under its title says what it waits for. Hover that line on any session to see where its group came from. &lt;code&gt;Maxwell state&lt;/code&gt; prints the same for every session.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed idle sessions showing as Working when Claude Code expected more work later&lt;/li&gt;&lt;li&gt;Fixed questions in a reply's body, such as an Open questions list, putting a session in Needs you when its status line said Safe to close or Not done&lt;/li&gt;&lt;li&gt;Needs you now clears when the prompt is answered or the turn ends, even without a hook&lt;/li&gt;&lt;li&gt;A turn that ends without a Stop hook (Esc, a queued prompt) no longer stays in Working&lt;/li&gt;&lt;li&gt;Sessions in a repo's main checkout no longer fail worktree clean because of other sessions' worktrees in .claude/worktrees&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>See the agents a session runs</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-see-your-agents</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-see-your-agents</guid>

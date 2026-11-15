@@ -46,12 +46,14 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 
 | Group | Meaning |
 |---|---|
-| **Needs you** | The session asked you something or needs a permission. You get a notification. |
-| **Your turn** | It answered and is waiting, or it offered a next step. |
-| **Working** | It's running. Leave it alone. |
+| **Needs you** | A permission prompt or question is open, or the turn ended on something only you can give: its status line says Needs you, or Claude Code marks it blocked. You get a notification. |
+| **Your turn** | The turn is over and nothing runs. Read it, reply or close it. |
+| **Working** | A turn or subagent is running, or the reply is in and background work it started is still running. Leave it alone. |
 | **Limited** | It hit a usage limit. Resume when the window resets, or move it to the account with the most room. |
 | **Safe to close** | Every check passed. Expand the row to see each one. |
 | **Idle** | Stopped and quiet for a day. Folded away. |
+
+Maxwell takes each group from Claude Code's own record first: what the process says it is doing (`sessions/<pid>.json`), and for background sessions its verdict on the last turn (`jobs/<id>/state.json`). Then it reads the session's status line, and only then the wording of the reply. Hooks make the change show at once, and the next listing confirms or corrects it within seconds. Hover the line under a session's title to see where its group came from. `Maxwell state` prints the same thing for every session.
 
 - **Projects stay separate.** A rail on the left, like the macOS Dock, switches between projects. Pin the ones you work on, and the others only appear when something there needs you. Each project shows its own logo, redrawn in Maxwell's style.
 - **The real session, in place.** The middle pane is the actual Claude session, attached in a Ghostty terminal. Closing Maxwell doesn't stop it.

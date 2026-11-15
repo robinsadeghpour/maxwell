@@ -140,6 +140,7 @@ final class SessionPane: MXView {
         let now = Date()
         banner.buttons.forEach { $0.removeFromSuperview() }
         banner.buttons = []
+        banner.source = s.phaseSource
         switch group {
         case .needsYou:
             if case .needsYou(let q) = s.phase { banner.configure(group: group, text: q, tint: { $0.on }) }
@@ -185,8 +186,9 @@ final class SessionPane: MXView {
                 banner.add(MXButton("Move to \(other.name)\(left)", hint: "⇧⌘M", primary: true) { [weak self] in self?.delegate?.move(s.id) })
             }
         case .working:
-            banner.isHidden = true
-            return
+            // A running turn needs no strip; a finished one still waiting on its background work does.
+            guard let w = s.waitingOn else { banner.isHidden = true; return }
+            banner.configure(group: group, text: "Working · the reply is in, \(w)", tint: { $0.fg3 })
         }
         banner.isHidden = false
     }
@@ -227,12 +229,15 @@ final class TerminalWell: MXView {
     }
 }
 
-/// The state strip under the header: glyph, one line, actions on the right.
-final class Banner: MXView {
+/// The state strip under the header: glyph, one line, actions on the right. Hovering the line
+/// says what the state rests on ("Claude Code: blocked on you").
+final class Banner: MXView, TipSource {
     private let glyph = GlyphView(frame: .zero)
     private let label = Label()
     var buttons: [MXButton] = []
     private var tint: (Theme) -> NSColor = { $0.fg3 }
+    /// Where the session's phase came from (`Session.phaseSource`); nil shows no tip.
+    var source: String?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -250,6 +255,12 @@ final class Banner: MXView {
     }
 
     func add(_ b: MXButton) { buttons.append(b); addSubview(b); needsLayout = true }
+
+    func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
+        let area = label.frame.union(glyph.frame)
+        guard let source, !source.isEmpty, area.contains(p) else { return nil }
+        return (Tip("Why: " + source), area)
+    }
 
     override func draw(_ r: NSRect) {
         tint(t).withAlphaComponent(0.08).setFill()

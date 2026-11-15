@@ -46,7 +46,7 @@ final class Store {
     /// Starts the live sources. Called once the window is on screen.
     func start() {
         notifyAfter = Date().addingTimeInterval(8)
-        log.tail { [weak self] in self?.apply($0) }
+        log.tail { [weak self] in self?.apply($0); self?.confirmHooks($0) }
         agents = AgentsProbe(accounts: config.accounts) { [weak self] in self?.apply([$0]) }
         let tw = TranscriptWatcher(accounts: config.accounts)
         tw.cwdFor = { [weak self] id in self?.state.sessions[id]?.cwd }
@@ -87,6 +87,19 @@ final class Store {
         bringInQueued()
         queuePluginSync()
         onChange?(state)
+    }
+
+    /// A hook sets the phase at once; a listing a few seconds later (when it is allowed to
+    /// override the hook, see `Live.covers`) confirms or corrects it, e.g. a Stop while a subagent still runs.
+    /// The probe drops a refresh while one for the account is running, so these stay cheap.
+    private func confirmHooks(_ events: [Event]) {
+        let accounts = Set(events.compactMap { e -> AccountID? in
+            guard case .hook(let h) = e else { return nil }
+            return state.accountId(forConfigDir: h.configDir)
+        })
+        for a in accounts {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in self?.agents?.refresh(a) }
+        }
     }
 
     // MARK: plugins

@@ -16,6 +16,12 @@ extension Array where Element == BackgroundTask {
         return [a > 0 ? "\(a) agent\(a == 1 ? "" : "s")" : nil, sh > 0 ? "\(sh) shell\(sh == 1 ? "" : "s")" : nil]
             .compactMap { $0 }.joined(separator: " · ")
     }
+    /// "2 subagents and 1 background shell running", for a check or the Working banner.
+    var running: String {
+        let a = agents.count, sh = count - a
+        let what = [a > 0 ? "\(a) subagent\(a == 1 ? "" : "s")" : nil, sh > 0 ? "\(sh) background shell\(sh == 1 ? "" : "s")" : nil]
+        return what.compactMap { $0 }.joined(separator: " and ") + " running"
+    }
 }
 
 /// Background work a transcript shows: shells started with run_in_background

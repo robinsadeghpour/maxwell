@@ -63,13 +63,16 @@ export const pages = {
     body: `
 <h2>The six groups</h2>
 <table><thead><tr><th>Group</th><th>Meaning</th></tr></thead><tbody>
-<tr><td>Needs you</td><td>The session asked you something or needs a permission. You get a notification.</td></tr>
-<tr><td>Your turn</td><td>It answered and is waiting, or it offered a next step.</td></tr>
-<tr><td>Working</td><td>It's running. Leave it alone.</td></tr>
+<tr><td>Needs you</td><td>A permission prompt or question is open, or the turn ended on something only you can give: its status line says Needs you, or Claude Code marks it blocked. You get a notification.</td></tr>
+<tr><td>Your turn</td><td>The turn is over and nothing runs. Read it, reply or close it.</td></tr>
+<tr><td>Working</td><td>A turn or subagent is running, or the reply is in and background work it started is still running. Leave it alone.</td></tr>
 <tr><td>Limited</td><td>It hit a usage limit. Resume when the window resets, or move it to the account with the most room.</td></tr>
 <tr><td>Safe to close</td><td>Every check passed. Expand the row to see each one.</td></tr>
 <tr><td>Idle</td><td>Stopped and quiet for a day, or a question nobody answered for 3 days. Folded away.</td></tr>
 </tbody></table>
+<h2>Where the group comes from</h2>
+<p>Maxwell asks Claude Code first. Each running session writes what it is doing: a turn running, a dialog waiting for you, or only background shells left. For background sessions, Claude Code also records how the last turn ended and, when it is blocked, what it needs from you. Maxwell then reads the session's status line, and only then the wording of the reply. A turn that ended on something only you can give is in Needs you, even while a shell it started keeps running.</p>
+<p>Hooks make a change show at once. The next listing confirms or corrects it within a few seconds, so a missed hook can't leave a session stuck in Working or Needs you. Hover the line under a session's title to see where its group came from. <code>Maxwell state</code> prints that for every session.</p>
 <p><strong>All projects</strong> (${k("⌘ 0")}) shows every session in these groups, so its count matches the bottom bar. A project shows only its own.</p>
 <h2>Clear out old sessions</h2>
 <p>Sessions keep running until something stops them, so a new Maxwell often finds some from days ago. They wait in Idle. Its <strong>stop all</strong> button stops the background ones with <code>claude stop</code>. Each keeps its conversation, and <strong>Undo</strong> or <strong>Recently closed</strong> brings it back. A session marked <em>in a terminal</em> belongs to that terminal, so end it there.</p>

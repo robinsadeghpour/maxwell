@@ -77,12 +77,44 @@ struct AgentsSnapshot: Equatable {
         var firstPrompt: String?  // for sessions that predate the hooks and have no title
         var used = false          // has a transcript, so someone prompted it
         var runningTasks: [BackgroundTask]?    // background tasks started since startedAt and not reported done; nil: no transcript
+        var pid: Int? = nil
+        /// When Claude Code last changed `status` (its sessions/<pid>.json); nil when that file was not read.
+        var statusAt: Date? = nil
+        /// Claude Code's own record of a background session's last turn (jobs/<id>/state.json).
+        var job: JobState? = nil
     }
 
+    /// What the Claude Code process is doing, as it writes it in sessions/<pid>.json.
     enum Status: Equatable {
-        case busy, idle
+        /// A turn is running, or a subagent it started.
+        case busy
+        /// The turn is over and nothing runs.
+        case idle
+        /// The turn is over; only background shells it started still run.
+        case shell
+        /// A permission prompt, question or other dialog waits for an answer.
         case waiting(String)
     }
+}
+
+/// Claude Code's own verdict on a background session's last turn, from jobs/<id>/state.json.
+/// It reads the reply when the turn ends, like Maxwell does, and says what the session needs.
+struct JobState: Equatable {
+    /// working | blocked | done | failed | stopped
+    var state: String
+    /// active: a turn runs; idle; blocked: waits on the user.
+    var tempo: String?
+    /// What it needs from the user, in its own words ("open the Sentry link, approve it, tell me").
+    var needs: String?
+    /// One line on where it stands.
+    var detail: String?
+    /// Background work still running that will report back: shells, agents, monitors.
+    /// Watchers that only wait for files (artifact_watch) and scheduled wakes don't count.
+    var work: Int
+    var updatedAt: Date?
+
+    /// Kinds of in-flight work that don't mean the session is busy.
+    static let passiveKinds: Set<String> = ["artifact_watch", "session_cron"]
 }
 
 // MARK: parsing (the only place raw JSON is trusted)
@@ -144,16 +176,62 @@ enum EventParser {
             let reach: Reach = kind == "background"
                 ? .background(shortId: a["id"] as? String ?? String(sid.prefix(8)))
                 : .elsewhere(pid: a["pid"] as? Int)
-            let status: AgentsSnapshot.Status
-            switch a["status"] as? String {
-            case "busy": status = .busy
-            case "waiting": status = .waiting(a["waitingFor"] as? String ?? "waiting")
-            default: status = a["state"] as? String == "working" ? .busy : .idle
-            }
+            // `state` is the job's verdict on its last turn, not what the process does now:
+            // "working" with status "idle" is a session that thinks more is coming, sitting idle.
+            // A job with no process has no status: nothing runs.
+            let status = parseStatus(a["status"] as? String, waitingFor: a["waitingFor"] as? String) ?? .idle
             let started = (a["startedAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) } ?? at
             return .init(sessionId: sid, name: a["name"] as? String ?? String(sid.prefix(8)), cwd: cwd,
-                         startedAt: started, reach: reach, status: status)
+                         startedAt: started, reach: reach, status: status, pid: (a["pid"] as? NSNumber)?.intValue)
         }
         return AgentsSnapshot(at: at, accountId: accountId, entries: entries)
     }
+
+    /// Claude Code's process status. `claude agents --json` folds "shell" into "busy";
+    /// sessions/<pid>.json keeps it. An unknown word counts as busy, as Claude Code's own listing does.
+    static func parseStatus(_ s: String?, waitingFor: String?) -> AgentsSnapshot.Status? {
+        switch s {
+        case nil: return nil
+        case "idle": return .idle
+        case "shell": return .shell
+        case "waiting": return .waiting(waitingFor ?? "waiting")
+        default: return .busy
+        }
+    }
+
+    /// One sessions/<pid>.json: the process's status and when it last changed, if it runs `sessionId`.
+    static func parsePidFile(_ data: Data, sessionId: SessionID) -> (status: AgentsSnapshot.Status, at: Date?)? {
+        guard let p = try? JSONSerialization.jsonObject(with: data) as? [String: Any], p["sessionId"] as? String == sessionId,
+              let status = parseStatus(p["status"] as? String, waitingFor: p["waitingFor"] as? String) else { return nil }
+        let at = (p["statusUpdatedAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) }
+        return (status, at)
+    }
+
+    /// One jobs/<id>/state.json.
+    static func parseJob(_ data: Data) -> JobState? {
+        guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let state = j["state"] as? String else { return nil }
+        func text(_ v: Any?) -> String? {
+            guard let s = (v as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+            return String(s.prefix(300))
+        }
+        // An AskUserQuestion dialog says exactly what it asks.
+        let question = ((j["block"] as? [String: Any])?["questions"] as? [[String: Any]])?.first.flatMap { text($0["question"]) }
+        var work = 0
+        if let f = j["inFlight"] as? [String: Any] {
+            let kinds = (f["kinds"] as? [String]) ?? []
+            let tasks = (f["tasks"] as? NSNumber)?.intValue ?? 0
+            // `tasks` counts every kind; take the passive ones off (one each, as listed).
+            work = max(0, tasks - kinds.filter(JobState.passiveKinds.contains).count)
+        }
+        let updated = (j["updatedAt"] as? String).flatMap { iso.date(from: $0) ?? isoPlain.date(from: $0) }
+        return JobState(state: state, tempo: j["tempo"] as? String, needs: question ?? text(j["needs"]),
+                        detail: text(j["detail"]), work: work, updatedAt: updated)
+    }
+
+    private static let iso: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let isoPlain = ISO8601DateFormatter()
 }

@@ -64,6 +64,17 @@ final class AgentsProbe {
         guard var snap = ClaudeCLI.agents(account).flatMap({ EventParser.parseAgents($0, accountId: account.id, at: at) }) else { return nil }
         for i in snap.entries.indices {
             let e = snap.entries[i]
+            // The listing folds "shell" into "busy" and drops when the status changed; the
+            // process's own file keeps both. Background sessions also have Claude Code's verdict on the turn.
+            if let pid = e.pid, let data = FileManager.default.contents(atPath: account.configDir.appendingPathComponent("sessions/\(pid).json").path),
+               let own = EventParser.parsePidFile(data, sessionId: e.sessionId) {
+                snap.entries[i].status = own.status
+                snap.entries[i].statusAt = own.at
+            }
+            if case .background(let short) = e.reach,
+               let data = FileManager.default.contents(atPath: account.configDir.appendingPathComponent("jobs/\(short)/state.json").path) {
+                snap.entries[i].job = EventParser.parseJob(data)
+            }
             snap.entries[i].title = Transcripts.tabTitle(e.sessionId)
             let path = Transcripts.defaultPath(sessionId: e.sessionId, cwd: e.cwd, account: account)
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
@@ -152,7 +163,9 @@ final class DoneChecker {
         let git = "/usr/bin/git"
         guard ClaudeCLI.run(git, ["-C", cwd, "rev-parse", "--is-inside-work-tree"], timeout: 5).status == 0 else { return check }
         check.repo = true
-        let status = ClaudeCLI.run(git, ["-C", cwd, "status", "--porcelain"], timeout: 10)
+        // Claude Code keeps worktrees in .claude/worktrees inside the repo: other sessions' checkouts, not
+        // changes here. -uall lists untracked files one by one, so other files under .claude/ still count.
+        let status = ClaudeCLI.run(git, ["-C", cwd, "status", "--porcelain", "-uall", "--", ":/", ":(top,exclude).claude/worktrees"], timeout: 10)
         if status.status == 0 { check.dirtyFiles = status.out.split(separator: "\n").count }
         let branch = ClaudeCLI.run(git, ["-C", cwd, "branch", "--show-current"], timeout: 5).out.trimmingCharacters(in: .whitespacesAndNewlines)
         check.branch = branch.isEmpty ? nil : branch

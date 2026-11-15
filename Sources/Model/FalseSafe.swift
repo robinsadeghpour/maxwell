@@ -15,6 +15,7 @@ enum FalseSafe {
         switch s.listedStatus {
         case .busy?: facts["listedStatus"] = "busy"
         case .idle?: facts["listedStatus"] = "idle"
+        case .shell?: facts["listedStatus"] = "shell"
         case .waiting(let w)?: facts["listedStatus"] = "waiting: " + w
         case nil: facts["listedStatus"] = NSNull()
         }
@@ -58,6 +59,7 @@ enum FalseSafe {
         switch f["listedStatus"] as? String {
         case "busy"?: s.listedStatus = .busy
         case "idle"?: s.listedStatus = .idle
+        case "shell"?: s.listedStatus = .shell
         case let w? where w.hasPrefix("waiting: "): s.listedStatus = .waiting(String(w.dropFirst(9)))
         default: s.listedStatus = nil
         }

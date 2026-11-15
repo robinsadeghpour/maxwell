@@ -119,8 +119,9 @@ check(busy.sessions["s1"]?.phase == .working && groupOf(busy, "s1", at: later) =
 check(outcome(verdictOf(busy, "s1", at: later), .idle) == .fail, "busy fails the idle check")
 let bgTask = evidence(s, "s1", at: later, tasks: [BackgroundTask(id: "a1", kind: .agent, label: "Review", startedAt: t0),
                                                   BackgroundTask(id: "a2", kind: .agent, startedAt: t0), BackgroundTask(id: "b1", kind: .shell, startedAt: t0)])
-check(outcome(verdictOf(bgTask, "s1", at: later), .idle) == .fail && groupOf(bgTask, "s1", at: later) == .yourTurn, "a running background task keeps it out of safe")
+check(outcome(verdictOf(bgTask, "s1", at: later), .idle) == .fail && groupOf(bgTask, "s1", at: later) == .working, "a running background task keeps it out of safe, and Working")
 check(verdictOf(bgTask, "s1", at: later).first { $0.kind == .idle }?.detail == "2 subagents and 1 background shell running", "the idle check names what runs")
+check(bgTask.sessions["s1"]?.waitingOn == "2 subagents and 1 background shell running", "Working says what it waits for")
 check(bgTask.sessions["s1"]?.runningTasks?.summary == "2 agents · 1 shell" && [BackgroundTask]().summary.isEmpty, "summary counts agents and shells")
 
 // Background tasks from transcript lines (shapes copied from a real transcript, 13 Nov).
@@ -215,7 +216,7 @@ s = reduce(s, .agents(AgentsSnapshot(at: snapAt, accountId: "work", entries: [
     .init(sessionId: "s2", name: "other", cwd: "/tmp/y", startedAt: snapAt, reach: .background(shortId: "s2"), status: .waiting("dialog open")),
 ])))
 check(s.sessions["s1"]?.phase == .ended, "session missing from the account's listing has ended")
-check(s.sessions["s2"]?.phase == .needsYou("dialog open"), "listed waiting session -> needs you")
+check(s.sessions["s2"]?.phase == .needsYou("A dialog is open in the session"), "listed waiting session -> needs you")
 check(s.sessions["s2"]?.reach == .background(shortId: "s2"), "reach from listing")
 s = reduce(s, hook(.stopped(lastMessage: "x"), "s1", at: 11))
 check(s.sessions["s1"]?.phase == .ended, "ended sessions ignore late hooks")
@@ -459,6 +460,7 @@ check(term.sessions["t1"]?.reach == .elsewhere(pid: 4242), "a hook line without 
 term = reduce(term, hook(.stopped(lastMessage: "ok"), "t0", at: -100))
 check(term.isNewestInFolder(term.sessions["t1"]!) && !term.isNewestInFolder(term.sessions["t0"]!), "only the newest session in a folder is a lone terminal's")
 
+liveStateTests()
 logoTests()
 artifactTests()
 pluginTests()

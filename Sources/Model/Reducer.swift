@@ -26,34 +26,43 @@ func reduce(into s: inout AppState, _ event: Event) {
         if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
         if let t = h.transcriptPath { session.transcriptPath = t }
         if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
+        let reset = s.account(acct)?.limitResetsAt(now: h.at)
+        // Hooks are the fast edge between listings: each sets the phase it implies right away.
         switch h.kind {
         case .sessionStart:
-            if session.phase == .ended { session.phase = .yourTurn }
+            if session.phase == .ended { session.phase = .yourTurn; session.phaseSource = "hook: session started" }
         case .promptSubmitted(let prompt, let title):
             session.prompted = true
             session.phase = .working
+            session.phaseSource = "hook: prompt sent"
+            session.stopFailure = nil
+            session.waitingOn = nil
             session.doneCheck = nil
             if let title, !title.isEmpty { session.hookTitle = title }
             if session.firstPrompt == nil, !prompt.isEmpty { session.firstPrompt = prompt }
         case .stopped(let message):
             session.prompted = true
             session.lastMessage = message ?? session.lastMessage
-            if case .limited = session.phase { break }
-            session.phase = Reply.phase(after: session.lastMessage)
+            session.waitingOn = nil
+            (session.phase, session.phaseSource) = Outcome.of(session, reset: reset, job: nil)
         case .stopFailed(let error):
-            if error.contains("rate_limit") || error.contains("usage_limit") {
-                session.phase = .limited(s.account(acct)?.limitResetsAt(now: h.at))
-            } else {
-                session.phase = .needsYou("Stopped on an error: \(error)")
-            }
+            session.stopFailure = error
+            session.waitingOn = nil
+            (session.phase, session.phaseSource) = Outcome.of(session, reset: reset, job: nil)
         case .notification(let type, let message):
-            // idle_prompt repeats "waiting for your input" after a Stop we already handled.
-            if type == "permission_prompt" || type == "elicitation_dialog" || (type.isEmpty && !message.isEmpty) {
-                session.phase = .needsYou(message)
+            // idle_prompt repeats "waiting for your input" after a Stop we already handled;
+            // agent_completed and push_notification report, they don't ask.
+            if ["permission_prompt", "elicitation_dialog", "agent_needs_input"].contains(type) || (type.isEmpty && !message.isEmpty) {
+                session.phase = .needsYou(message.isEmpty ? "Waiting for your answer" : message)
+                session.phaseSource = "hook: \(type.isEmpty ? "notification" : type)"
+                session.waitingOn = nil
             }
         case .sessionEnd:
             session.phase = .ended
+            session.phaseSource = "hook: session ended"
         }
+        // A listing that already saw this moment (its status changed with it) knows more than the hook.
+        if session.phase != .ended, Live.covers(session, h.at) { Live.settle(&session, reset: reset) }
         s.sessions[h.sessionId] = session
 
     case .usage(let u):
@@ -83,7 +92,10 @@ func reduce(into s: inout AppState, _ event: Event) {
             session.accountId = snap.accountId
             session.listedAt = snap.at
             session.listedStatus = e.status
+            session.statusAt = e.statusAt
+            session.job = e.job
             session.runningTasks = e.runningTasks
+            if let pid = e.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
             s.closed[e.sessionId] = nil
             if let t = e.title { session.tabTitle = t }
             if e.used { session.prompted = true }
@@ -91,26 +103,19 @@ func reduce(into s: inout AppState, _ event: Event) {
             if session.firstPrompt == nil, let p = e.firstPrompt { session.firstPrompt = String(p.prefix(400)) }
             // The transcript is written on every prompt and reply, including ones typed in another terminal.
             if let active = e.lastActiveAt { session.lastEventAt = max(session.lastEventAt, active) }
-            switch e.status {
-            case .busy:
-                session.prompted = true
-                if case .limited = session.phase {} else if session.phase != .working {
-                    session.phase = .working
-                    session.doneCheck = nil
-                }
-            case .waiting(let why):
-                if case .needsYou = session.phase {} else { session.phase = .needsYou(why) }
-            case .idle:
-                switch session.phase {
-                case .working, .ended, .yourTurn: session.phase = Reply.phase(after: session.lastMessage)
-                case .needsYou, .limited: break
-                }
+            if e.status == .busy { session.prompted = true }
+            // A hook newer than what this listing saw stands until a listing catches up with it.
+            if session.hookSeenAt.map({ Live.covers(session, $0) }) ?? true {
+                if session.phase == .ended { session.phase = .yourTurn }
+                Live.settle(&session, reset: s.account(snap.accountId)?.limitResetsAt(now: snap.at))
             }
             s.sessions[e.sessionId] = session
         }
         // A session of this account that is no longer listed has exited.
         for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended {
             s.sessions[id]?.phase = .ended
+            s.sessions[id]?.phaseSource = "no longer in claude agents --json"
+            s.sessions[id]?.waitingOn = nil
         }
 
     case .doneCheck(let id, let check):
@@ -199,13 +204,11 @@ enum Reply: Equatable {
     case limitHit           // the reply is Claude Code's own "You've hit your limit" line
     case statement          // reports; nothing asked, offered or left for him to do
 
+    /// The phase a reply alone implies (no listing, no job record): `Outcome.of` without them.
     static func phase(after message: String?) -> Phase {
-        if let w = message.flatMap(Wrap.parse), w.state == .needsYou { return .needsYou(w.note.isEmpty ? "Needs you" : w.note) }
-        switch message.map(classify) {
-        case .question(let q)?: return .needsYou(q)
-        case .limitHit?: return .limited(nil)
-        default: return .yourTurn
-        }
+        var s = Session(id: "", name: "", accountId: "", cwd: "", at: .distantPast, origin: .external, reach: .elsewhere(pid: nil))
+        s.lastMessage = message
+        return Outcome.of(s, reset: nil, job: nil).0
     }
 
     /// Looks at the last few paragraphs, skipping trailers sessions often end with

@@ -155,6 +155,16 @@ struct Session: Equatable {
     /// When the session's account listing last included it, and the status it gave.
     var listedAt: Date?
     var listedStatus: AgentsSnapshot.Status?
+    /// When Claude Code last changed that status; nil when its sessions/<pid>.json was not read.
+    var statusAt: Date?
+    /// Claude Code's own verdict on the last turn (background sessions only).
+    var job: JobState?
+    /// The error a turn stopped on (StopFailure), until the next prompt.
+    var stopFailure: String?
+    /// Set while the phase is working although the turn is over: the background work it waits for.
+    var waitingOn: String?
+    /// Where the phase came from, in a few words: the evidence `Maxwell state` and the header show.
+    var phaseSource = ""
     /// Background shells and async subagents started since the process started and not yet
     /// reported done in the transcript; nil when the transcript could not be read.
     var runningTasks: [BackgroundTask]?
