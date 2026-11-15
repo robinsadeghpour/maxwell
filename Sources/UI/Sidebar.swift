@@ -37,6 +37,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private var hoverIndex: Int?
     var onOpen: ((SessionID) -> Void)?
     var onCloseAllSafe: (() -> Void)?
+    /// Stops the idle sessions Maxwell can stop (background ones); Undo reopens them.
+    var onStopIdle: (([SessionID]) -> Void)?
     var onReopen: ((SessionID) -> Void)?
     var onNotSafe: ((SessionID) -> Void)?
     /// Right-click on a session row.
@@ -50,6 +52,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private var downAt: (point: NSPoint, row: Row)?
     private(set) var expanded = Set<SessionID>()
     private let closeAll = MXButton("close all", hint: "⇧⌘X", small: true)
+    private let stopIdle = MXButton("stop all", small: true)
     private var spinAngle: CGFloat = 0
     private var timer: Timer?
     private var lastGroup: [SessionID: PhaseGroup] = [:]
@@ -62,6 +65,9 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         closeAll.isHidden = true
         closeAll.tip = Tip("Close every session that is safe to close")
         addSubview(closeAll)
+        stopIdle.action = { [weak self] in guard let self else { return }; self.onStopIdle?(self.stoppableIdle) }
+        stopIdle.isHidden = true
+        addSubview(stopIdle)
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -164,15 +170,30 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
 
     private var height: CGFloat { max((rowRects(settled: true).last?.maxY ?? 0) + 10, superview?.bounds.height ?? 0) }
 
+    /// Idle sessions running in the background. One in a terminal is that terminal's to end.
+    private var stoppableIdle: [SessionID] {
+        (groups.first { $0.0 == .idle }?.1 ?? []).compactMap { r in
+            if case .background = r.session.reach { return r.session.id }
+            return nil
+        }
+    }
+
     private func layoutCloseAll() {
         let rects = rowRects()
-        if let i = items.firstIndex(where: { if case .group(.safeToClose, _) = $0 { return true }; return false }) {
-            let size = closeAll.intrinsicContentSize
-            closeAll.frame = NSRect(x: bounds.width - size.width - 10, y: rects[i].midY - size.height / 2, width: size.width, height: size.height)
-            closeAll.isHidden = false
-        } else {
-            closeAll.isHidden = true
+        func place(_ b: MXButton, on g: PhaseGroup, when ok: Bool = true) {
+            guard ok, let i = items.firstIndex(where: { if case .group(g, _) = $0 { return true }; return false }) else { b.isHidden = true; return }
+            let size = b.intrinsicContentSize
+            b.frame = NSRect(x: bounds.width - size.width - 10, y: rects[i].midY - size.height / 2, width: size.width, height: size.height)
+            b.isHidden = false
         }
+        place(closeAll, on: .safeToClose)
+        let n = stoppableIdle.count
+        let idleCount = groups.first { $0.0 == .idle }?.1.count ?? 0
+        stopIdle.title = n == idleCount ? "stop all" : "stop \(n)"
+        stopIdle.tip = Tip(n == idleCount
+            ? "Stop every idle session. Conversations are kept; Undo or Recently closed reopens them."
+            : "Stop the \(n) idle sessions running in the background. The other \(idleCount - n) run in a terminal; end those there.")
+        place(stopIdle, on: .idle, when: n > 0)
     }
 
     override func resizeSubviews(withOldSize s: NSSize) { super.resizeSubviews(withOldSize: s); layoutCloseAll() }
@@ -257,7 +278,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             Text.draw("click reopens", in: NSRect(x: bounds.width - 120, y: r.minY, width: 106, height: r.height), color: t.fg3.withAlphaComponent(0.8), font: Fonts.mono(Metrics.fontSize - 2.5), align: .right)
         }
         if g == .idle {
-            Text.draw(idleNote, in: NSRect(x: bounds.width - 120, y: r.minY, width: 106, height: r.height), color: t.fg3.withAlphaComponent(0.8), font: Fonts.mono(Metrics.fontSize - 2.5), align: .right)
+            let right = stopIdle.isHidden ? bounds.width - 14 : stopIdle.frame.minX - 8
+            Text.draw(idleNote, in: NSRect(x: right - 106, y: r.minY, width: 106, height: r.height), color: t.fg3.withAlphaComponent(0.8), font: Fonts.mono(Metrics.fontSize - 2.5), align: .right)
         }
     }
 

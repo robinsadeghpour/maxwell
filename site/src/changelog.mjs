@@ -5,6 +5,21 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-setup-and-all-projects",
+    date: "2026-11-15",
+    versions: "0.1.28",
+    title: "Set up in one place, and All projects adds up",
+    figure: fig.setup("Each step checks itself, and the list goes away when everything is done."),
+    body: `
+<p>With no session open, Maxwell now starts with <strong>Set up Maxwell</strong>. It checks four things: that Claude Code is installed, the session hooks, a claude.ai sign-in for each account so artifacts open beside the session, and notifications. Each step that's left has one button. Steps tick themselves off as you go, and the list goes away once everything is done. <strong>Hide</strong> puts it away early. Everything in it is also in Settings.</p>
+<p><strong>All projects</strong> now lists every session, not only the ones waiting on you. Its count matches the bottom bar. Idle and Recently closed stay folded.</p>
+<p>A new Maxwell often finds sessions from days ago that are still running. They fold into Idle, and its new <strong>stop all</strong> stops the background ones. Conversations are kept, and <strong>Undo</strong> brings them back. Rows of sessions running in another terminal now say so.</p>`,
+    fixes: [
+      "A question nobody answered for 3 days now folds into Idle instead of staying in Needs you",
+      "The Dock badge now counts the Needs you group",
+    ],
+  },
+  {
     slug: "2026-11-15-terminal-window",
     date: "2026-11-15",
     versions: "0.1.27",

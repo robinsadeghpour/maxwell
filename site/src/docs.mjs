@@ -26,9 +26,9 @@ export const pages = {
 <h2>Install</h2>
 <ol class="steps">
 <li><a href="${GH}/releases/latest/download/Maxwell.dmg">Download Maxwell</a>, open the DMG and drag Maxwell to Applications. Older versions are on <a href="${GH}/releases">Releases</a>.</li>
-<li>Maxwell isn't notarized by Apple yet, so macOS blocks it the first time. Open <strong>System Settings › Privacy &amp; Security</strong> and click <strong>Open Anyway</strong>, or run this once:<pre><code>xattr -dr com.apple.quarantine /Applications/Maxwell.app</code></pre></li>
-<li>Choose <strong>Maxwell › Install Hooks</strong> (${k("⇧ ⌘ H")}). That's how Maxwell learns what your sessions are doing.</li>
+<li>Open Maxwell. With no session open, <strong>Set up Maxwell</strong> lists what's left: Claude Code, the session hooks, a claude.ai sign-in for artifacts, and notifications. Each step has one button and ticks itself off. The list goes away once everything is done.</li>
 </ol>
+<p>The session hooks are how Maxwell learns what your sessions are doing. You can also install them with <strong>Maxwell › Install Hooks</strong> (${k("⇧ ⌘ H")}).</p>
 <p class="note">Install Hooks backs up each account's <code>settings.json</code> before it adds anything. <code>Maxwell uninstall-hooks</code> restores them exactly. See <a href="/docs/privacy">What Maxwell touches</a>.</p>
 <h2>Updates</h2>
 <p>Maxwell checks GitHub for a new release every few hours. When one is ready, the bottom bar shows <strong>Restart to update</strong>. Nothing changes until you click it. Then Maxwell quits, swaps in the new version and opens again.</p>
@@ -65,8 +65,11 @@ export const pages = {
 <tr><td>Working</td><td>It's running. Leave it alone.</td></tr>
 <tr><td>Limited</td><td>It hit a usage limit. Resume when the window resets, or move it to the account with the most room.</td></tr>
 <tr><td>Safe to close</td><td>Every check passed. Expand the row to see each one.</td></tr>
-<tr><td>Idle</td><td>Stopped and quiet for a day. Folded away.</td></tr>
+<tr><td>Idle</td><td>Stopped and quiet for a day, or a question nobody answered for 3 days. Folded away.</td></tr>
 </tbody></table>
+<p><strong>All projects</strong> (${k("⌘ 0")}) shows every session in these groups, so its count matches the bottom bar. A project shows only its own.</p>
+<h2>Clear out old sessions</h2>
+<p>Sessions keep running until something stops them, so a new Maxwell often finds some from days ago. They wait in Idle. Its <strong>stop all</strong> button stops the background ones with <code>claude stop</code>. Each keeps its conversation, and <strong>Undo</strong> or <strong>Recently closed</strong> brings it back. A session marked <em>in a terminal</em> belongs to that terminal, so end it there.</p>
 <h2>Move through sessions</h2>
 <p>${k("J")} and ${k("K")} move up and down the list, and ${k("⏎")} opens a session. ${k("⌘ J")} jumps to the next session that needs you, across every project.</p>
 <p>${k("⇧ ⌘ I")} shows or hides Idle. How long a stopped session waits before it folds into Idle is set by <code>idle-after</code>, 24 hours by default.</p>

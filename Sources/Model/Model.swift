@@ -77,7 +77,7 @@ enum PhaseGroup: Int, CaseIterable {
         case .recentlyClosed: return "Recently closed"
         }
     }
-    /// Groups that wait on you: the "All" view and the project badges count these.
+    /// Groups that wait on you: the rail badges count these.
     var needsHim: Bool { self == .needsYou || self == .yourTurn }
     /// Groups that start folded and open on a click on their header.
     var folds: Bool { self == .idle || self == .recentlyClosed }
@@ -91,6 +91,9 @@ struct GroupRules: Equatable {
     /// An agents listing older than this no longer proves the session is there and idle.
     var listingFresh: TimeInterval = 5 * 60
     static let recentlyClosed: TimeInterval = 7 * 86400
+    /// A question waits longer than a finished turn before it counts as forgotten: a few days
+    /// with no answer (a permission prompt left in a terminal last week) is no longer news.
+    var questionIdleAfter: TimeInterval { max(idleAfter, 3 * 86400) }
 }
 
 enum Origin: Equatable { case maxwell, external }
@@ -236,7 +239,7 @@ struct AppState: Equatable {
     /// The sidebar group a session shows in right now.
     func group(_ s: Session, now: Date, rules: GroupRules) -> PhaseGroup? {
         switch s.phase {
-        case .needsYou: return .needsYou
+        case .needsYou: return now.timeIntervalSince(s.lastEventAt) > rules.questionIdleAfter ? .idle : .needsYou
         case .working: return .working
         case .limited: return .limited
         case .ended: return closed[s.id].map { now.timeIntervalSince($0.at) < GroupRules.recentlyClosed } == true ? .recentlyClosed : nil

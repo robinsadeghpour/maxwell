@@ -23,6 +23,8 @@ final class Store {
     private var projects: Projects
     private var pluginSyncQueued = false
     var onToast: ((String) -> Void)?
+    /// macOS answered the notification permission request (or had answered it before).
+    var onNotificationsAnswered: (() -> Void)?
 
     init(config: Config) {
         self.config = config
@@ -62,6 +64,7 @@ final class Store {
         syncPlugins()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             mark("notifications \(granted ? "allowed" : "not allowed")\(error.map { " (\($0.localizedDescription))" } ?? "")")
+            DispatchQueue.main.async { self.onNotificationsAnswered?() }
         }
     }
 
@@ -419,6 +422,26 @@ final class Store {
             }
         }
         next(confirmed[...])
+    }
+
+    /// Stops idle background sessions with `claude stop`, without the safe-to-close checks: you
+    /// chose them, and each keeps its conversation and shows under Recently closed. A session that
+    /// woke up since the click (no longer idle) is left alone.
+    func stopIdle(_ ids: [SessionID], done: @escaping (_ stopped: [SessionID], _ notes: [String]) -> Void) {
+        var stopped: [SessionID] = [], notes: [String] = []
+        func next(_ rest: ArraySlice<SessionID>) {
+            guard let id = rest.first else { return done(stopped, notes) }
+            guard let s = state.sessions[id], let a = state.account(s.accountId),
+                  state.group(s, now: Date(), rules: config.rules) == .idle else { return next(rest.dropFirst()) }
+            stop(s, account: a) { r in
+                switch r {
+                case .closed: stopped.append(id)
+                case .skipped(let why), .failed(let why): notes.append("\(s.title): \(why)")
+                }
+                next(rest.dropFirst())
+            }
+        }
+        next(ids[...])
     }
 
     /// A fresh listing of the session's account and a fresh repo check, folded in.

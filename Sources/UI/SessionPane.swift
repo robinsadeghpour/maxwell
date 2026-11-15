@@ -31,6 +31,16 @@ final class SessionPane: MXView {
     private let overview = Overview(frame: .zero)
     private var terminal: TerminalView?
 
+    /// The setup checklist on the no-session overview; empty once everything is done or hidden.
+    var setup: [SetupStep] {
+        get { overview.setup }
+        set { overview.setup = newValue }
+    }
+    var onHideSetup: (() -> Void)? {
+        get { overview.onHideSetup }
+        set { overview.onHideSetup = newValue }
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         [glyph, title, project, pills, headerLine, banner, content, empty, message.scroll, overview].forEach(addSubview)
@@ -97,7 +107,14 @@ final class SessionPane: MXView {
             if case .needsYou(let q) = s.phase { banner.configure(group: group, text: q, tint: { $0.on }) }
         case .yourTurn where !s.prompted && s.origin == .maxwell:
             banner.configure(group: group, text: "New session · type the first prompt below", tint: { $0.fg3 })
-        case .yourTurn, .idle:
+        case .idle:
+            // A question nobody answered for days: still say what it asked, quietly.
+            if case .needsYou(let q) = s.phase {
+                banner.configure(group: group, text: "Asked \(Format.ago(s.lastEventAt, now: now)) · \(q)", tint: { $0.fg3 })
+                break
+            }
+            fallthrough
+        case .yourTurn:
             let offer: String? = { if case .offer(let o)? = s.lastMessage.map(Reply.classify) { return o }; return nil }()
             let wrap = s.lastMessage.flatMap(Wrap.parse)
             let open = wrap.flatMap { $0.state == .open ? "Not done" + ($0.note.isEmpty ? "" : " · " + $0.note) : nil }
@@ -274,13 +291,96 @@ final class MessageView: NSObject {
     }
 }
 
-/// What the middle pane shows with no session open: the state of everything, and the keys.
+/// One thing Maxwell needs to work fully, checked live. `button` runs `action`.
+struct SetupStep {
+    var title: String
+    var detail: String
+    var done: Bool
+    var button: String? = nil
+    var action: (() -> Void)? = nil
+    var key: String { "\(title)|\(detail)|\(done)|\(button ?? "")" }
+}
+
+/// What the middle pane shows with no session open: what is left to set up, the state of
+/// everything, and the keys.
 final class Overview: MXView {
     var counts: [(PhaseGroup, Int)] = [] { didSet { needsDisplay = true } }
+    var setup: [SetupStep] = [] {
+        didSet {
+            guard setup.map(\.key) != oldValue.map(\.key) else { return }
+            buttons.forEach { $0.removeFromSuperview() }
+            buttons = setup.map { step in
+                let b = MXButton(step.button ?? "", primary: false, small: true, action: step.action)
+                b.isHidden = step.done || step.button == nil
+                addSubview(b)
+                return b
+            }
+            hide.isHidden = setup.isEmpty
+            needsLayout = true
+            needsDisplay = true
+        }
+    }
+    var onHideSetup: (() -> Void)?
+    private var buttons: [MXButton] = []
+    private let hide = MXButton("Hide", small: true)
+    private static let x: CGFloat = 32, top: CGFloat = 40, rowH: CGFloat = 40, cardPad: CGFloat = 14
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        hide.tip = Tip("Hide this list. Everything in it is also in Settings.")
+        hide.action = { [weak self] in self?.onHideSetup?() }
+        hide.isHidden = true
+        addSubview(hide)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var cardWidth: CGFloat { min(620, bounds.width - 2 * Self.x) }
+    private var cardHeight: CGFloat { setup.isEmpty ? 0 : Self.cardPad + 30 + CGFloat(setup.count) * Self.rowH + Self.cardPad - 6 }
+
+    override func layout() {
+        super.layout()
+        let right = Self.x + cardWidth - Self.cardPad
+        let hs = hide.intrinsicContentSize
+        hide.frame = NSRect(x: right - hs.width, y: Self.top + Self.cardPad + 2, width: hs.width, height: hs.height)
+        for (i, b) in buttons.enumerated() {
+            let size = b.intrinsicContentSize
+            let y = Self.top + Self.cardPad + 30 + CGFloat(i) * Self.rowH
+            b.frame = NSRect(x: right - size.width, y: y + (Self.rowH - size.height) / 2 - 1, width: size.width, height: size.height)
+        }
+    }
+
+    private func drawSetup() -> CGFloat {
+        guard !setup.isEmpty else { return Self.top }
+        let x = Self.x, card = NSRect(x: x, y: Self.top, width: cardWidth, height: cardHeight)
+        let path = NSBezierPath(roundedRect: card.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8)
+        t.panel.setFill(); path.fill()
+        t.hair.setStroke(); path.lineWidth = 1; path.stroke()
+        let ix = x + Self.cardPad
+        var y = Self.top + Self.cardPad
+        let w = Text.draw("Set up Maxwell", in: NSRect(x: ix, y: y, width: 240, height: 22), color: t.fg, font: Fonts.mono(Metrics.fontSize + 1, .semibold))
+        let done = setup.filter(\.done).count
+        Text.draw("\(done) of \(setup.count) done", in: NSRect(x: ix + w + 12, y: y, width: 160, height: 22), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 1))
+        y += 30
+        let textW = card.maxX - Self.cardPad - ix - 28 - 110
+        for (i, step) in setup.enumerated() {
+            if i > 0 { t.hair2.setFill(); NSRect(x: ix, y: y, width: card.width - 2 * Self.cardPad, height: 1).fill() }
+            let mark = NSRect(x: ix, y: y + 11, width: 16, height: 16)
+            if step.done {
+                t.safe.setFill(); NSBezierPath(ovalIn: mark).fill()
+                Text.draw("✓", in: mark, color: t.background, font: Fonts.mono(Metrics.fontSize - 2, .bold), align: .center)
+            } else {
+                t.fg3.setStroke(); let o = NSBezierPath(ovalIn: mark.insetBy(dx: 1, dy: 1)); o.lineWidth = 1.2; o.stroke()
+            }
+            Text.draw(step.title, in: NSRect(x: ix + 28, y: y + 3, width: textW, height: 18), color: step.done ? t.fg2 : t.fg, font: Fonts.mono(Metrics.fontSize, step.done ? .regular : .semibold))
+            Text.draw(step.detail, in: NSRect(x: ix + 28, y: y + 20, width: textW, height: 16), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 1.5))
+            y += Self.rowH
+        }
+        return Self.top + cardHeight + 28
+    }
 
     override func draw(_ r: NSRect) {
-        let x: CGFloat = 32
-        var y: CGFloat = 40
+        let x = Self.x
+        var y = drawSetup()
         Text.draw("No session open", in: NSRect(x: x, y: y, width: bounds.width - 2 * x, height: 22), color: t.fg, font: Fonts.mono(Metrics.fontSize + 2, .semibold))
         y += 30
         let hints: [PhaseGroup: String] = [.needsYou: "⌘J jumps to the next one", .safeToClose: "⇧⌘X closes them all"]

@@ -112,8 +112,7 @@ Every key can be changed with a `keybind` line in the config.
 You need a Mac with Apple silicon, macOS 14 or later, and Claude Code.
 
 1. [Download Maxwell](https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.dmg), open it and drag Maxwell to Applications. Older versions are on [Releases](https://github.com/robinsadeghpour/maxwell/releases).
-2. Maxwell isn't notarized by Apple yet, so macOS blocks it the first time. Open **System Settings › Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Maxwell.app` once.
-3. Choose **Maxwell › Install Hooks**. That's how Maxwell learns what your sessions are doing.
+2. Open Maxwell. **Set up Maxwell** lists what's left: Claude Code, the session hooks (how Maxwell learns what your sessions are doing), a claude.ai sign-in for artifacts, and notifications. Each step has one button.
 
 ### Updates
 

@@ -179,3 +179,13 @@ export const notifications = (caption) => plate(`<div class="w mid">
     <li><i style="color:var(--faint)">–</i><span style="color:var(--dim)">The session you're looking at stays quiet</span><span></span></li>
   </ul>
 </div>`, caption);
+
+export const setup = (caption) => plate(`<div class="w mid">
+  ${chrome("Set up Maxwell", "<span>2 of 4 done</span>")}
+  <ul class="checks" style="margin:10px 14px 12px">
+    <li><i>✓</i><span>Claude Code</span><span>~/.local/bin/claude</span></li>
+    <li><i>✓</i><span>Session hooks</span><span>installed</span></li>
+    <li><i style="color:var(--faint)">○</i><span>claude.ai, for artifacts</span><span style="color:var(--ink)">Sign in…</span></li>
+    <li><i style="color:var(--faint)">○</i><span>Notifications</span><span style="color:var(--ink)">Open Settings…</span></li>
+  </ul>
+</div>`, caption);

@@ -71,6 +71,12 @@ func outcome(_ checks: [Check], _ k: Check.Kind) -> Check.Outcome? { checks.firs
 func groupOf(_ st: AppState, _ id: String, at: Double, _ r: GroupRules = rules) -> PhaseGroup? { st.group(st.sessions[id]!, now: t0.addingTimeInterval(at), rules: r) }
 
 let later = 6.0 + 7200 + 60
+do {
+    let asked = reduce(s, hook(.stopped(lastMessage: "Should I also update the docs?"), at: 7))
+    check(groupOf(asked, "s1", at: 7 + 2 * 86400) == .needsYou, "a question two days old still needs you")
+    check(groupOf(asked, "s1", at: 7 + 3 * 86400 + 60) == .idle, "a question nobody answered for 3 days is idle")
+    check(groupOf(asked, "s1", at: 7 + 4 * 86400, GroupRules(idleAfter: 5 * 86400)) == .needsYou, "a longer idle-after keeps it longer")
+}
 var safe = evidence(s, "s1", at: later)
 check(groupOf(safe, "s1", at: later) == .safeToClose, "every check passing -> safe to close")
 check(verdictOf(safe, "s1", at: later).allSatisfy { !$0.source.isEmpty && !$0.detail.isEmpty }, "every check names what it found and where")

@@ -68,7 +68,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         mark("window ordered front (id \(main.window?.windowNumber ?? 0))")
         DispatchQueue.main.async {
             mark("first runloop after window")
+            self.store.onNotificationsAnswered = { [weak self] in self?.main.recheckNotifications() }
             self.store.start()
+            self.main.refreshSetup()
             self.runTestHooks()
             self.main.updater.start()
             if !Updater.isRelease { NSApp.dockTile.badgeLabel = "dev" }
@@ -96,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidBecomeActive(_ n: Notification) {
         main?.recheckNotifications()
+        main?.refreshSetup()
     }
 
     /// Clicking a notification opens that session.
@@ -134,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard c != store.config || Look.theme.name != c.theme(systemDark: SystemAppearance.isDark) else { return }
         if c.wrapLine != store.config.wrapLine { Wrap.publish(c.wrapLine) }
         store.reloadConfig(c)
+        main.refreshSetup()
         main.applyLook(c)
         IconArt.choice = c.appIcon
         IconArt.apply(dark: Look.theme.dark)
@@ -295,6 +299,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             after("--close-after", 6) {
                 self.main.closeAllSafe(onlyNamed: prefix)
                 mark("close sheet (\(prefix)*): \(self.main.closeSheet.items.map(\.title))")
+            }
+        }
+        if let prefix = arg("--stop-idle") {
+            // Presses the Idle header's stop button, limited to names with this prefix (test runs: "mxtest").
+            after("--stop-after", 6) {
+                let now = Date(), st = self.store.state
+                let ids = st.sessions.values.filter { $0.name.hasPrefix(prefix) && st.group($0, now: now, rules: self.store.config.rules) == .idle }.map(\.id)
+                mark("stop idle (\(prefix)*): \(ids)")
+                self.main.stopIdle(ids)
             }
         }
         if let spec = arg("--switch-project"), let at = spec.split(separator: "@").last.flatMap({ Double($0) }) {

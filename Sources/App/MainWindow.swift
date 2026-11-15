@@ -88,6 +88,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
+        root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
+        root.sessionPane.onHideSetup = { [weak self] in self?.hideSetup() }
+        NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: nil, queue: .main) { [weak self] _ in self?.refreshSetup() }
         root.sidebar.list.onReopen = { [weak self] in self?.reopen($0) }
         root.sidebar.list.onNotSafe = { [weak self] in self?.notSafe($0) }
         root.sidebar.list.menuFor = { [weak self] in self?.sessionMenu($0) }
@@ -215,7 +218,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
         let shown: [(PhaseGroup, [Session])] = scope.map { p in all.compactMap { g, l in
             let k = l.filter { state.project($0, in: projects) == p }; return k.isEmpty ? nil : (g, k)
-        } } ?? all.filter { $0.0.needsHim }
+        } } ?? all
         let rows = shown.map { g, list in (g, list.map { s in
             Row(session: s, group: g, detail: detail(s, state: state),
                 checks: g == .safeToClose ? state.checks(s, now: now, rules: rules) : [], closedAt: g == .recentlyClosed ? state.closed[s.id]?.at : nil,
@@ -224,7 +227,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let hours = Int(store.config.idleAfter / 3600)
         root.sidebar.list.idleNote = hours >= 48 && hours % 24 == 0 ? "quiet \(hours / 24)d+" : "quiet \(hours)h+"
         root.sidebar.list.emptyText = scope == nil
-            ? ["Nothing needs you.", "", "Every session is working, stopped", "or safe. Pick a project on the left", "to see all of its sessions."]
+            ? ["No Claude sessions running.", "", "⌘N starts one in any folder.", "Sessions you start in a terminal", "show up here too."]
             : ["No sessions in \(scope!).", "", "⌘N starts one."]
         var perAccount: [AccountID: Int] = [:]
         for s in state.sessions.values where s.phase != .ended { perAccount[s.accountId, default: 0] += 1 }
@@ -246,10 +249,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                               terminal: current.flatMap { detached.contains($0) ? nil : terminals[$0] },
                               summary: PhaseGroup.allCases.filter { !$0.folds }.map { g in (g, (scope == nil ? all : shown).first { $0.0 == g }?.1.count ?? 0) })
         root.viewerPane.setRoot(s?.cwd)
-        NSApp.dockTile.badgeLabel = {
-            let n = state.sessions.values.filter { if case .needsYou = $0.phase { return true }; return false }.count
-            return n > 0 ? "\(n)" : nil
-        }()
+        NSApp.dockTile.badgeLabel = (all.first { $0.0 == .needsYou }?.1.count).map { "\($0)" }
     }
 
     /// Plugin badges for a row, plugin by plugin in name order.
@@ -370,6 +370,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             parts.append(String(m.replacingOccurrences(of: "**", with: "").prefix(80)))
         }
         parts.insert(state.account(s.accountId)?.name ?? s.accountId, at: min(parts.count, scope == nil ? 1 : 0))
+        // Started outside Maxwell and still there: say where, so an unfamiliar row explains itself.
+        if case .elsewhere = s.reach { parts.append("in a terminal") }
         return parts.joined(separator: " · ")
     }
 
@@ -734,6 +736,21 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
+    /// The Idle header's stop button: no sheet, because Undo brings every one back.
+    func stopIdle(_ ids: [SessionID]) {
+        guard !ids.isEmpty else { return }
+        toast("Stopping \(ids.count) idle session\(ids.count == 1 ? "" : "s")…")
+        store.stopIdle(ids) { [weak self] stopped, notes in
+            guard let self else { return }
+            stopped.forEach(self.forget)
+            let head = stopped.isEmpty ? "Stopped none." : "Stopped \(stopped.count). Conversations kept; Recently closed reopens them."
+            let text = ([head] + notes).joined(separator: " · ")
+            mark("stop idle: \(text)")
+            if stopped.isEmpty { return self.toast(text) }
+            self.root.status.show(toast: text, action: ("Undo", { [weak self] in stopped.forEach { self?.reopen($0) } }), seconds: 10)
+        }
+    }
+
     /// Undo and Recently closed: `claude attach` starts the stopped session again, in its pane.
     func reopen(_ id: SessionID) {
         store.reopened(id)
@@ -1053,6 +1070,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             toast("Hooks installed. Backups sit next to each settings file.")
         } catch { toast("Install failed: \(error)") }
         refreshSettings()
+        refreshSetup()
     }
 
     func uninstallHooks() {
@@ -1061,6 +1079,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             toast("Hooks removed.")
         } catch { toast("Uninstall failed: \(error)") }
         refreshSettings()
+        refreshSetup()
     }
 
     func refreshSettings() {
@@ -1092,7 +1111,62 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             guard let self, ok != self.notificationsAllowed else { return }
             self.notificationsAllowed = ok
             self.refreshSettings()
+            self.refreshSetup()
         }
+    }
+
+    // MARK: setup
+
+    private static let setupHiddenKey = "Maxwell.setupHidden"
+
+    /// What Maxwell still needs, looked at again whenever one of them can change: launch, hooks,
+    /// a claude.ai sign-in, coming back to the front (from System Settings or a terminal).
+    func refreshSetup() {
+        let c = store.config
+        var steps: [SetupStep] = []
+        if ClaudeCLI.claudeFound {
+            steps.append(SetupStep(title: "Claude Code", detail: (ClaudeCLI.claudePath as NSString).abbreviatingWithTildeInPath, done: true))
+        } else {
+            steps.append(SetupStep(title: "Claude Code", detail: "Not found. Install it, then reopen Maxwell.", done: false, button: "How to install") {
+                NSWorkspace.shared.open(URL(string: "https://code.claude.com/docs/en/setup")!)
+            })
+        }
+        let files = HookInstaller.settingsFiles(c.accounts)
+        let hooked = files.filter { ((try? String(contentsOf: $0, encoding: .utf8)) ?? "").contains(HookInstaller.marker) }.count
+        steps.append(hooked == files.count && !files.isEmpty
+            ? SetupStep(title: "Session hooks", detail: "Maxwell hears the moment a session asks or finishes.", done: true)
+            : SetupStep(title: "Session hooks", detail: "So Maxwell hears the moment a session asks or finishes.", done: false, button: "Install") { [weak self] in self?.installHooks() })
+        if c.artifacts == "viewer" {
+            let many = store.state.accounts.count > 1
+            for a in store.state.accounts {
+                let status = ClaudeWeb.shared.status[a.name] ?? .unknown
+                if status == .unknown { ClaudeWeb.shared.refresh(a) }
+                let title = many ? "claude.ai · \(a.name)" : "claude.ai"
+                let email = ClaudeWeb.expectedEmail(a)
+                steps.append(status == .signedIn
+                    ? SetupStep(title: title, detail: "Artifacts open signed in, beside the session.", done: true)
+                    : SetupStep(title: title, detail: "Sign in\(email.map { " as \($0)" } ?? "") so artifacts open beside the session.", done: false, button: "Sign in…") { [weak self] in
+                        SignInWindow.show(a, near: self?.window)
+                    })
+            }
+        }
+        switch notificationsAllowed {
+        case true?: steps.append(SetupStep(title: "Notifications", detail: "A session that needs you taps you on the shoulder.", done: true))
+        case false?:
+            steps.append(SetupStep(title: "Notifications", detail: "Allow them so a session that needs you can tell you.", done: false, button: "Open Settings…") {
+                let id = Bundle.main.bundleIdentifier ?? "dev.maxwell.app"
+                if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") { NSWorkspace.shared.open(url) }
+            })
+        case nil: recheckNotifications()
+        }
+        let hidden = UserDefaults.standard.bool(forKey: Self.setupHiddenKey)
+        root.sessionPane.setup = hidden || steps.allSatisfy(\.done) ? [] : steps
+    }
+
+    func hideSetup() {
+        UserDefaults.standard.set(true, forKey: Self.setupHiddenKey)
+        refreshSetup()
+        toast("Setup hidden. Hooks, claude.ai and notifications are all in Settings.")
     }
 
     func checkForUpdates() {
