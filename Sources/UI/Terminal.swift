@@ -92,7 +92,14 @@ final class GhosttyRuntime {
             guard let v = view(target) else { return false }
             DispatchQueue.main.async { v.onExit?() }
             return true
-        case GHOSTTY_ACTION_MOUSE_SHAPE, GHOSTTY_ACTION_MOUSE_OVER_LINK, GHOSTTY_ACTION_SET_TITLE, GHOSTTY_ACTION_RING_BELL:
+        case GHOSTTY_ACTION_MOUSE_OVER_LINK:
+            // Comes back inside ghostty_surface_mouse_pos, so linkUnderClick can read it right away.
+            let u = action.action.mouse_over_link
+            let s = u.len == 0 ? nil : String(decoding: UnsafeRawBufferPointer(start: u.url, count: Int(u.len)), as: UTF8.self)
+            guard let v = view(target) else { return true }
+            if Thread.isMainThread { v.linkUnderPointer = s } else { DispatchQueue.main.async { v.linkUnderPointer = s } }
+            return true
+        case GHOSTTY_ACTION_MOUSE_SHAPE, GHOSTTY_ACTION_SET_TITLE, GHOSTTY_ACTION_RING_BELL:
             return true
         default:
             return false
@@ -210,6 +217,13 @@ final class TerminalView: NSView, NSTextInputClient {
     private var clipboardAtClick = NSPasteboard.general.changeCount
     var cwd: String?
     var onOpenURL: ((String, String?) -> Void)?
+    /// Links a plain click opens in Maxwell (claude.ai artifacts) instead of passing the click on.
+    var claimsLink: ((String) -> Bool)?
+    /// The link Ghostty last reported under the pointer (MOUSE_OVER_LINK).
+    fileprivate var linkUnderPointer: String?
+    /// A plain press on a claimed link, held back: it opens the link on release, or goes through
+    /// late when the pointer drags away (a selection that starts on the link).
+    private var heldLink: (url: String, down: NSEvent)?
     var onExit: (() -> Void)?
     /// The shell reported a new working folder.
     var onCwd: (() -> Void)?
@@ -429,15 +443,62 @@ final class TerminalView: NSView, NSTextInputClient {
         ghostty_surface_mouse_pos(surface, p.x, bounds.height - p.y, Self.mouseMods(e.modifierFlags))
     }
     override func mouseMoved(with e: NSEvent) { pos(e) }
-    override func mouseDragged(with e: NSEvent) { pos(e) }
+    override func mouseDragged(with e: NSEvent) {
+        if let h = heldLink {
+            let a = h.down.locationInWindow, b = e.locationInWindow
+            guard hypot(a.x - b.x, a.y - b.y) > 4 else { return }
+            heldLink = nil
+            press(h.down)
+        }
+        pos(e)
+    }
     override func mouseDown(with e: NSEvent) {
         window?.makeFirstResponder(self)
         clipboardAtClick = NSPasteboard.general.changeCount
+        let plain = e.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty
+        if plain, e.clickCount == 1, let url = linkUnderClick(e), claimsLink?(url) == true {
+            heldLink = (url, e)
+            return
+        }
+        press(e)
+    }
+    private func press(_ e: NSEvent) {
         pos(e)
         if let surface { _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, Self.mouseMods(e.modifierFlags)) }
     }
     override func mouseUp(with e: NSEvent) {
+        if let h = heldLink {
+            heldLink = nil
+            onOpenURL?(h.url, cwd)
+            return
+        }
         if let surface { _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, Self.mouseMods(e.modifierFlags)) }
+    }
+
+    /// The link under a plain click, found the way ⌘-click finds it. Claude Code turns on mouse
+    /// reporting and opens a clicked link in the system browser itself, so without this Maxwell
+    /// never hears of the click.
+    func linkUnderClick(_ e: NSEvent) -> String? {
+        let p = convert(e.locationInWindow, from: nil)
+        return linkAt(x: p.x, y: bounds.height - p.y, restoring: Self.mouseMods(e.modifierFlags))
+    }
+
+    /// x, y from the top left, in points. `restoring` is the modifier state Ghostty is left with.
+    private func linkAt(x: Double, y: Double, restoring mods: ghostty_input_mods_e) -> String? {
+        guard let surface, claimsLink != nil else { return nil }
+        let sz = ghostty_surface_size(surface)
+        let ch = Double(sz.cell_height_px) / (window?.backingScaleFactor ?? 2)
+        let cmd = Self.mouseMods(.command)
+        // Ghostty only looks again when the pointer changes cell, so step off the cell and back.
+        ghostty_surface_mouse_pos(surface, x, y + ch < bounds.height ? y + ch : y - ch, cmd)
+        linkUnderPointer = nil
+        ghostty_surface_mouse_pos(surface, x, y, cmd)
+        let found = linkUnderPointer
+        // Shift alone looks again with no link modifier, which takes the underline away.
+        ghostty_surface_mouse_pos(surface, x, y, Self.mods(.shift))
+        ghostty_surface_mouse_pos(surface, x, y, mods)
+        linkUnderPointer = nil
+        return found
     }
     override func scrollWheel(with e: NSEvent) {
         guard let surface else { return }
@@ -472,7 +533,34 @@ final class TerminalView: NSView, NSTextInputClient {
 
     /// Test hook: Cmd+click the first on-screen occurrence of `needle` (as a user would).
     func cmdClick(on needle: String) -> Bool {
-        guard let surface, let scale = window?.backingScaleFactor else { return false }
+        guard let surface, let (x, y) = point(of: needle) else { return false }
+        let m = Self.mouseMods(.command)
+        ghostty_surface_mouse_pos(surface, x, y, m)
+        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, m)
+        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, m)
+        return true
+    }
+
+    /// Test hook: a plain click (no modifiers) on the last place `needle` shows, through
+    /// mouseDown/mouseUp as a real click goes. The link it found, or "-" for none.
+    func plainClick(on needle: String) -> String? {
+        guard let window, let (x, y) = point(of: needle) else { return nil }
+        let at = window.convertPoint(toScreen: convert(NSPoint(x: x, y: bounds.height - y), to: nil))
+        let loc = window.convertPoint(fromScreen: at)
+        func ev(_ t: NSEvent.EventType) -> NSEvent? {
+            NSEvent.mouseEvent(with: t, location: loc, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+        }
+        guard let down = ev(.leftMouseDown), let up = ev(.leftMouseUp) else { return nil }
+        let link = linkUnderClick(down)
+        mouseDown(with: down)
+        mouseUp(with: up)
+        return link ?? "-"
+    }
+
+    /// Middle of the cell where `needle` starts (its last showing), from the top left in points.
+    private func point(of needle: String) -> (Double, Double)? {
+        guard let surface, let scale = window?.backingScaleFactor else { return nil }
         let sz = ghostty_surface_size(surface)
         let cols = Int(sz.columns)
         // viewportText joins soft-wrapped rows, so map logical lines back to grid rows.
@@ -480,18 +568,13 @@ final class TerminalView: NSView, NSTextInputClient {
         let lines = viewportText().components(separatedBy: "\n")
         for l in lines { rowOf.append(r0); r0 += max(1, (l.count + cols - 1) / cols) }
         guard let li = lines.lastIndex(where: { $0.contains(needle) }),
-              let r = lines[li].range(of: needle) else { return false }
+              let r = lines[li].range(of: needle) else { return nil }
         let off = lines[li].distance(from: lines[li].startIndex, to: r.lowerBound) + 1
         let row = rowOf[li] + off / cols, col = off % cols
         let cw = Double(sz.cell_width_px) / scale, ch = Double(sz.cell_height_px) / scale
         let padX = (Double(sz.width_px) / scale - Double(sz.columns) * cw) / 2
         let padY = (Double(sz.height_px) / scale - Double(sz.rows) * ch) / 2
-        let x = padX + (Double(col) + 0.5) * cw, y = padY + (Double(row) + 0.5) * ch
-        let m = Self.mouseMods(.command)
-        ghostty_surface_mouse_pos(surface, x, y, m)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, m)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, m)
-        return true
+        return (padX + (Double(col) + 0.5) * cw, padY + (Double(row) + 0.5) * ch)
     }
 
     /// Sends Ctrl+<letter> as a real key event (test hook: Ctrl+Z detaches `claude attach`).

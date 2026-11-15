@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-artifact-links-open-in-place",
+    date: "2026-11-15",
+    versions: "0.1.38",
+    title: "Artifact links open beside the session",
+    figure: "",
+    body: `
+<p>Clicking a claude.ai artifact link in a session's terminal now opens the artifact in the viewer, signed in to that session's account. Before, a plain click went to Claude Code, which opened the link in your default browser, and only ${k("⌘")}-click reached the viewer.</p>
+<p>Other clicks still go to Claude Code as before, and dragging from a link still selects text.</p>`,
+    fixes: [],
+  },
+  {
     slug: "2026-11-15-settings-you-can-read",
     date: "2026-11-15",
     versions: "0.1.37",

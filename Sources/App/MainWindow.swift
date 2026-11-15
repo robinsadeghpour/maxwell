@@ -545,6 +545,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if let self { self.render(self.store.state) }
         }
         t.onOpenURL = { [weak self] url, cwd in self?.openURL(url, cwd: cwd, session: id) }
+        t.claimsLink = { ArtifactLink.parse($0) != nil }
         terminals[id] = t
         detached.remove(id)
     }

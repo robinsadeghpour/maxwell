@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Artifact links open beside the session</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-artifact-links-open-in-place</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-artifact-links-open-in-place</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Clicking a claude.ai artifact link in a session's terminal now opens the artifact in the viewer, signed in to that session's account. Before, a plain click went to Claude Code, which opened the link in your default browser, and only &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;/span&gt;-click reached the viewer.&lt;/p&gt;
+&lt;p&gt;Other clicks still go to Claude Code as before, and dragging from a link still selects text.&lt;/p&gt;</description>
+</item>
+<item>
 <title>Settings you can read</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-settings-you-can-read</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-settings-you-can-read</guid>

@@ -61,7 +61,8 @@ glass at its extremes (see `docs/design-rounds.md`, round 7).
 
 A claude.ai artifact a session publishes (or opens, or names in its reply) opens in the viewer like a
 Markdown file, signed in to claude.ai as that session's account. Publishing it again reloads it in place,
-even when it is pinned. ⌘-click an artifact link in the terminal to open it the same way.
+even when it is pinned. Click an artifact link in the terminal to open it the same way. A plain click
+is enough: Maxwell takes it before Claude Code would hand it to the system browser.
 
 Each account has its own WebKit data store inside Maxwell, so logins never mix. Sign in once per
 account, in the viewer or in Settings › Accounts; it is claude.ai's own page (Google and email work;

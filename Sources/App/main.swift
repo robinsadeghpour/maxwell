@@ -305,6 +305,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 mark("cmd-click \(needle): \(t?.cmdClick(on: needle) ?? false)")
             }
         }
+        if let needle = arg("--plain-click") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--click-after") ?? "5") ?? 5)) {
+                let t = self.main.root.sessionPane.content.subviews.first { !$0.isHidden } as? TerminalView
+                mark("plain-click \(needle): \(t?.plainClick(on: needle) ?? "not on screen")")
+            }
+        }
         func after(_ key: String, _ fallback: Double, _ run: @escaping () -> Void) {
             DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg(key) ?? "") ?? fallback), execute: run)
         }
