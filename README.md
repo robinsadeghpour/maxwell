@@ -117,6 +117,21 @@ You need a Mac with Apple silicon, macOS 14 or later, and Claude Code.
 
 Maxwell checks GitHub for a new release every few hours. When one is ready, the bottom bar shows **v0.1.7 ready · Restart to update**. Nothing changes until you click it. Then Maxwell quits, swaps in the new version and opens again. Your Claude sessions keep running the whole time, because they are background sessions. **Maxwell › Check for Updates…** checks right away.
 
+### Signing in to claude.ai, once per account
+
+Artifacts need a claude.ai login, and each account has its own. Maxwell already knows which account every session runs on, so it always picks the right login. You only sign in once per account.
+
+1. Open **Settings › Accounts** (⌘, then ⌘3). Each account has a **claude.ai** row with the email it uses in Claude Code.
+2. Click **Sign in…**. claude.ai's own sign-in page opens. Sign in with that email, using Google or email. Sign in with Apple doesn't work inside Maxwell.
+3. The window closes by itself and the row says **Signed in**. Do the same for the other accounts.
+
+Or skip Settings: the first artifact from an account shows **Sign in to claude.ai** in the viewer, and you sign in right there.
+
+- The logins stay separate and survive restarts. **Sign out** removes one.
+- If Google refuses the page, use "Continue with email". If the email has a sign-in link, copy it, then click **Paste link** above the page.
+- Signed in with the wrong email? The artifact says "This account can't open the artifact". **Sign in again** clears that login so you can use the right one.
+- **Open in browser** (⇧⌘O) uses the browser, profile or container set for that account in Settings › Accounts.
+
 ## What it touches on your Mac
 
 Everything stays on your machine. Maxwell sends nothing anywhere, apart from the Haiku reads above, which go through your own Claude account, and what plugins you turn on send (the Linear plugin talks to Linear's API with your key, and the Slack plugin reads your DMs, mentions and threads with your token, read only; each only after you add a key).
