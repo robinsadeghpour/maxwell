@@ -11,7 +11,7 @@
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-update-from-the-dmg</guid>
 <pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
 <description>&lt;p&gt;If you open Maxwell straight from the DMG without dragging it to Applications first, it runs from a disk macOS won't let it change. &lt;strong&gt;Restart to update&lt;/strong&gt; then reopened the same old version and offered the same update again. Maxwell now installs the update into Applications and opens it from there.&lt;/p&gt;
-&lt;p&gt;Still on an older version and stuck like this? Quit Maxwell, drag it from the DMG to Applications, and open it from there. Updates work from then on.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed Restart to update reopening the old version when Maxwell ran from the DMG&lt;/li&gt;&lt;li&gt;Restart to update now says so when no Applications folder can be written, instead of quitting&lt;/li&gt;&lt;/ul&gt;</description>
+&lt;p&gt;Still on an older version and stuck like this? Quit Maxwell, drag it from the DMG to Applications, and open it from there. Updates work from then on.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed Restart to update reopening the old version when Maxwell ran from the DMG&lt;/li&gt;&lt;li&gt;Restart to update now says so when no Applications folder can be written, instead of quitting&lt;/li&gt;&lt;li&gt;Maxwell releases are now built, signed and notarized by GitHub Actions on a clean Mac, one release at a time&lt;/li&gt;&lt;/ul&gt;</description>
 </item>
 <item>
 <title>Set up in one place, and All projects adds up</title>

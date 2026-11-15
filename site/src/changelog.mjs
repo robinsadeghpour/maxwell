@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-update-from-the-dmg",
     date: "2026-11-15",
-    versions: "0.1.30",
+    versions: "0.1.30 – 0.1.31",
     title: "Updates work when Maxwell runs from the DMG",
     figure: "",
     body: `
@@ -16,6 +16,7 @@ export default [
     fixes: [
       "Fixed Restart to update reopening the old version when Maxwell ran from the DMG",
       "Restart to update now says so when no Applications folder can be written, instead of quitting",
+      "Maxwell releases are now built, signed and notarized by GitHub Actions on a clean Mac, one release at a time",
     ],
   },
   {
