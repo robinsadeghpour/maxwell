@@ -16,16 +16,18 @@ rm -rf $FRAMES; mkdir -p $FRAMES "$(dirname $OUT)"
 
 # Times are seconds after launch.
 if [[ ${TAKE:-short} == tour ]]; then
-  # The tour (demo/reel Tour): every panel up, plugins included. It answers the permission, opens
-  # the plan the session wrote beside it, steps through the projects on the rail, opens a safe
-  # session's evidence and closes everything that's done.
-  LENGTH=52
-  FLAGS=(--size ${SIZE:-1440x900} --retina --move system:bottom --click "33:1095,563"
-    --select "Dark mode for settings"
-    --keys "9:cmd+j;12.5:1;22:cmd+1;24.5:cmd+2;27:cmd+3;29.5:cmd+0;41.5:cmd+shift+x"
-    --open "$ROOT/lumen/.worktrees/passkeys/docs/passkeys-rollout.md" --open-after 15.5
-    --expand "Bump dependencies" --expand-after 35
-    --confirm-after 46)
+  # The tour (demo/reel Tour): every panel up, plugins included. The passkeys session is selected
+  # from the start, so its terminal is attached before the recording is used and never flashes a
+  # shell. It asks (6.3 s), is answered, opens its plan beside it, steps through the projects on the
+  # rail, shows the Slack tab, opens a safe session's evidence and closes everything that's done.
+  # Steps are spaced so the film plays the take at real speed.
+  LENGTH=38
+  FLAGS=(--size ${SIZE:-1440x900} --retina --move system:bottom --click "25:1095,563"
+    --select "Migrate sign-in to passkeys"
+    --keys "12.5:1;19.5:cmd+1;20.6:cmd+2;21.7:cmd+3;22.8:cmd+0;31:cmd+shift+x"
+    --open "$ROOT/lumen/.worktrees/passkeys/docs/passkeys-rollout.md" --open-after 15
+    --expand "Bump dependencies" --expand-after 28
+    --confirm-after 33.5)
 else
   # The short take: what needs you, live; answer it in place; every group in one project; the
   # evidence behind Safe to close; close them all.
