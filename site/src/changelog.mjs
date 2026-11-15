@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-cleaner-panels",
     date: "2026-11-15",
-    versions: "0.1.20",
+    versions: "0.1.20 – 0.1.21",
     title: "Quieter plugin lists and a tidier Settings",
     figure: fig.panels(),
     body: `
@@ -16,6 +16,7 @@ export default [
     fixes: [
       "Fixed × on the System or Usage panel closing both. It now closes only its own panel. The bottom panels together still hide with ⌥⌘J",
       "Plugin panel section titles now match the other panel headers",
+      "Plugin keys no longer ask for Keychain access again after every update. Allow it once more after this update and it sticks",
     ],
   },
   {

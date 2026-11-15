@@ -11,7 +11,7 @@
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-cleaner-panels</guid>
 <pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
 <description>&lt;p&gt;The Linear and Slack lists now read like lists. Ticket keys sit in their own dim column, so titles line up. A ticket with nothing to add is one line tall. Status badges are a dot and a word. A row's buttons show when the pointer is on it, so they no longer crowd the text.&lt;/p&gt;
-&lt;p&gt;Every Settings tab picks its options from one segmented control, and notes wrap instead of being cut off. Each plugin's description reads in full under its switch.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed × on the System or Usage panel closing both. It now closes only its own panel. The bottom panels together still hide with ⌥⌘J&lt;/li&gt;&lt;li&gt;Plugin panel section titles now match the other panel headers&lt;/li&gt;&lt;/ul&gt;</description>
+&lt;p&gt;Every Settings tab picks its options from one segmented control, and notes wrap instead of being cut off. Each plugin's description reads in full under its switch.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed × on the System or Usage panel closing both. It now closes only its own panel. The bottom panels together still hide with ⌥⌘J&lt;/li&gt;&lt;li&gt;Plugin panel section titles now match the other panel headers&lt;/li&gt;&lt;li&gt;Plugin keys no longer ask for Keychain access again after every update. Allow it once more after this update and it sticks&lt;/li&gt;&lt;/ul&gt;</description>
 </item>
 <item>
 <title>Every reply ends with where the session stands</title>
