@@ -382,6 +382,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             parts.append(String(m.replacingOccurrences(of: "**", with: "").prefix(80)))
         }
         parts.insert(state.account(s.accountId)?.name ?? s.accountId, at: min(parts.count, scope == nil ? 1 : 0))
+        if let tasks = s.runningTasks, !tasks.isEmpty { parts.append(tasks.summary) }
         // Started outside Maxwell and still there: say where, so an unfamiliar row explains itself.
         if case .elsewhere = s.reach { parts.append("in a terminal") }
         return parts.joined(separator: " · ")
@@ -685,6 +686,23 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func send(_ line: String, to id: SessionID) {
         if terminals[id] == nil || detached.contains(id) { reattach(id) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.terminals[id]?.sendLine(line) }
+    }
+
+    /// Claude's own TUI lists a session's background agents under its prompt; Down opens that list.
+    func showAgents(_ id: SessionID) {
+        guard case .background = store.state.sessions[id]?.reach else { return }
+        let press = { [weak self] in
+            guard let self, let t = self.terminals[id] else { return }
+            self.window?.makeFirstResponder(t)
+            t.sendKey(keyCode: 125) // kVK_DownArrow
+        }
+        if terminals[id] == nil || detached.contains(id) {
+            reattach(id)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: press)
+        } else {
+            if current != id { open(id) }
+            press()
+        }
     }
 
     func move(_ id: SessionID) {
@@ -1417,6 +1435,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             },
             Action(id: "move", title: "Move to the Account With Most Room", menu: "Session", shortcut: Shortcut("cmd+shift+m"), isEnabled: limited) { [weak self] in
                 if let id = self?.current { self?.move(id) }
+            },
+            Action(id: "show-agents", title: "Show Agents", menu: "Session", shortcut: Shortcut("cmd+shift+a"), isEnabled: { [weak self] in
+                guard let self, let id = self.current, let s = self.store.state.sessions[id], case .background = s.reach else { return false }
+                return !(s.runningTasks?.agents.isEmpty ?? true)
+            }) { [weak self] in
+                if let id = self?.current { self?.showAgents(id) }
             },
             Action(id: "undo-close", title: "Undo Close", menu: "Session", shortcut: Shortcut("cmd+z"), isEnabled: { [weak self] in self?.root.status.toastAction != nil }) { [weak self] in
                 self?.root.status.runToastAction()

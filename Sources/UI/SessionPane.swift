@@ -12,6 +12,7 @@ protocol SessionPaneDelegate: AnyObject {
     func scheduledResume(_ id: SessionID) -> Date?
     func bringIn(_ id: SessionID, force: Bool)
     func bringInQueued(_ id: SessionID) -> Bool
+    func showAgents(_ id: SessionID)
 }
 
 /// The middle pane: header with pills, a state banner, and the session's terminal.
@@ -23,6 +24,7 @@ final class SessionPane: MXView {
     private let title = Label(font: Fonts.mono(Metrics.fontSize, .semibold))
     private let project = Label(color: { $0.fg3 })
     private let pills = Label(color: { $0.fg3 })
+    private let agents = MXButton("", small: true)
     private let headerLine = Fill { $0.hair2 }
     private let banner = Banner(frame: .zero)
     let content = TerminalWell(frame: .zero)
@@ -46,7 +48,7 @@ final class SessionPane: MXView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [glyph, prompt, title, project, pills, headerLine, banner, content, empty, message.scroll, overview].forEach(addSubview)
+        [glyph, prompt, title, project, pills, agents, headerLine, banner, content, empty, message.scroll, overview].forEach(addSubview)
         banner.isHidden = true
         prompt.isHidden = true
     }
@@ -62,7 +64,7 @@ final class SessionPane: MXView {
         overview.isHidden = s != nil
         message.scroll.isHidden = true
         guard let s else {
-            [glyph, title, project, pills, banner, empty, headerLine].forEach { $0.isHidden = true }
+            [glyph, title, project, pills, agents, banner, empty, headerLine].forEach { $0.isHidden = true }
             overview.counts = summary
             needsLayout = true
             return
@@ -78,6 +80,19 @@ final class SessionPane: MXView {
         if case .open(let n) = s.doneCheck?.pr { p.append("[PR #\(n)]") }
         if case .merged = s.doneCheck?.pr { p.append("[PR merged]") }
         if let ctx = s.contextTokens { p.append("[ctx \(ctx / 1000)k]") }
+        let tasks = s.runningTasks ?? []
+        let names = tasks.agents.map { $0.label ?? "agent \($0.id.prefix(8))" }
+        let attachable: Bool = { if case .background = s.reach { return true }; return false }()
+        agents.isHidden = names.isEmpty || !attachable
+        pills.tip = nil
+        if !agents.isHidden {
+            agents.title = tasks.summary
+            agents.tip = Tip("Open Claude's agent list", action: "show-agents").adding(names.joined(separator: "\n"))
+            agents.action = { [weak self] in self?.delegate?.showAgents(s.id) }
+        } else if !tasks.isEmpty {
+            p.append("[\(tasks.summary)]")
+            if !names.isEmpty { pills.tip = Tip("Agents running").adding(names.joined(separator: "\n")) }
+        }
         pills.text = p.joined(separator: " ")
         updateBanner(s, group: group ?? .idle, blockers: blockers)
         if case .elsewhere = s.reach {
@@ -185,7 +200,9 @@ final class SessionPane: MXView {
         title.frame = NSRect(x: 28, y: 0, width: tw, height: h)
         let pw = project.textWidth + 2
         project.frame = NSRect(x: title.frame.maxX + 8, y: 0, width: pw, height: h)
-        pills.frame = NSRect(x: project.frame.maxX + 10, y: 0, width: max(0, w - project.frame.maxX - 22), height: h)
+        pills.frame = NSRect(x: project.frame.maxX + 10, y: 0, width: min(pills.textWidth + 2, max(0, w - project.frame.maxX - 22)), height: h)
+        let bs = agents.intrinsicContentSize
+        agents.frame = NSRect(x: pills.frame.maxX + 8, y: ((h - bs.height) / 2).rounded(), width: bs.width, height: bs.height)
         headerLine.frame = NSRect(x: 0, y: h - 1, width: w, height: 1)
         var y = h
         if !banner.isHidden && session != nil && !shellShown {

@@ -508,6 +508,19 @@ final class TerminalView: NSView, NSTextInputClient {
         _ = ghostty_surface_key(surface, k)
     }
 
+    /// Presses a key that types no text (an arrow) as a real key event.
+    func sendKey(keyCode: UInt16) {
+        guard let surface else { return }
+        var k = ghostty_input_key_s()
+        k.action = GHOSTTY_ACTION_PRESS
+        k.keycode = UInt32(keyCode)
+        k.mods = GHOSTTY_MODS_NONE
+        k.consumed_mods = GHOSTTY_MODS_NONE
+        _ = ghostty_surface_key(surface, k)
+        k.action = GHOSTTY_ACTION_RELEASE
+        _ = ghostty_surface_key(surface, k)
+    }
+
     /// Types a line and presses Return (Return as a real key, so the shell runs it).
     func sendLine(_ s: String) {
         guard let surface else { return }
