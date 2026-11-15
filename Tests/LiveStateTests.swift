@@ -51,8 +51,11 @@ func liveStateTests() {
     let snap = EventParser.parseAgents(Data(agents.utf8), accountId: "work", at: t0)!
     check(snap.entries[0].status == .idle, "idle with job state working is idle")
     check(snap.entries[0].pid == 4242, "the listing's pid is kept, to read the process's own file")
-    check(snap.entries[1].status == .idle, "a job with no process has nothing running")
+    check(snap.entries[1].status == .idle && snap.stopped == ["1fc2e8d4-1": "1fc2e8d4"], "a job with no process has nothing running: stopped")
     check(snap.entries[2].status == .busy && snap.entries[2].reach == .elsewhere(pid: 3), "a terminal session's busy")
+    let blocked = reduce(fresh(), .agents(AgentsSnapshot(at: at(5), accountId: "work", entries: [snap.entries[1]], stopped: snap.stopped)))
+    check(blocked.sessions["1fc2e8d4-1"]?.parkedAt != nil && blocked.group(blocked.sessions["1fc2e8d4-1"]!, now: at(5), rules: GroupRules()) != nil,
+          "listed with no process: shown, and parked so opening it doesn't wake it")
 
     // MARK: Needs you
 

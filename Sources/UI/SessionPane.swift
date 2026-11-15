@@ -108,9 +108,12 @@ final class SessionPane: MXView {
         } else if s.parkedAt != nil && terminal == nil {
             empty.isHidden = true
             message.scroll.isHidden = false
-            message.show(note: "Claude Code stopped this session while it waited, to free memory. The conversation is kept; Resume starts it again.",
-                         text: s.lastMessage ?? "No reply yet.")
-            banner.add(MXButton("Resume", hint: "⌘R", primary: true) { [weak self] in self?.delegate?.reattach(s.id) })
+            message.show(note: "This session isn't running: Claude Code stopped it while it waited. The conversation is kept; ⌘R resumes it.",
+                         text: s.lastMessage ?? "Resume to see where it left off.")
+            // Safe to close already offers Close as the one main action; elsewhere Resume is the next step.
+            if group != .safeToClose {
+                banner.add(MXButton("Resume", hint: "⌘R", primary: true) { [weak self] in self?.delegate?.reattach(s.id) })
+            }
         } else {
             empty.isHidden = terminal != nil
             empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R reattaches."]

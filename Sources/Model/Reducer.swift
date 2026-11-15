@@ -40,7 +40,7 @@ func reduce(into s: inout AppState, _ event: Event) {
             session.reach = e.reach
             session.accountId = snap.accountId
             session.listedAt = snap.at
-            session.parkedAt = nil
+            if snap.stopped[e.sessionId] == nil { session.parkedAt = nil }
             // A turn that began without a prompt hook (a background task's report, a wake) starts when the process goes busy.
             if e.status == .busy, session.listedStatus != .busy {
                 let began = e.statusAt ?? snap.at
@@ -65,7 +65,14 @@ func reduce(into s: inout AppState, _ event: Event) {
                 if session.phase == .ended { session.phase = .yourTurn }
                 Live.settle(&session, reset: s.account(snap.accountId)?.limitResetsAt(now: snap.at))
             }
+            // Listed without a process: stopped while it waits on you.
+            if snap.stopped[e.sessionId] != nil, session.parkable { session.parkedAt = session.parkedAt ?? snap.at }
             s.sessions[e.sessionId] = session
+        }
+        // Known to Maxwell from hooks alone (started in a terminal, or before a restart): the listing
+        // says it is a background session, so it can be parked and resumed below.
+        for (id, short) in snap.stopped where s.sessions[id]?.accountId == snap.accountId {
+            s.sessions[id]?.reach = .background(shortId: short)
         }
         // A session of this account that is no longer listed has exited, unless it was a background
         // session waiting on you: Claude Code stops those when idle and keeps the conversation.

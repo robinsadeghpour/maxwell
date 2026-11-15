@@ -123,6 +123,16 @@ check(gone.sessions["s1"]?.phase == .ended, "a working session that leaves the l
 let other = emptyListing(reduce(AppState(accounts: accounts), hook(.stopped(lastMessage: "Done."), "t1", at: 1)), at: 60)
 check(other.sessions["t1"]?.phase == .ended, "a session in another terminal that leaves the listing has ended")
 
+// `--all` lists a stopped background session without a pid. Shapes from 2.1.325.
+let allListing = #"[{"id":"ab12cd34","cwd":"/tmp/x","kind":"background","startedAt":1794665405519,"sessionId":"t2-0000","name":"mx-t2","state":"done"},{"id":"ef56ab78","pid":4242,"status":"idle","cwd":"/tmp/x","kind":"background","startedAt":1794665405519,"sessionId":"t3-0000","name":"mx-t3","state":"done"},{"pid":4286,"cwd":"/tmp/x","kind":"interactive","startedAt":1794776741357,"sessionId":"t4-0000","name":"mx-t4","status":"busy"},{"id":"99887766","cwd":"/tmp/x","kind":"background","startedAt":1794665405519,"sessionId":"t5-0000","name":"mx-t5","state":"stopped"}]"#
+let allSnap = EventParser.parseAgents(Data(allListing.utf8), accountId: "work", at: t0.addingTimeInterval(120))
+check(allSnap?.stopped == ["t2-0000": "ab12cd34"] && allSnap?.entries.map(\.sessionId) == ["t3-0000", "t4-0000"], "idle-stopped (done): stopped, not listed; claude stop (stopped): neither")
+// Known from hooks alone (started in a terminal, or before Maxwell restarted): the listing makes it a background session, parked.
+let hooksOnly = reduce(AppState(accounts: accounts), hook(.stopped(lastMessage: "Want me to ship it?"), "t2-0000", at: 1))
+let parkedAfterRestart = reduce(hooksOnly, .agents(allSnap!))
+check(parkedAfterRestart.sessions["t2-0000"]?.reach == .background(shortId: "ab12cd34") && parkedAfterRestart.sessions["t2-0000"]?.parkedAt != nil
+      && parkedAfterRestart.sessions["t2-0000"]?.phase == .needsYou("Want me to ship it?"), "a stopped session known from hooks is parked and can be resumed")
+
 // Terminals off screen are let go, so Claude Code can stop sessions that idle.
 let shownAt = ["a": t0, "b": t0.addingTimeInterval(-TerminalRelease.after), "c": t0.addingTimeInterval(60)]
 check(TerminalRelease.due(attached: ["a", "b", "c", "d"], lastShown: shownAt, onScreen: "b", now: t0.addingTimeInterval(TerminalRelease.after)) == ["a", "d"],
