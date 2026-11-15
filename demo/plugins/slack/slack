@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Demo Slack plugin: invented colleagues waiting on a reply. Speaks Maxwell's plugin protocol
+(docs/plugins.md) and never talks to Slack."""
+import json, sys
+
+WAITING = [
+    ("mara", "Mara", "Can passkeys ship behind a flag this week?", "#lumen · 12m", "needsYou"),
+    ("theo", "Theo", "Did the importer load test finish?", "DM · 40m", "needsYou"),
+    ("ines", "Ines", "Thanks for the webhook docs!", "#orbit · 2h", "done"),
+]
+
+
+def send(msg):
+    sys.stdout.write(json.dumps(msg) + "\n"); sys.stdout.flush()
+
+
+def panel(sessions):
+    by_title = {s.get("title"): s["id"] for s in sessions}
+    link = {"mara": "Migrate sign-in to passkeys", "theo": "Load test the CSV importer", "ines": "Docs for webhooks"}
+    rows = []
+    for pid, who, text, where, status in WAITING:
+        row = {"id": pid, "title": f"{who}: {text}", "subtitle": where, "status": status}
+        if by_title.get(link[pid]):
+            row["session"] = by_title[link[pid]]
+        rows.append(row)
+    send({"jsonrpc": "2.0", "method": "panel/set", "params": {"panel": "waiting", "count": 2,
+          "view": {"type": "list", "sections": [{"title": "Waiting on your reply", "rows": rows[:2]}, {"title": "Answered", "rows": rows[2:]}]}}})
+    sid = by_title.get("Migrate sign-in to passkeys")
+    if sid:
+        send({"jsonrpc": "2.0", "method": "session/annotate", "params": {"session": sid,
+              "badges": [{"text": "Mara is waiting", "tone": "warn", "tooltip": "Slack: Can passkeys ship behind a flag this week?"}]}})
+
+
+sessions = {}
+for line in sys.stdin:
+    try:
+        msg = json.loads(line)
+    except ValueError:
+        continue
+    method = msg.get("method")
+    if method == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
+        send({"jsonrpc": "2.0", "method": "status", "params": {"state": "ok"}})
+    elif method == "sessions/changed":
+        for s in msg["params"].get("sessions", []):
+            sessions[s["id"]] = s
+        for gone in msg["params"].get("removed", []):
+            sessions.pop(gone, None)
+        panel(list(sessions.values()))
+    elif method == "shutdown":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": None}); break
+    elif "id" in msg:
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
