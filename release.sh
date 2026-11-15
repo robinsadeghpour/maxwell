@@ -21,6 +21,10 @@ ID=${MAXWELL_SIGN_ID:-$(security find-identity -v -p codesigning | sed -nE 's/.*
 [[ -n $ID ]] || { echo "No Developer ID Application certificate in the keychain (see the top of release.sh)."; exit 1; }
 [[ -z $(git status --porcelain) ]] || { echo "Commit or stash first."; exit 1; }
 [[ $(git rev-parse --abbrev-ref HEAD) == v1 ]] || { echo "Release from v1."; exit 1; }
+# The website changelog names every release. Its pages are committed, so they must be built already.
+node site/src/build.mjs --check "$V"
+node site/src/build.mjs >/dev/null
+[[ -z $(git status --porcelain) ]] || { echo "The site pages were stale: run node site/src/build.mjs, commit, and release again."; git checkout -q -- site; exit 1; }
 
 OUT=build/release APP=build/release/Maxwell.app
 ZIP=$OUT/Maxwell-v$V.zip DMG=$OUT/Maxwell-v$V.dmg

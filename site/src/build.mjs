@@ -1,13 +1,29 @@
 // node site/src/build.mjs
 // Writes site/changelog/**, site/docs/** and site/changelog/rss.xml from changelog.mjs and docs.mjs.
 // No dependencies. The output is committed; Vercel serves site/ as static files.
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import entries from "./changelog.mjs";
 import { sections, pages } from "./docs.mjs";
 
 const SITE = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+// Every version the changelog covers. "0.1.15 – 0.1.18" covers 0.1.15, 0.1.16, 0.1.17 and 0.1.18.
+const covered = new Set(entries.flatMap((e) => {
+  const [a, b = a] = e.versions.split(/\s*–\s*/);
+  const [maj, min, lo] = a.split("."), hi = +b.split(".")[2];
+  return Array.from({ length: hi - +lo + 1 }, (_, i) => `${maj}.${min}.${+lo + i}`);
+}));
+
+// node site/src/build.mjs --check 0.1.20: exit 1 unless the changelog has that version. release.sh runs it.
+const ci = process.argv.indexOf("--check");
+if (ci > 0) {
+  const v = process.argv[ci + 1]?.replace(/^v/, "");
+  if (!covered.has(v)) { console.error(`site/src/changelog.mjs has no entry for ${v}. Add one (or add it to the day's entry), then run node site/src/build.mjs and commit.`); process.exit(1); }
+  process.exit(0);
+}
 const ORIGIN = "https://www.runmaxwell.com";
 const GH = "https://github.com/robinsadeghpour/maxwell";
 
@@ -249,4 +265,32 @@ write("docs/index.html", shell({
 // llms.txt: the docs as a plain index, for agents
 write("llms.txt", `# Maxwell\n\n> The session manager for Claude Code. A native Mac app.\n\n${sections.map((s) => `## ${s.title}\n\n${s.pages.map((slug) => `- [${pages[slug].title}](${ORIGIN}/docs/${slug}): ${strip(pages[slug].lede)}`).join("\n")}`).join("\n\n")}\n\n## Changelog\n\n${entries.map((e) => `- [${e.title}](${ORIGIN}/changelog/${e.slug}) (${e.date}, v${e.versions})`).join("\n")}\n`);
 
-console.log(`changelog: ${entries.length} entries · docs: ${order.length} pages`);
+/* ---------------- home page pill, sitemap, 404 ---------------- */
+
+const latest = entries[0];
+const homePath = join(SITE, "index.html");
+const home0 = readFileSync(homePath, "utf8");
+const pill = `<!-- latest -->\n      <a class="new" href="/changelog/${latest.slug}"><b>v${latest.versions.split(/\s*–\s*/).pop()}</b><span>${latest.title}</span><i aria-hidden="true">→</i></a>\n      <!-- /latest -->`;
+if (!/<!-- latest -->[\s\S]*?<!-- \/latest -->/.test(home0)) throw new Error("index.html: no <!-- latest --> marker");
+writeFileSync(homePath, home0.replace(/<!-- latest -->[\s\S]*?<!-- \/latest -->/, pill));
+
+const urls = ["/", "/changelog", ...entries.map((e) => `/changelog/${e.slug}`), "/docs", ...order.map((o) => `/docs/${o.slug}`)];
+write("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${ORIGIN}${u}</loc>${u.startsWith("/changelog/") ? `<lastmod>${entries.find((e) => u.endsWith(e.slug)).date}</lastmod>` : ""}</url>`).join("\n")}\n</urlset>\n`);
+write("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${ORIGIN}/sitemap.xml\n`);
+
+write("404.html", shell({
+  title: "Not found · Maxwell", description: "This page doesn't exist.", path: "/404", current: "",
+  body: band(`<header class="ph" style="padding-bottom:96px"><div><p class="ver" style="display:inline-block;margin:0 0 18px">404</p><h1>Nothing here</h1><p>This page moved or never existed. The docs and the changelog are the best places to look.</p><div class="subs" style="margin-top:28px"><a class="pill" href="/docs">Docs</a><a class="pill" href="/changelog">Changelog</a><a class="pill" href="/">Home</a></div></div></header>`),
+}));
+
+// Releases on GitHub that the changelog doesn't mention yet (skipped without gh or network).
+try {
+  const tags = execFileSync("gh", ["release", "list", "-R", "robinsadeghpour/maxwell", "--limit", "100", "--json", "tagName", "--jq", ".[].tagName"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 8000 })
+    .split("\n").filter(Boolean).map((t) => t.replace(/^v/, ""));
+  const first = "0.1.12"; // the first public release; older tags were private builds
+  const cmp = (a, b) => a.split(".").map(Number).reduce((r, n, i) => r || n - +b.split(".")[i], 0);
+  const missing = tags.filter((t) => cmp(t, first) >= 0 && !covered.has(t));
+  if (missing.length) console.warn(`Not in the changelog yet: ${missing.map((t) => "v" + t).join(", ")}`);
+} catch {}
+
+console.log(`changelog: ${entries.length} entries · docs: ${order.length} pages · home pill: ${latest.title}`);
