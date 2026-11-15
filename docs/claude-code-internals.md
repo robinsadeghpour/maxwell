@@ -47,4 +47,5 @@ Processes a background session starts are their own "responsible process" for ma
 - `sessions/<pid>.json` changes status within about 0.1 s of the event. The Stop hook runs a moment after `status` turns idle.
 - The `permission_prompt` Notification hook arrives about 6 s after `status` turns `waiting`, with vaguer text ("Claude needs your permission") than `jobs/<id>/state.json`'s `needs` ("approve Bash: curl …").
 - Esc ends a turn with no Stop hook; only `status` changes.
+- A hook's stdout on `SessionStart` and on `UserPromptSubmit` (exit 0) is added to the session's context (2.1, 2026-11-15). The hook prints the status-line rule on SessionStart, or on the first prompt of a session that started without it, and records that in `<state dir>/briefed/<session id>`.
 - Stop fires while a background subagent or shell still runs; `status` stays `busy` (subagent) or becomes `shell`.

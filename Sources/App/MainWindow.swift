@@ -249,11 +249,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let shown: [(PhaseGroup, [Session])] = scope.map { p in all.compactMap { g, l in
             let k = l.filter { state.project($0, in: projects) == p }; return k.isEmpty ? nil : (g, k)
         } } ?? all
-        let rows = shown.map { g, list in (g, list.map { s in
-            Row(session: s, group: g, detail: detail(s, state: state),
+        func row(_ s: Session, _ g: PhaseGroup) -> Row {
+            Row(session: s, group: g, detail: (state.mark(s) == nil ? "" : "marked · ") + detail(s, state: state),
                 checks: g == .safeToClose ? state.checks(s, now: now, rules: rules) : [], closedAt: g == .recentlyClosed ? state.closed[s.id]?.at : nil,
                 suggestion: g == .recentlyClosed ? nil : state.suggestion(s, in: projects), badges: badges(s, state: state))
-        }) }
+        }
+        let isPinned = { (s: Session) in state.pins.contains(s.id) && s.phase != .ended }
+        let rows = shown.map { g, list in (g, list.filter { !isPinned($0) }.map { row($0, g) }) }.filter { !$0.1.isEmpty }
+        let pinnedRows = shown.flatMap { g, list in list.filter(isPinned).map { row($0, g) } }.sorted { $0.session.lastEventAt > $1.session.lastEventAt }
         let hours = Int(store.config.idleAfter / 3600)
         root.sidebar.list.idleNote = hours >= 48 && hours % 24 == 0 ? "quiet \(hours / 24)d+" : "quiet \(hours)h+"
         root.sidebar.list.emptyText = scope == nil
@@ -262,7 +265,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         var perAccount: [AccountID: Int] = [:]
         for s in state.sessions.values where s.phase != .ended { perAccount[s.accountId, default: 0] += 1 }
         root.sidebar.list.shells = shellRows()
-        root.sidebar.update(scope: scope ?? "All projects", groups: rows)
+        root.sidebar.update(scope: scope ?? "All projects", pinned: pinnedRows, groups: rows)
         root.sidebar.mark.roots = every.first { $0.name == scope }?.roots ?? []
         root.sidebar.mark.monogram = scope.map { String($0.prefix(2)) } ?? ""
         root.sidebar.mark.project = scope
@@ -347,6 +350,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         move.isEnabled = sub.numberOfItems > 0
         m.addItem(move)
         m.addItem(MenuAction("Open Terminal Here") { [weak self] in self?.openShell(in: s.cwd) })
+        m.addItem(.separator())
+        let pinned = state.pins.contains(s.id)
+        m.addItem(MenuAction(pinned ? "Unpin" : "Pin to Top") { [weak self] in self?.pinSession(s.id, !pinned) })
+        m.addItem(markMenu(s, in: state))
         if current != home { m.addItem(MenuAction("Move back to \(home)") { [weak self] in self?.store.moveProject(s.id, to: nil) }) }
         m.addItem(.separator())
         if let shellId = hosted[s.id] {
@@ -370,6 +377,27 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
         if !pluginItems.isEmpty { m.addItem(.separator()); pluginItems.forEach { m.addItem($0) } }
         return m
+    }
+
+    /// Mark as ▸ Your turn, Safe to close, Idle: your call over the verdict until the next turn.
+    /// Working and ended sessions have none to give.
+    private func markMenu(_ s: Session, in state: AppState) -> NSMenuItem {
+        let item = NSMenuItem(title: "Mark As", action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        let markable = s.phase == .yourTurn || { if case .needsYou = s.phase { return true }; return false }()
+        let current = state.mark(s)?.mark
+        for mk in Mark.allCases {
+            let a = MenuAction(mk.group.title) { [weak self] in self?.markSession(s.id, as: mk) }
+            a.state = current == mk ? .on : .off
+            sub.addItem(a)
+        }
+        if current != nil {
+            sub.addItem(.separator())
+            sub.addItem(MenuAction("Let Maxwell Decide") { [weak self] in self?.markSession(s.id, as: nil) })
+        }
+        item.submenu = sub
+        item.isEnabled = markable
+        return item
     }
 
     /// Your own title for a session, kept in Maxwell. Empty goes back to the automatic one.
@@ -827,11 +855,15 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// Opens the confirm sheet for every session safe to close. `onlyNamed` limits it to names
-    /// with that prefix (test runs use "mxtest").
+    /// Opens the confirm sheet for every session safe to close in the open project (all of them
+    /// under All projects), pinned ones left out. `onlyNamed` limits it to names with that prefix
+    /// (test runs use "mxtest").
     func closeAllSafe(onlyNamed prefix: String? = nil) {
-        let safe = store.safeToClose().filter { prefix.map($0.name.hasPrefix) ?? true }.sorted { $0.lastEventAt > $1.lastEventAt }
-        guard !safe.isEmpty else { return toast("Nothing is safe to close yet.") }
+        let state = store.state
+        let safe = store.safeToClose()
+            .filter { !state.pins.contains($0.id) && (scope == nil || state.project($0, in: projects) == scope) && (prefix.map($0.name.hasPrefix) ?? true) }
+            .sorted { $0.lastEventAt > $1.lastEventAt }
+        guard !safe.isEmpty else { return toast(scope.map { "Nothing in \($0) is safe to close yet." } ?? "Nothing is safe to close yet.") }
         presentClose(safe)
     }
 
@@ -890,7 +922,20 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let url = store.markNotSafe(id)
         root.sidebar.list.setExpanded(id, false)
         render(store.state)
-        toast("Marked not safe until it does something new. Evidence logged" + (url.map { "; test fixture \($0.lastPathComponent)" } ?? "") + ".")
+        toast("Kept under Your turn until its next turn. Evidence logged" + (url.map { "; test fixture \($0.lastPathComponent)" } ?? "") + ".")
+    }
+
+    /// The row menu's Mark as: nil hands the session back to Maxwell's verdict.
+    func markSession(_ id: SessionID, as mark: Mark?) {
+        store.setMark(id, mark)
+        root.sidebar.list.setExpanded(id, false)
+        render(store.state)
+        toast(mark.map { "Shown under \($0.group.title) until its next turn." } ?? "Back to Maxwell's verdict.")
+    }
+
+    func pinSession(_ id: SessionID, _ on: Bool) {
+        store.setPinned(id, on)
+        render(store.state)
     }
 
     // MARK: new session

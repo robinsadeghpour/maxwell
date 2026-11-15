@@ -38,6 +38,8 @@ func linearPluginTests() {
     timed.notes["s1"]?["linear"]?.at = t0.addingTimeInterval(at)
     check(outcome(verdictOf(timed, "s1", at: at), .plugin) == .fail && groupOf(timed, "s1", at: at) == .yourTurn, "an open ticket keeps the session out of Safe to close")
     check(note?.actions?.contains("move-done") == true, "Move to Done is offered for this session")
+    // The panel is a separate message from the note: wait for it to carry the suggestion.
+    pump { if case .list(let s)? = host.panels["linear"]?["tickets"] { return s.first?.title == "Suggested" }; return false }
     if case .list(let sections)? = host.panels["linear"]?["tickets"] {
         check(sections.first?.title == "Suggested" && sections.first?.rows.first?.actions.first?.title == "Move to Done", "the panel lists the suggestion first")
         check(sections.map(\.title) == ["Suggested", "In progress  2", "Todo  1", "Backlog  1", "Done this week  1"], "then every ticket of yours by status (\(sections.map(\.title)))")

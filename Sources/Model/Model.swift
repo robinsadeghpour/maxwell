@@ -83,6 +83,25 @@ enum PhaseGroup: Int, CaseIterable {
     var folds: Bool { self == .idle || self == .recentlyClosed }
 }
 
+/// A group you put a session in by hand, over Maxwell's verdict: you disagree with it.
+/// Never Working: only the session itself can say it works.
+enum Mark: String, CaseIterable {
+    case yourTurn = "your-turn", safe, idle
+    var group: PhaseGroup {
+        switch self {
+        case .yourTurn: return .yourTurn
+        case .safe: return .safeToClose
+        case .idle: return .idle
+        }
+    }
+}
+
+/// A mark holds until the session's next turn: then Maxwell's verdict is news again.
+struct Marked: Equatable {
+    var mark: Mark
+    var at: Date
+}
+
 /// The clock-dependent thresholds the sidebar groups by (config: idle-after, judge).
 struct GroupRules: Equatable {
     var idleAfter: TimeInterval = 24 * 3600
@@ -175,8 +194,6 @@ struct Session: Equatable {
     var runningTasks: [BackgroundTask]?
     /// The last hook event from this session: proof the Maxwell hooks run in it.
     var hookSeenAt: Date?
-    /// You pressed "Not safe": it stays out of Safe to close until new activity.
-    var markedNotSafeAt: Date?
     /// When Claude Code stopped this background session's process while it waited on you, to free
     /// memory. The conversation is kept and attaching resumes it. Nil while its process runs.
     var parkedAt: Date?
@@ -238,6 +255,10 @@ struct AppState: Equatable {
     var suggested: [SessionID: String] = [:]
     /// Titles you gave sessions, or a model wrote, by id (kept off the session: one can fold first).
     var named: [SessionID: SessionTitle] = [:]
+    /// Groups you put sessions in by hand ("Not safe" is a Your turn mark). See `mark(_:)`.
+    var marks: [SessionID: Marked] = [:]
+    /// Sessions you pinned: listed first, under Pinned, and never closed by Close all.
+    var pins: Set<SessionID> = []
     /// Suggestions you waved away, per session.
     var dismissed: [SessionID: Set<String>] = [:]
     /// What each plugin says about a session (badges, fields, checks), by session then plugin.
@@ -264,8 +285,18 @@ struct AppState: Equatable {
         return accounts.first { Paths.normalize($0.configDir.path) == d }?.id
     }
 
-    /// The sidebar group a session shows in right now.
+    /// Your mark on a session, while it still holds: no turn has begun since you made it.
+    func mark(_ s: Session) -> Marked? {
+        guard let m = marks[s.id], s.turnAt.map({ $0 <= m.at }) ?? true else { return nil }
+        return m
+    }
+
+    /// The sidebar group a session shows in right now: your mark, else Maxwell's verdict.
     func group(_ s: Session, now: Date, rules: GroupRules) -> PhaseGroup? {
+        switch s.phase {
+        case .needsYou, .yourTurn: if let m = mark(s) { return m.mark.group }
+        default: break
+        }
         switch s.phase {
         case .needsYou: return now.timeIntervalSince(s.lastEventAt) > rules.questionIdleAfter ? .idle : .needsYou
         case .working: return .working

@@ -207,12 +207,32 @@ check(unread.judgeCandidates(now: t0.addingTimeInterval(later), rules: rules).ma
 check(Judgment.parse("Finished.") == .finished && Judgment.parse("finished, nothing left") == .unsure && Judgment.parse("PENDING") == .pending, "model output must be exactly one word")
 check(Reply.hash("a") == Reply.hash("a") && Reply.hash("a") != Reply.hash("b") && Reply.hash("a").count == 16, "message hash is stable")
 
-// "Not safe" holds until new activity.
-let marked = reduce(safe, .markedNotSafe("s1", at: t0.addingTimeInterval(later)))
+// "Not safe" is a Your turn mark; a mark holds until the session's next turn.
+let marked = reduce(safe, .marked("s1", .yourTurn, at: t0.addingTimeInterval(later)))
 check(outcome(verdictOf(marked, "s1", at: later + 1), .marked) == .fail && groupOf(marked, "s1", at: later + 1) == .yourTurn, "marked not safe leaves safe to close")
 var active = reduce(marked, hook(.promptSubmitted(prompt: "more", title: nil), at: later + 2))
 active = reduce(active, hook(.stopped(lastMessage: "Fixed and pushed. PR #12 is merged."), at: later + 3))
 check(outcome(verdictOf(active, "s1", at: later + 7300), .marked) == nil, "new activity clears the mark")
+let notSafeLine = #"{"ts":1,"maxwell":{"type":"not-safe","session":"s1","hash":"","checks":[]}}"#
+if case .marked("s1", .yourTurn?, _)? = EventParser.parse(line: Substring(notSafeLine)) {} else { check(false, "an old not-safe line reads as a Your turn mark") }
+
+// Your marks: Safe to close over failing checks, Idle, and back to the verdict.
+let markedSafe = reduce(notRepo, .marked("s1", .safe, at: t0.addingTimeInterval(later)))
+check(groupOf(notRepo, "s1", at: later + 1) == .yourTurn && groupOf(markedSafe, "s1", at: later + 1) == .safeToClose, "marked safe shows under Safe to close despite failing checks")
+check(outcome(verdictOf(markedSafe, "s1", at: later + 1), .marked) == .pass, "the mark is a passing check you can see")
+check(groupOf(reduce(notRepo, .marked("s1", .idle, at: t0.addingTimeInterval(later))), "s1", at: later + 1) == .idle, "marked idle shows under Idle")
+check(groupOf(reduce(markedSafe, .marked("s1", nil, at: t0.addingTimeInterval(later + 1))), "s1", at: later + 2) == .yourTurn, "Let Maxwell decide clears the mark")
+check(groupOf(reduce(busy, .marked("s1", .safe, at: t0.addingTimeInterval(later))), "s1", at: later + 1) == .working, "a mark never hides a working session")
+let markLine = #"{"ts":1,"maxwell":{"type":"marked","session":"s1","as":"safe"}}"#, clearLine = #"{"ts":2,"maxwell":{"type":"marked","session":"s1"}}"#
+var remarked = reduce(notRepo, EventParser.parse(line: Substring(markLine))!)
+check(remarked.marks["s1"]?.mark == .safe, "a marked line replays")
+remarked = reduce(remarked, EventParser.parse(line: Substring(clearLine))!)
+check(remarked.marks["s1"] == nil, "a marked line without a group clears it")
+
+// Pins.
+let pinLine = #"{"ts":1,"maxwell":{"type":"pinned","session":"s1","on":true}}"#, unpinLine = #"{"ts":2,"maxwell":{"type":"pinned","session":"s1","on":false}}"#
+let pinnedState = reduce(safe, EventParser.parse(line: Substring(pinLine))!)
+check(pinnedState.pins == ["s1"] && reduce(pinnedState, EventParser.parse(line: Substring(unpinLine))!).pins.isEmpty, "pins replay from the log")
 
 // Closing: a record moves it to Recently closed; reopening clears it.
 let closedRec = ClosedSession(at: t0.addingTimeInterval(later), session: { var c = safe.sessions["s1"]!; c.phase = .ended; return c }(), checks: verdictOf(safe, "s1", at: later))
