@@ -842,12 +842,20 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func showNewSession() {
         dismissOverlays()
         let state = store.state
-        var folders: [String] = []
-        for s in state.sessions.values.sorted(by: { $0.lastEventAt > $1.lastEventAt }) {
-            if let f = startFolder(s.cwd), !folders.contains(f) { folders.append(f) }
-        }
-        if let c = current.flatMap({ state.sessions[$0]?.cwd }).flatMap(startFolder) { folders.removeAll { $0 == c }; folders.insert(c, at: 0) }
-        newPanel.present(.init(accounts: state.accounts, defaultAccount: state.roomiest(now: Date())?.id, folders: Array(folders.prefix(5))), in: root)
+        // Home is never offered: a session there sees everything. ⌘O still reaches it, with a warning.
+        let used = state.sessions.values.compactMap { s in startFolder(s.cwd).map { (path: $0, at: s.lastEventAt) } }
+            .filter { Paths.normalize($0.path) != Paths.normalize(Paths.home.path) }
+        var folders = ProjectFolders.all(used: used, projects: projects)
+        // The open session's folder and then the open project's lead, so ⏎ or one ↓ reaches them.
+        let here = current.flatMap { state.sessions[$0]?.cwd }.flatMap(startFolder)
+        folders = folders.filter { $0.path == here } + folders.filter { $0.path != here }
+        if let scope { folders = folders.filter { $0.project == scope } + folders.filter { $0.project != scope } }
+        // Inside a project, start in it. From All projects, pick: the last folder looked at is a guess.
+        let preselected = scope.flatMap { s in folders.first { $0.project == s }?.path }
+        newPanel.present(.init(accounts: state.accounts, defaultAccount: state.roomiest(now: Date())?.id, folders: folders,
+                               preselected: preselected,
+                               isProject: { [projects] in ProjectFolders.isProject($0, projects: projects) },
+                               projectName: { [projects] in projects.name(for: $0) }), in: root)
     }
 
     /// Where a new session for a session's folder starts: the project's main checkout, never a
@@ -1249,6 +1257,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func folderHere(_ state: AppState) -> String? {
         let inScope = { (s: Session) in !s.cwd.isEmpty && (self.scope == nil || state.project(s, in: self.projects) == self.scope) }
         if let s = current.flatMap({ state.sessions[$0] }), inScope(s), let f = startFolder(s.cwd) { return f }
+        // From All projects with nothing open there is no "here": ⌘T asks, like ⌘N, instead of guessing.
+        guard scope != nil else { return nil }
         let own = state.sessions.values.filter { inScope($0) && (self.scope == nil || self.projects.name(for: $0.cwd) == self.scope) }
         return own.sorted { $0.lastEventAt > $1.lastEventAt }.lazy.compactMap { self.startFolder($0.cwd) }.first
     }

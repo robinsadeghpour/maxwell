@@ -24,7 +24,7 @@
   "Sources/UI/Theme.swift": 1
  },
  "file-lines": {
-  "Sources/App/MainWindow.swift": 1644,
+  "Sources/App/MainWindow.swift": 1652,
   "Sources/App/Probes.swift": 540,
   "Sources/App/Store.swift": 593,
   "Sources/App/main.swift": 626,
@@ -45,7 +45,6 @@
  "hand-made-controls": {
   "Sources/App/MainWindow.swift": 1,
   "Sources/UI/FileTree.swift": 1,
-  "Sources/UI/NewSessionPanel.swift": 1,
   "Sources/UI/Search.swift": 1,
   "Sources/UI/SettingsWindow.swift": 1
  },
