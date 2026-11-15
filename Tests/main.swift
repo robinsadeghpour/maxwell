@@ -110,7 +110,7 @@ check(outcome(verdictOf(unlisted, "s1", at: later), .listed) == .unknown && grou
 func emptyListing(_ st: AppState, at: Double) -> AppState { reduce(st, .agents(AgentsSnapshot(at: t0.addingTimeInterval(at), accountId: "work", entries: []))) }
 let parked = emptyListing(safe, at: later + 3600)
 check(parked.sessions["s1"]?.phase == .yourTurn && parked.sessions["s1"]?.parkedAt != nil, "a background session that leaves the listing while it waits is parked, not ended")
-check(outcome(verdictOf(parked, "s1", at: later + 3600), .listed) == .pass, "parked: known to run nothing")
+check(outcome(verdictOf(parked, "s1", at: later + 3600), .listed) == .pass && outcome(verdictOf(parked, "s1", at: later + 3600), .idle) == .pass, "parked: known to run nothing")
 check(groupOf(parked, "s1", at: later + 3600) == .safeToClose, "a parked session passing every other check is safe to close")
 check(groupOf(parked, "s1", at: later + 2 * 86400) == .idle, "a session parked long ago folds into Idle, not Safe to close")
 check(evidence(parked, "s1", at: later + 3700).sessions["s1"]?.parkedAt == nil, "listed again: it runs again")

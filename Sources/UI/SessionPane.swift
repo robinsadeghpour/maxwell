@@ -108,8 +108,10 @@ final class SessionPane: MXView {
         } else if s.parkedAt != nil && terminal == nil {
             empty.isHidden = true
             message.scroll.isHidden = false
+            let asked: String? = { if case .needsYou(let q) = s.phase { return q }; return nil }()
             message.show(note: "This session isn't running: Claude Code stopped it while it waited. The conversation is kept; ⌘R resumes it.",
-                         text: s.lastMessage ?? "Resume to see where it left off.")
+                         text: (s.lastMessage ?? asked).map { "⏺ " + $0 } ?? "Resume to see where it left off.")
+            banner.append(" · not running")
             // Safe to close already offers Close as the one main action; elsewhere Resume is the next step.
             if group != .safeToClose {
                 banner.add(MXButton("Resume", hint: "⌘R", primary: true) { [weak self] in self?.delegate?.reattach(s.id) })
@@ -253,6 +255,12 @@ final class Banner: MXView, TipSource {
         [glyph, label].forEach(addSubview)
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Adds to the line, after what the group says.
+    func append(_ more: String) {
+        label.text += more
+        needsLayout = true
+    }
 
     func configure(group: PhaseGroup, text: String, tint: @escaping (Theme) -> NSColor) {
         glyph.group = group
