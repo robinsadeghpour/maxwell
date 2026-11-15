@@ -16,9 +16,15 @@ case ${1:-} in
     dir=$(mktemp -d)
     swiftc -O -o "$dir/export-identity" packaging/ci/export-identity.swift
     export P12_PASSWORD=$(openssl rand -base64 24)
-    "$dir/export-identity" | secret MAXWELL_CERT_P12
+    trap 'security delete-keychain "$dir/check.keychain-db" 2>/dev/null; rm -rf "$dir"' EXIT
+    p12=$("$dir/export-identity")
+    # Import it the way release.yml will before uploading, so a bad export never reaches CI.
+    base64 -D <<<"$p12" > "$dir/cert.p12"
+    security create-keychain -p check "$dir/check.keychain-db"
+    security import "$dir/cert.p12" -k "$dir/check.keychain-db" -P "$P12_PASSWORD" >/dev/null ||
+      { echo "The exported certificate doesn't import with its password; nothing was uploaded."; exit 1; }
+    printf %s "$p12" | secret MAXWELL_CERT_P12
     printf %s "$P12_PASSWORD" | secret MAXWELL_CERT_PASSWORD
-    rm -rf "$dir"
     echo "Set MAXWELL_CERT_P12 and MAXWELL_CERT_PASSWORD on $REPO (environment: release)."
     ;;
   notary)

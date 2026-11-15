@@ -27,10 +27,13 @@ let identity = identities.first { id in
 }
 guard let identity else { fail("No valid \"\(prefix)\" identity in the keychain.") }
 
+// The passphrase must outlive SecItemExport: a temporary `password as CFString` is freed first
+// under -O, and the export is then encrypted with whatever that memory held.
+let passphrase = password as CFString
 var params = SecItemImportExportKeyParameters()
 params.version = UInt32(SEC_KEY_IMPORT_EXPORT_PARAMS_VERSION)
-params.passphrase = Unmanaged.passUnretained(password as CFString)
+params.passphrase = Unmanaged.passUnretained(passphrase)
 var data: CFData?
-let status = SecItemExport(identity, .formatPKCS12, [], &params, &data)
+let status = withExtendedLifetime(passphrase) { SecItemExport(identity, .formatPKCS12, [], &params, &data) }
 guard status == errSecSuccess, let data else { fail("Export failed (\(status)). Allow it when macOS asks.") }
 print((data as Data).base64EncodedString())
