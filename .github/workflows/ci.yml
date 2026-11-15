@@ -1,0 +1,52 @@
+# Every pull request and every push to v1: the engineering standard check, the tests, and a full
+# build of Maxwell Dev, on the same macOS image the release uses. Nothing here signs or publishes.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [v1]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use Xcode 27
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
+
+      - name: Standard check and tests
+        run: ./build.sh test
+
+      - name: Read the GhosttyKit pin
+        id: ghostty
+        run: echo "commit=$(sed -n 's/^GHOSTTY_COMMIT=//p' build.sh)" >> "$GITHUB_OUTPUT"
+      - name: Restore GhosttyKit (built and cached by the release workflow)
+        id: ghostty-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            vendor/ghostty
+            !vendor/ghostty/.zig-cache
+          key: ghosttykit-${{ runner.os }}-${{ runner.arch }}-${{ steps.ghostty.outputs.commit }}-zig0.17.1
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        if: steps.ghostty-cache.outputs.cache-hit != 'true'
+        with:
+          version: 0.17.1
+      - name: Build GhosttyKit (only when the pin changed)
+        if: steps.ghostty-cache.outputs.cache-hit != 'true'
+        run: |
+          xcodebuild -downloadComponent MetalToolchain
+          ./build.sh ghostty
+
+      - name: Build Maxwell Dev
+        run: ./build.sh

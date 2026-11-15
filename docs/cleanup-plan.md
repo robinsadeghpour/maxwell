@@ -26,16 +26,13 @@ Pick up the first step that isn't done. Mark it done here in the same PR that fi
 
 ### 0. A standard, a check, and one place for knowledge — done 2026-11-15
 
-`docs/engineering-standard.md`, `scripts/check-standard.py` (runs in `./build.sh test`, so in every release), `CLAUDE.md`, and `docs/shipping.md`, `harness.md`, `claude-code-internals.md`, moved out of per-account memories.
+`docs/engineering-standard.md`, `scripts/check-standard.py` (runs in `./build.sh test`, so in every release), `CLAUDE.md`, and `docs/releasing.md`, `harness.md`, `claude-code-internals.md`, moved out of per-account memories.
 
-### 1. One copy of the code
+### 1. One copy of the code — done 2026-11-15
 
-Make the public repo the only home of the code. maxwell-private shrinks to what must stay private (`docs/launch/`, `docs/decisions.tsv`, `docs/shipping.md`, interviews), or moves into a private folder that is never pushed public.
+This public repository is the only home of the code, its docs, CI and decision log. `maxwell-private` keeps only what shouldn't be public: user research with real people, the old decision log and design rounds (full of real project names), launch material until launch, screenshots of real sessions, and real-data fixtures. Its code was removed, and its CI fails any change that adds code back.
 
-- First reconcile the 21 differing files one by one: for each, take the newer intent from both sides, never a whole file from one side. Build and test both before switching.
-- Then sessions branch from public `v1`, and `docs/shipping.md` loses its porting section.
-- **Done when** there is no porting step, and `diff -r` of the code between the two repos is empty or the private one has no code.
-- **Before starting**, check with Robin which private docs must never become public. This is the one step that could publish something private.
+Reconciling showed public was already a superset: every private-only line was an older version of code public had since rewritten, or a real name public had replaced with an invented one. The last unported change (three demo tweaks from the launch film) came across with this step.
 
 ### 2. Beta and Stable
 
@@ -86,6 +83,6 @@ In this order, because sessions touch them most: `MainWindow` (actions, wiring a
 
 ## Order and size
 
-Steps 1 and 2 protect users now; do them first. Step 3 makes every later step safe to do. Steps 4 and 5 handle the failures that come from Claude Code and macOS rather than from Maxwell. Steps 6 and 7 can run alongside feature work: any session touching one of these files leaves it smaller.
+Step 2 protects users now; do it first. Step 3 makes every later step safe to do. Steps 4 and 5 handle the failures that come from Claude Code and macOS rather than from Maxwell. Steps 6 and 7 can run alongside feature work: any session touching one of these files leaves it smaller.
 
 Rough size, one session each: step 1 half a day (most of it reconciling files carefully), 2 half a day, 3 a day, 4 a day, 5 half a day, 6 and 7 a few hours per file.

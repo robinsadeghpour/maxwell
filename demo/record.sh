@@ -3,6 +3,7 @@
 # take driven by Maxwell's own test flags. Frames come from the app's own window (no screen
 # recording permission). Needs an unlocked screen.
 #   ./demo/record.sh [out.mp4]          default: build/demo/raw.mp4
+#   WIDTH=2560 keeps the full Retina size, for edits that zoom in (demo/reel).
 # Then ./demo/cut.sh adds the captions.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -16,7 +17,7 @@ rm -rf $FRAMES; mkdir -p $FRAMES "$(dirname $OUT)"
 # Times are seconds after launch. The story: what needs you, live; answer it in place; every
 # group in one project; the evidence behind Safe to close; close them all.
 env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_SESSION_ID $(cat $ROOT/.env) \
-  build/Maxwell.app/Contents/MacOS/Maxwell --size 1280x800 --retina --hide system \
+  build/Maxwell.app/Contents/MacOS/Maxwell --size ${SIZE:-1280x800} --retina --hide system \
   --select "Dark mode for settings" \
   --keys "9:cmd+j;12.5:1;16.5:cmd+1;25.5:cmd+0;26.5:cmd+shift+x" \
   --expand "Bump dependencies" --expand-after 19 \
@@ -37,7 +38,7 @@ with open(f"{d}/list.txt", "w") as out:
         out.write(f"file '{a}'\nduration {((int(b[:-5]) if b else int(a[:-5]) + 33) - int(a[:-5])) / 1000:.3f}\n")
     out.write(f"file '{fs[-1]}'\n")
 EOF
-ffmpeg -v error -y -f concat -safe 0 -i $FRAMES/list.txt -vf "fps=30,scale=1920:-2:flags=lanczos,format=yuv420p" \
+ffmpeg -v error -y -f concat -safe 0 -i $FRAMES/list.txt -vf "fps=30,scale=${WIDTH:-1920}:-2:flags=lanczos,format=yuv420p" \
   -c:v libx264 -preset slow -crf 16 -movflags +faststart $OUT
 rm -rf $FRAMES
 echo $OUT

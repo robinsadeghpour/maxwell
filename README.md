@@ -197,6 +197,8 @@ Speed and memory are checked on every build by `./measure.sh`: window on screen 
 
 ## Develop
 
+[CONTRIBUTING.md](CONTRIBUTING.md) is the short version, [docs/engineering-standard.md](docs/engineering-standard.md) says how the code is organised, and [docs/cleanup-plan.md](docs/cleanup-plan.md) is the work in progress.
+
 You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`) and Zig 0.17 (`brew install zig`). Releases also need a Developer ID Application certificate, an App Store Connect API key in [asc](https://github.com/rorkai/App-Store-Connect-CLI) for notarization, and [uv](https://docs.astral.sh/uv/) for the DMG. The top of `release.sh` lists the one-time setup.
 
 ```sh

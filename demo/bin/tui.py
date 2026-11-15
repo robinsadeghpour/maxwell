@@ -73,7 +73,7 @@ def screen(state, tick, approved):
     w = min(cols - 2, 96)
     home = os.path.expanduser("~")
     where = s["cwd"].replace(home, "~")
-    out = box([(f"{ORANGE}✻{RESET} {BOLD}Welcome to the demo session{RESET}", "✻ Welcome to the demo session"),
+    out = box([(f"{ORANGE}✻{RESET} {BOLD}Claude Code{RESET}", "✻ Claude Code"),
                ("", ""), (f"{DIM}  cwd: {where}{RESET}", f"  cwd: {where}")], min(w, 64), DIM)
     out += ["", f"{DIM}>{RESET} {s['prompt']}", ""]
     tools = TOOLS.get(s["key"], []) + (AFTER.get(s["key"], [])[:approved] if approved else [])
