@@ -176,7 +176,10 @@ final class PluginListView: MXView, TipSource {
     var onStatusButton: (() -> Void)?
     private var hover: Hit?
 
-    private enum Hit: Equatable { case row(String), button(String, String), statusButton }
+    private enum Hit: Equatable {
+        case row(String), button(String, String), statusButton
+        var row: String? { switch self { case .row(let id), .button(let id, _): return id; case .statusButton: return nil } }
+    }
     private static let section: CGFloat = 24
 
     override init(frame: NSRect) {
@@ -185,31 +188,47 @@ final class PluginListView: MXView, TipSource {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    /// A row with a second line is two lines tall; one without stays one line, so a list of
+    /// bare titles reads as a dense list instead of a column of blanks.
+    private static func height(_ r: PluginView.Row) -> CGFloat { r.subtitle == nil ? 26 : Metrics.row2 }
+
     func contentHeight(width: CGFloat) -> CGFloat {
-        guard case .list(let sections) = content else { return 120 }
-        return sections.reduce(8) { $0 + ($1.title.isEmpty ? 0 : Self.section) + CGFloat($1.rows.count) * Metrics.row2 } + 8
+        guard case .list = content else { return 120 }
+        return (layoutRows().rows.last?.rect.maxY ?? 0) + 10
     }
 
-    private struct Layout { var sections: [(String, CGFloat)]; var rows: [(PluginView.Row, NSRect)] }
+    /// Where a row's parts start: the status glyph, the key column and the title share x within
+    /// a section, so titles line up even when keys differ in length.
+    private struct Placed { var row: PluginView.Row; var rect: NSRect; var keyW: CGFloat; var glyph: Bool }
+    private struct Layout { var sections: [(String, CGFloat)]; var rows: [Placed] }
     private func layoutRows() -> Layout {
         guard case .list(let sections) = content else { return Layout(sections: [], rows: []) }
-        var y: CGFloat = 4, heads: [(String, CGFloat)] = [], rows: [(PluginView.Row, NSRect)] = []
-        for s in sections {
+        let font = Fonts.mono()
+        var y: CGFloat = 6, heads: [(String, CGFloat)] = [], rows: [Placed] = []
+        for s in sections where !s.rows.isEmpty {
             if !s.title.isEmpty { heads.append((s.title, y)); y += Self.section }
-            for r in s.rows { rows.append((r, NSRect(x: 0, y: y, width: bounds.width, height: Metrics.row2))); y += Metrics.row2 }
+            let keyW = s.rows.compactMap(\.key).map { Text.width($0, font: font) }.max().map { $0 + 8 } ?? 0
+            let glyph = s.rows.contains { $0.status != nil }
+            for r in s.rows {
+                let h = Self.height(r)
+                rows.append(Placed(row: r, rect: NSRect(x: 0, y: y, width: bounds.width, height: h), keyW: keyW, glyph: glyph))
+                y += h
+            }
+            y += 6
         }
         return Layout(sections: heads, rows: rows)
     }
 
-    /// Action buttons on a row's second line, right-aligned; the first is the main one.
+    /// Action buttons, right-aligned and centred on the row. They show while the pointer is on
+    /// the row; the first is the main one.
     private func buttonRects(_ row: PluginView.Row, in r: NSRect) -> [(PluginView.Button, NSRect)] {
         let small = Fonts.mono(Metrics.fontSize - 2)
-        var right = r.maxX - 16
+        var right = r.maxX - 8
         var out: [(PluginView.Button, NSRect)] = []
         for b in row.actions.prefix(2) {
-            let w = Text.width(b.title, font: small) + 12
-            let rect = NSRect(x: right - w, y: r.minY + 20, width: w, height: 15)
-            if rect.minX < r.minX + r.width * 0.15 { break }
+            let w = Text.width(b.title, font: small) + 14
+            let rect = NSRect(x: right - w, y: r.midY - 9, width: w, height: 18)
+            if rect.minX < r.minX + r.width * 0.3 { break }
             out.append((b, rect))
             right = rect.minX - 4
         }
@@ -230,40 +249,51 @@ final class PluginListView: MXView, TipSource {
         case .list(let sections):
             if sections.allSatisfy({ $0.rows.isEmpty }) { return drawMessage("Nothing here.", nil, nil) }
             let l = layoutRows()
+            let head = Fonts.mono(Metrics.fontSize - 2.5, .medium)
             for (title, y) in l.sections {
-                Text.draw(title, in: NSRect(x: 14, y: y, width: bounds.width - 28, height: Self.section), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1, .semibold))
+                Text.draw(title.uppercased(), in: NSRect(x: 14, y: y, width: bounds.width - 28, height: Self.section), color: t.fg3, font: head)
             }
-            for (row, r) in l.rows {
-                let box = r.insetBy(dx: 6, dy: 1.5)
-                if hover == .row(row.id) { t.hover.setFill(); NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5).fill() }
-                var right = box.maxX - 10
-                if let b = row.badge {
-                    let w = min(box.width * 0.45, Text.width(b.text, font: small) + 19)
-                    let rect = NSRect(x: right - w, y: r.minY + 4.5, width: w, height: 15)
-                    let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
-                    t.hair2.setFill(); path.fill(); t.hair.setStroke(); path.lineWidth = 1; path.stroke()
+            for p in l.rows {
+                let row = p.row, r = p.rect
+                let box = r.insetBy(dx: 6, dy: 1)
+                let lit = hover?.row == row.id
+                if lit { t.hover.setFill(); NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4).fill() }
+                // The pointer's row trades its badge for its buttons; other rows stay quiet.
+                let buttons = lit ? buttonRects(row, in: box) : []
+                var right = (buttons.map(\.1.minX).min() ?? box.maxX - 4) - 6
+                let line1 = NSRect(x: 0, y: r.minY + (row.subtitle == nil ? (r.height - 18) / 2 : 3), width: 0, height: 18)
+                if buttons.isEmpty, let b = row.badge {
+                    let w = min(box.width * 0.4, Text.width(b.text, font: small) + 11)
+                    let x = box.maxX - 8 - w
                     t.color(for: b.tone).setFill()
-                    NSBezierPath(roundedRect: NSRect(x: rect.minX + 6, y: rect.midY - 2.5, width: 5, height: 5), xRadius: 1, yRadius: 1).fill()
-                    Text.draw(b.text, in: NSRect(x: rect.minX + 15, y: rect.minY, width: rect.width - 19, height: 15), color: t.fg2, font: small)
-                    right = rect.minX - 8
+                    NSRect(x: x, y: line1.midY - 2.5, width: 5, height: 5).fill()
+                    Text.draw(b.text, in: NSRect(x: x + 10, y: line1.minY, width: w - 10, height: 18), color: t.fg3, font: small)
+                    right = x - 10
                 }
+                var x = box.minX + 8
                 // Rows with a status lead with the session glyph that means the same, like the sessions list.
-                let indent: CGFloat = row.status == nil ? 8 : 22
-                if let st = row.status {
-                    Glyph.draw(st.glyph, at: NSPoint(x: box.minX + 11, y: r.minY + 12), color: t.color(for: st.glyph), angle: 90)
+                if p.glyph {
+                    if let st = row.status { Glyph.draw(st.glyph, at: NSPoint(x: x + 4, y: line1.midY), color: t.color(for: st.glyph), angle: 90) }
+                    x += 16
                 }
-                Text.draw(row.title, in: NSRect(x: box.minX + indent, y: r.minY + 3, width: right - box.minX - indent, height: 18), color: t.fg)
-                let buttons = buttonRects(row, in: box)
-                let subRight = buttons.map(\.1.minX).min().map { $0 - 6 } ?? box.maxX - 10
+                if let k = row.key {
+                    Text.draw(k, in: NSRect(x: x, y: line1.minY, width: max(0, min(p.keyW, right - x)), height: 18), color: t.fg3)
+                    x += p.keyW
+                }
+                Text.draw(row.title, in: NSRect(x: x, y: line1.minY, width: max(0, right - x), height: 18), color: t.fg)
                 if let sub = row.subtitle {
-                    Text.draw(sub, in: NSRect(x: box.minX + indent, y: r.minY + 20, width: subRight - box.minX - indent, height: 15), color: t.fg3, font: small)
+                    let sx = x
+                    let subRight = (buttons.map(\.1.minX).min() ?? box.maxX - 4) - 6
+                    Text.draw(sub, in: NSRect(x: sx, y: r.minY + 20, width: max(0, subRight - sx), height: 15), color: t.fg3, font: small)
                 }
-                for (b, rect) in buttons {
+                for (i, (b, rect)) in buttons.enumerated() {
                     let hot = hover == .button(row.id, b.action)
-                    let path = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
-                    (hot ? t.hover : t.hair2).setFill(); path.fill()
+                    let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 3, yRadius: 3)
+                    // The main action is filled; the rest are outlined.
+                    if i == 0 { (hot ? t.fg2 : t.fg3).withAlphaComponent(0.35).setFill(); path.fill() }
+                    else if hot { t.hair2.setFill(); path.fill() }
                     t.hair.setStroke(); path.lineWidth = 1; path.stroke()
-                    Text.draw(b.title, in: rect, color: hot ? t.fg : t.fg2, font: small, align: .center)
+                    Text.draw(b.title, in: rect, color: hot || i == 0 ? t.fg : t.fg2, font: small, align: .center)
                 }
             }
         }
@@ -291,7 +321,8 @@ final class PluginListView: MXView, TipSource {
 
     private func hit(_ p: NSPoint) -> (Hit, PluginView.Row?)? {
         if let b = statusButtonTitle, statusButtonRect(b).contains(p) { return (.statusButton, nil) }
-        for (row, r) in layoutRows().rows where r.contains(p) {
+        for placed in layoutRows().rows where placed.rect.contains(p) {
+            let row = placed.row, r = placed.rect
             if let (b, _) = buttonRects(row, in: r.insetBy(dx: 6, dy: 1.5)).first(where: { $0.1.insetBy(dx: -2, dy: -2).contains(p) }) { return (.button(row.id, b.action), row) }
             return (.row(row.id), row)
         }
@@ -320,7 +351,7 @@ final class PluginListView: MXView, TipSource {
 
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         guard let (h, row) = hit(p), let row else { return nil }
-        let r = layoutRows().rows.first { $0.0.id == row.id }!.1
+        let r = layoutRows().rows.first { $0.row.id == row.id }!.rect
         switch h {
         case .button(_, let a):
             let rect = buttonRects(row, in: r.insetBy(dx: 6, dy: 1.5)).first { $0.0.action == a }!.1

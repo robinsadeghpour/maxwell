@@ -174,6 +174,8 @@ enum PluginView: Equatable {
         var actions: [Button]
         /// Where the item stands, in the words every plugin shares; drawn with the session glyphs.
         var status: ItemStatus? = nil
+        /// A short identifier drawn dim before the title in its own column ("TIN-33").
+        var key: String? = nil
     }
     /// A plugin item's status (issue #1): the host picks glyph and colour, plugins never do.
     enum ItemStatus: String {
@@ -209,7 +211,7 @@ enum PluginView: Equatable {
                     }
                     return Row(id: id, title: title, subtitle: str(r, "subtitle"), badge: b, session: str(r, "session"), url: str(r, "url"),
                                actions: ((r["actions"] as? [[String: Any]]) ?? []).compactMap { button($0) },
-                               status: str(r, "status").flatMap(ItemStatus.init))
+                               status: str(r, "status").flatMap(ItemStatus.init), key: str(r, "key"))
                 })
             }
             return .list(sections)

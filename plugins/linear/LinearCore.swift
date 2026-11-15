@@ -303,14 +303,13 @@ enum LinearBoard {
         func rank(_ s: LinearSession) -> Int { urgency.firstIndex(of: s.group ?? "") ?? urgency.count }
         func row(_ id: String, _ issue: LinearIssue?) -> [String: Any] {
             let ss = (byTicket[id] ?? []).sorted { rank($0) < rank($1) }
-            var r: [String: Any] = ["id": "issue:\(id)", "title": "\(id) \(issue?.title ?? "")", "actions": issue == nil ? [] : [["action": "open-ticket", "title": "Open"]]]
+            var r: [String: Any] = ["id": "issue:\(id)", "key": id, "title": issue?.title ?? "Reading…", "actions": issue == nil ? [] : [["action": "open-ticket", "title": "Open"]]]
             if let top = ss.first {
                 r["session"] = top.id
                 let g = top.group ?? "idle"
                 r["badge"] = ["text": groupNames[g] ?? g, "tone": groupTone[g] ?? "neutral"]
                 r["subtitle"] = ss.count == 1 ? top.title : "\(ss.count) sessions · " + summary(ss)
             } else {
-                r["subtitle"] = "no session"
                 if let u = issue?.url { r["url"] = u }
             }
             return r

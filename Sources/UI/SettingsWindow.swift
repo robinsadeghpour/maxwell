@@ -154,46 +154,117 @@ final class KeyRecorder: MXView {
     }
 }
 
+/// Exclusive choice as one control: segments joined in a single outline, the current one raised.
+final class Segmented: MXView {
+    let options: [(value: String, title: String)]
+    var current: String { didSet { needsDisplay = true } }
+    var onPick: ((String) -> Void)?
+    private var hover: Int?
+    private let font = Fonts.mono(Metrics.fontSize - 1)
+
+    init(_ options: [(value: String, title: String)], current: String) {
+        self.options = options; self.current = current
+        super.init(frame: .zero)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var widths: [CGFloat] { options.map { Text.width($0.title, font: font) + 20 } }
+    override var intrinsicContentSize: NSSize { NSSize(width: widths.reduce(0, +), height: Metrics.control) }
+    private func rects() -> [NSRect] {
+        var x: CGFloat = 0
+        return widths.map { w in defer { x += w }; return NSRect(x: x, y: 0, width: w, height: bounds.height) }
+    }
+
+    override func draw(_ r: NSRect) {
+        let outer = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+        t.hair2.setFill(); outer.fill()
+        for (i, (o, rect)) in zip(options, rects()).enumerated() {
+            let on = o.value == current
+            if on {
+                let k = NSBezierPath(roundedRect: rect.insetBy(dx: 2, dy: 2), xRadius: 3, yRadius: 3)
+                t.rowSel.setFill(); k.fill()
+                t.hair.setStroke(); k.lineWidth = 1; k.stroke()
+            } else if hover == i {
+                t.hover.setFill(); NSBezierPath(roundedRect: rect.insetBy(dx: 2, dy: 2), xRadius: 3, yRadius: 3).fill()
+            }
+            Text.draw(o.title, in: rect, color: on ? t.fg : t.fg2, font: on ? Fonts.mono(Metrics.fontSize - 1, .medium) : font, align: .center)
+        }
+        t.hair.setStroke(); outer.lineWidth = 1; outer.stroke()
+    }
+
+    private func index(_ e: NSEvent) -> Int? { let p = convert(e.locationInWindow, from: nil); return rects().firstIndex { $0.contains(p) } }
+    override func mouseMoved(with e: NSEvent) { let i = index(e); if i != hover { hover = i; needsDisplay = true } }
+    override func mouseExited(with e: NSEvent) { hover = nil; needsDisplay = true }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    override func mouseDown(with e: NSEvent) {
+        guard let i = index(e), options[i].value != current else { return }
+        current = options[i].value
+        onPick?(current)
+    }
+}
+
 // MARK: form
 
-/// One section's rows on one grid: labels in a 168 pt column, controls from there, 30 pt rows.
+/// One section's rows on one grid: labels in a 200 pt column, controls from there, 30 pt rows.
+/// Notes wrap under their controls instead of being cut off.
 final class FormView: MXView {
-    private struct Line { var y: CGFloat; var label: String; var note: String?; var header: Bool }
+    private struct Line { var y: CGFloat; var label: String; var note: String?; var noteH: CGFloat = 0; var header: Bool }
     private var lines: [Line] = []
     private(set) var cursor: CGFloat = 0
     static let labelW: CGFloat = 200
     static let rowH: CGFloat = 30
     static let x0: CGFloat = 24
+    /// Notes stop at a reading width, however wide the window is.
+    static let noteMax: CGFloat = 480
+    private static let noteFont = Fonts.mono(Metrics.fontSize - 2)
+
+    private var noteWidth: CGFloat { max(160, min(Self.noteMax, bounds.width - Self.x0 * 2 - Self.labelW)) }
+    private static func noteAttrs(_ color: NSColor) -> [NSAttributedString.Key: Any] {
+        let p = NSMutableParagraphStyle(); p.lineSpacing = 2
+        return [.font: noteFont, .foregroundColor: color, .paragraphStyle: p]
+    }
+    private func noteHeight(_ s: String) -> CGFloat {
+        ceil((s as NSString).boundingRect(with: NSSize(width: noteWidth, height: 1000), options: [.usesLineFragmentOrigin], attributes: Self.noteAttrs(.black)).height)
+    }
 
     func reset() { subviews.forEach { $0.removeFromSuperview() }; lines = []; cursor = 16; needsDisplay = true }
 
     func header(_ s: String) {
-        if cursor > 16 { cursor += 10 }
+        if cursor > 16 { cursor += 14 }
         lines.append(Line(y: cursor, label: s, note: nil, header: true))
-        cursor += 26
+        cursor += 30
     }
 
     /// A row: label on the left, the controls left to right with their own widths, an optional note under them.
+    /// A leading value label is only as wide as its text, so its buttons sit right after it;
+    /// later labels keep their width so columns of buttons line up.
     func row(_ label: String, _ controls: [(NSView, CGFloat)], note: String? = nil, height: CGFloat = FormView.rowH) {
         var x = Self.x0 + Self.labelW
-        for (v, w) in controls {
-            let h = v is MXButton ? Metrics.control : v is KeyRecorder ? 22 : height
+        for (i, (v, w)) in controls.enumerated() {
+            let h = v is MXButton || v is Segmented ? Metrics.control : v is KeyRecorder ? 22 : height
+            let w = i == 0 && controls.count > 1 ? (v as? Label).map { min(w, $0.textWidth + 2) } ?? w : w
             v.frame = NSRect(x: x, y: cursor + (height - h) / 2, width: w, height: h)
             addSubview(v)
-            x += w + 6
+            x += w + (i == 0 && v is Label ? 12 : 6)
         }
-        lines.append(Line(y: cursor, label: label, note: note, header: false))
-        cursor += height + (note == nil ? 0 : 16)
+        let nh = note.map(noteHeight) ?? 0
+        lines.append(Line(y: cursor, label: label, note: note, noteH: nh, header: false))
+        cursor += height + (note == nil ? 2 : nh + 6)
     }
 
-    /// Exclusive choice: one button per option, the current one lit.
+    /// Exclusive choice: one segmented control, the current option raised.
     func choice(_ label: String, _ options: [(value: String, title: String)], current: String, note: String? = nil, onPick: @escaping (String) -> Void) {
-        let buttons = options.map { o -> (NSView, CGFloat) in
-            let b = MXButton(o.title) { onPick(o.value) }
-            b.isOn = o.value == current
-            return (b, b.intrinsicContentSize.width)
-        }
-        row(label, buttons, note: note)
+        let s = Segmented(options, current: current)
+        s.onPick = onPick
+        row(label, [(s, s.intrinsicContentSize.width)], note: note)
+    }
+
+    /// A paragraph across the control column, with no label: what a group of rows is about.
+    func paragraph(_ s: String) {
+        let nh = noteHeight(s)
+        lines.append(Line(y: cursor - FormView.rowH + 2, label: "", note: s, noteH: nh, header: false))
+        cursor += nh + 10
     }
 
     /// Equal tiles, left to right, wrapping to the next line when the column is full.
@@ -209,7 +280,7 @@ final class FormView: MXView {
         let height = CGFloat(rows) * (size.height + gap) - gap + 8
         lines.append(Line(y: cursor, label: label, note: nil, header: false))
         cursor += height
-        if let note { lines.append(Line(y: cursor - FormView.rowH + 4, label: "", note: note, header: false)); cursor += 16 }
+        if let note { paragraph(note) }
     }
 
     func toggle(_ label: String, _ on: Bool, note: String? = nil, onChange: @escaping (Bool) -> Void) {
@@ -233,7 +304,6 @@ final class FormView: MXView {
     }
 
     override func draw(_ r: NSRect) {
-        let small = Fonts.mono(Metrics.fontSize - 2)
         for l in lines {
             if l.header {
                 Text.draw(l.label.uppercased(), in: NSRect(x: Self.x0, y: l.y, width: 300, height: 20), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 2.5, .medium))
@@ -241,7 +311,8 @@ final class FormView: MXView {
             } else {
                 Text.draw(l.label, in: NSRect(x: Self.x0, y: l.y, width: Self.labelW - 12, height: FormView.rowH), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1))
                 if let n = l.note {
-                    Text.draw(n, in: NSRect(x: Self.x0 + Self.labelW, y: l.y + FormView.rowH - 4, width: bounds.width - Self.x0 * 2 - Self.labelW, height: 16), color: t.fg3, font: small)
+                    (n as NSString).draw(with: NSRect(x: Self.x0 + Self.labelW, y: l.y + FormView.rowH - 2, width: noteWidth, height: l.noteH + 4),
+                                         options: [.usesLineFragmentOrigin], attributes: Self.noteAttrs(t.fg3))
                 }
             }
         }
@@ -664,11 +735,11 @@ final class SettingsView: MXView {
         if model.plugins.isEmpty { form.text("", "No plugins installed.") }
         for p in model.plugins {
             let m = p.manifest
-            form.header("\(m.name)  \(m.version)\(m.bundled ? "  ·  comes with Maxwell" : "")")
+            form.header("\(m.name)  ·  \(m.version)\(m.bundled ? "  ·  built in" : "")")
             let on = c.pluginEnabled(m.id)
-            form.toggle("On", on, note: m.description) { [weak self] in self?.set("\(m.id).enabled", $0 ? "true" : "false") }
+            form.toggle("Enabled", on, note: m.description) { [weak self] in self?.set("\(m.id).enabled", $0 ? "true" : "false") }
             guard on else { continue }
-            var buttons: [(NSView, CGFloat)] = [(Label(p.status.line, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), min(w - 190, max(160, Text.width(p.status.line, font: Fonts.mono(Metrics.fontSize - 1)) + 8)))]
+            var buttons: [(NSView, CGFloat)] = [(Label(p.status.line, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), w - 190)]
             let restart = MXButton("Restart", small: true) { [weak self] in self?.onPluginRestart?(m.id) }
             restart.tip = Tip("Stop and start \(m.name) again")
             let log = MXButton("Open Log", small: true) {
@@ -688,7 +759,8 @@ final class SettingsView: MXView {
                 case .string:
                     let field = InputField(value: value, placeholder: f.placeholder ?? "", secure: false)
                     field.onCommit = { [weak self] in self?.set(key, $0) }
-                    form.row(f.title, [(field, min(w, 280))], note: f.help)
+                    // A number needs room for a few digits, not a sentence.
+                    form.row(f.title, [(field, Int(value) != nil ? 72 : min(w, 280))], note: f.help)
                 case .secret:
                     let saved = p.secretsSet.contains(f.key)
                     let field = InputField(value: "", placeholder: saved ? "Saved in Keychain" : (f.placeholder ?? "Paste it here"), secure: true)

@@ -75,7 +75,7 @@ func linearTests() {
     check(r12?["session"] as? String == "a" && (r12?["badge"] as? [String: Any])?["text"] as? String == "needs you", "a ticket's badge is its most urgent session, and a click opens that one")
     check(r12?["subtitle"] as? String == "2 sessions · 1 needs you, 1 safe to close", "the line says how its sessions stand")
     let r7 = ((secs.dropFirst().first?["rows"] as? [[String: Any]])?.first)
-    check(r7?["subtitle"] as? String == "no session" && r7?["url"] as? String == todo.url, "a ticket with no session opens in Linear")
+    check(r7?["subtitle"] == nil && r7?["key"] as? String == todo.identifier && r7?["url"] as? String == todo.url, "a ticket with no session opens in Linear")
 
     // Writes are dry runs here: logged, never sent.
     final class Recorder: LinearTransport {

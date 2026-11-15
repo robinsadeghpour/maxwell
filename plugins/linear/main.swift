@@ -222,7 +222,7 @@ final class LinearPlugin {
             let issue = issues[id]
             for sug in p {
                 if sync == "auto" { perform(sug) { _ in }; continue }
-                suggested.append(["id": "\(sug.key)@\(s.id)", "title": "\(id) \(issue?.title ?? "")", "subtitle": "\(sug.why(s)) · \(s.title)",
+                suggested.append(["id": "\(sug.key)@\(s.id)", "key": id, "title": issue?.title ?? id, "subtitle": "\(sug.why(s)) · \(s.title)",
                                   "badge": issue.map { ["text": $0.state.name, "tone": LinearRules.tone($0)] } ?? NSNull(), "session": s.id,
                                   "actions": [["action": sug.action, "title": issue.map { sug.title($0) } ?? sug.action], ["action": "dismiss", "title": "Not now"]]])
             }

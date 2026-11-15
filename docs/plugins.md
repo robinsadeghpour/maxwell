@@ -190,7 +190,7 @@ View types:
 
 | `type` | Fields |
 |---|---|
-| `list` | `sections`: `[{ title, rows }]`. A row: `id`, `title`, `subtitle?`, `badge?`, `session?` (click selects it), `url?` (click opens it), `actions?` (buttons; the first is the row's main action), `status?` (below) |
+| `list` | `sections`: `[{ title, rows }]`. A row: `id`, `title`, `key?` (a short id drawn dim before the title, in a column of its own), `subtitle?`, `badge?`, `session?` (click selects it), `url?` (click opens it), `actions?` (buttons; the first is the row's main action), `status?` (below) |
 | `empty` | `title`, `body?`, `action?` (`{ action, title }`, a button) |
 | `loading` | `title?` |
 

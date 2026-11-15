@@ -633,9 +633,7 @@ final class DockView: MXView {
                 addSubview(g, positioned: .above, relativeTo: v)
             }
             if let c = controls[p] {
-                // The area's close and maximize sit on its last panel (bottom) or first (right).
-                c.areaButtons = dock == .bottom ? (i == views.count - 1 ? [.maximize, .close] : [])
-                    : dock == .right && i == 0 && p != .viewer ? [.close] : []
+                c.showsMaximize = dock == .bottom && i == views.count - 1
                 c.maximized = maximized
                 let grip = v.gripRect
                 let w = c.preferredWidth
@@ -708,13 +706,12 @@ final class Splitter: MXView {
     }
 }
 
-/// The buttons on a panel's header, JetBrains / VS Code style: ⋯ options, – hide, and on the
-/// area's edge panel ⌃ maximize (bottom) and × close the whole area.
+/// The buttons on a panel's header: ⋯ options, ⌃ maximize on the bottom area's last panel, and
+/// × to hide this panel only (it stays on the edge stripe). ⌥⌘J still hides the whole area.
 final class PanelControls: MXView {
-    enum AreaButton { case maximize, close }
     let panel: PanelID
     weak var root: RootView?
-    var areaButtons: [AreaButton] = [] { didSet { if areaButtons != oldValue { rebuild() } } }
+    var showsMaximize = false { didSet { if showsMaximize != oldValue { rebuild() } } }
     var maximized = false { didSet { if maximized != oldValue { rebuild() } } }
     private var buttons: [IconButton] = []
 
@@ -735,18 +732,11 @@ final class PanelControls: MXView {
                 guard let self, let b = self.buttons.first else { return }
                 self.root?.showMenu(for: p, below: b)
             },
-            IconButton(.minimize, tip: Tip("Hide this panel", action: "panel-\(p.rawValue)").adding("It stays on the edge, one click away")) { [weak self] in self?.root?.setHidden(p, true) },
         ]
-        for a in areaButtons {
-            switch a {
-            case .maximize:
-                list.append(IconButton(maximized ? .restore : .maximize, tip: Tip(maximized ? "Back to normal height" : "Make the bottom panels taller")) { [weak self] in self?.root?.toggleMaximizeBottom() })
-            case .close:
-                let d = root?.panels.place[p] ?? .bottom
-                let action = d == .bottom ? "toggle-bottom" : d == .left ? "toggle-left" : "toggle-right"
-                list.append(IconButton(.close, tip: Tip("Hide the \(d.rawValue) panels", action: action).adding("They stay on the edge, one click away")) { [weak self] in self?.root?.toggleArea(d) })
-            }
+        if showsMaximize {
+            list.append(IconButton(maximized ? .restore : .maximize, tip: Tip(maximized ? "Back to normal height" : "Make the bottom panels taller")) { [weak self] in self?.root?.toggleMaximizeBottom() })
         }
+        list.append(IconButton(.close, tip: Tip("Hide \(p.title)", action: "panel-\(p.rawValue)").adding("It stays on the edge, one click away")) { [weak self] in self?.root?.setHidden(p, true) })
         buttons = list
         buttons.forEach(addSubview)
         needsLayout = true
