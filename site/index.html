@@ -119,6 +119,7 @@ h2 { margin: 0; font: 500 clamp(28px, 3.4vw, 40px)/1.1 var(--sans); letter-spaci
 .install > div + div { border-left: 1px solid var(--line); }
 .install small { display: block; font: 400 11.5px/1 var(--gmono); color: var(--faint); margin-bottom: 12px; }
 .install h3 { margin: 0 0 4px; font: 500 15px/1.35 var(--sans); }
+.install code { overflow-wrap: anywhere; }
 .install p { margin: 0; color: var(--dim); font-size: 14px; }
 .install code { font: 12.5px var(--mono); color: var(--ink); }
 @media (max-width: 760px) { .install { grid-template-columns: 1fr; } .install > div + div { border-left: 0; border-top: 1px solid var(--line); } }
@@ -341,7 +342,7 @@ h2 { margin: 0; font: 500 clamp(28px, 3.4vw, 40px)/1.1 var(--sans); letter-spaci
     <div class="in">
       <div class="sec-h"><h2>Install</h2><p>Everything stays on your Mac. Nothing is sent anywhere except the Haiku reads, through your own Claude account.</p></div>
       <div class="install">
-        <div><small>1</small><h3>Download</h3><p>Open the DMG and drag Maxwell to Applications.</p></div>
+        <div><small>1</small><h3>Download</h3><p>Open the DMG and drag Maxwell to Applications, or run <code>brew install --cask robinsadeghpour/maxwell/maxwell</code>.</p></div>
         <div><small>2</small><h3>Set it up</h3><p>Maxwell lists what's left, one button each. Your settings are backed up first.</p></div>
         <div><small>3</small><h3>Add accounts</h3><p>One line per account in <code>~/.config/maxwell/config</code>.</p></div>
       </div>

@@ -111,12 +111,20 @@ Every key can be changed with a `keybind` line in the config.
 
 You need a Mac with Apple silicon, macOS 14 or later, and Claude Code.
 
-1. [Download Maxwell](https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.dmg), open it and drag Maxwell to Applications. Older versions are on [Releases](https://github.com/robinsadeghpour/maxwell/releases).
+1. Install with [Homebrew](https://brew.sh):
+
+   ```sh
+   brew install --cask robinsadeghpour/maxwell/maxwell
+   ```
+
+   Or [download Maxwell](https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.dmg), open it and drag Maxwell to Applications. Older versions are on [Releases](https://github.com/robinsadeghpour/maxwell/releases). Maxwell is signed and notarized by Apple, so it opens without a warning.
 2. Open Maxwell. **Set up Maxwell** lists what's left: Claude Code, the session hooks (how Maxwell learns what your sessions are doing), a claude.ai sign-in for artifacts, and notifications. Each step has one button.
 
 ### Updates
 
 Maxwell checks GitHub for a new release every few hours. When one is ready, the bottom bar shows **v0.1.7 ready · Restart to update**. Nothing changes until you click it. Then Maxwell quits, swaps in the new version and opens again. Your Claude sessions keep running the whole time, because they are background sessions. **Maxwell › Check for Updates…** checks right away.
+
+Installed with Homebrew? Maxwell still updates itself. The cask is marked `auto_updates`, so `brew upgrade` leaves it alone, and `brew upgrade --greedy maxwell` updates it through Homebrew if you prefer. Before `brew uninstall`, choose **Maxwell › Uninstall Hooks**.
 
 ### Signing in to claude.ai, once per account
 
@@ -204,7 +212,7 @@ gh workflow run release.yml -R robinsadeghpour/maxwell -f version=0.1.13 -f note
 gh run watch -R robinsadeghpour/maxwell "$(gh run list -R robinsadeghpour/maxwell -w release.yml -L 1 --json databaseId -q '.[0].databaseId')"
 ```
 
-It runs `release.sh` from `v1`: tests, builds, signs with the Developer ID certificate, has Apple notarize the app and the DMG, pushes `main` and publishes the DMG and zip. A version that's already released is refused, and a second release waits for the first. GhosttyKit is cached, so zig only runs when its pinned commit changes. `dry_run` only tests and builds.
+It runs `release.sh` from `v1`: tests, builds, signs with the Developer ID certificate, has Apple notarize the app and the DMG, pushes `main` and publishes the DMG and zip. A version that's already released is refused, and a second release waits for the first. GhosttyKit is cached, so zig only runs when its pinned commit changes. `dry_run` only tests and builds. The [Homebrew tap](https://github.com/robinsadeghpour/homebrew-maxwell) follows releases on its own within 30 minutes (`packaging/homebrew/bump-cask.sh`). A release made on a Mac bumps it right away.
 
 The certificate and the notary key are secrets of the repo's `release` environment, which only `v1` and `main` can use. `packaging/ci/set-release-secrets.sh` puts them there. `./release.sh 0.1.13 "What changed"` still releases from a Mac set up as the top of `release.sh` describes.
 

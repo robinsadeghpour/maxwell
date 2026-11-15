@@ -17,6 +17,7 @@ export default [
     fixes: [
       "A question nobody answered for 3 days now folds into Idle instead of staying in Needs you",
       "The Dock badge now counts the Needs you group",
+      "Maxwell now installs with Homebrew: brew install --cask robinsadeghpour/maxwell/maxwell",
     ],
   },
   {

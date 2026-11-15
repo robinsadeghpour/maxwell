@@ -1,7 +1,8 @@
 #!/bin/zsh
 # ./release.sh 0.1.13 "What changed, in plain words"
 # Tests, builds the released Maxwell at this version, signs it with your Developer ID, has Apple
-# notarize the app and the DMG, pushes v1 and main, and publishes the GitHub release.
+# notarize the app and the DMG, pushes v1 and main, publishes the GitHub release, and points the
+# Homebrew cask (robinsadeghpour/homebrew-maxwell) at it.
 # Installed copies offer it as "Restart to update"; this never installs or restarts anything here.
 #
 # GitHub Actions runs this same script (.github/workflows/release.yml): that is the usual way to
@@ -97,3 +98,8 @@ cp "$DMG" "$OUT/Maxwell.dmg"
 
 git push -q --atomic origin v1 v1:main
 gh release create "v$V" "$DMG" "$OUT/Maxwell.dmg" "$ZIP" --target main --title "v$V" --notes "$NOTES"
+
+# Homebrew: point the cask at this release now. In GitHub Actions the token can't push to the tap;
+# the tap's own workflow picks the release up within 30 minutes instead.
+[[ -n ${GITHUB_ACTIONS:-} ]] || packaging/homebrew/bump-cask.sh "$V" ||
+  echo "The release is out, but the Homebrew cask wasn't updated. Run: packaging/homebrew/bump-cask.sh $V"
