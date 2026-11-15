@@ -1,7 +1,7 @@
 #!/bin/zsh
 # ./build.sh                  Maxwell Dev, build/Maxwell.app (its own app ID: never touches the released app)
 # ./build.sh release 0.1.7    the released Maxwell, build/release/Maxwell.app (use ./release.sh)
-# ./build.sh test             reducer, logo and plugin tests
+# ./build.sh test             engineering standard check, then reducer, logo and plugin tests
 # ./build.sh ghostty          (re)builds GhosttyKit at the pinned commit
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -26,6 +26,7 @@ ghostty() {
 
 if [[ ${1:-} == ghostty ]]; then ghostty; exit; fi
 if [[ ${1:-} == test ]]; then
+  python3 -I scripts/check-standard.py
   mkdir -p build
   plugins/slack/build.sh test
   swiftc -swift-version 5 -o build/linear-plugin plugins/sdk/MaxwellPlugin.swift plugins/linear/*.swift

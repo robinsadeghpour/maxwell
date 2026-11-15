@@ -234,6 +234,7 @@ Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the w
 | `plugins/` | Plugins that ship with Maxwell (Linear, Slack) and the Swift plugin SDK |
 | `examples/plugins/` | A complete plugin in 55 lines of Python |
 | `hook/` | The hook and status-line tap, in C |
+| `scripts/` | `check-standard.py`, the engineering standard's ratchet, and its baseline |
 | `docs/` | Config reference and the images in this README |
 | `site/` | The website, [runmaxwell.com](https://www.runmaxwell.com). Docs and changelog live in `site/src/`; `node site/src/build.mjs` writes the pages |
 

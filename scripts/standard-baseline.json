@@ -1,0 +1,88 @@
+{
+ "claude-code-internals": {
+  "Sources/App/ClaudeCLI.swift": 5,
+  "Sources/App/Probes.swift": 5
+ },
+ "crash-on-surprise": {
+  "Sources/Model/Artifacts.swift": 1,
+  "Sources/Model/ProjectHints.swift": 3,
+  "Sources/Model/Reducer.swift": 1,
+  "Sources/UI/FileTree.swift": 2,
+  "Sources/UI/Search.swift": 1,
+  "Sources/UI/Viewer.swift": 2,
+  "plugins/linear/LinearCore.swift": 2,
+  "plugins/slack/Sources/Manifest.swift": 1
+ },
+ "effects-in-ui": {
+  "Sources/UI/BottomPanel.swift": 1,
+  "Sources/UI/FileTree.swift": 1,
+  "Sources/UI/IconArt.swift": 2,
+  "Sources/UI/ProjectLogo.swift": 5,
+  "Sources/UI/Search.swift": 1,
+  "Sources/UI/SettingsWindow.swift": 1,
+  "Sources/UI/Terminal.swift": 1,
+  "Sources/UI/Theme.swift": 1
+ },
+ "file-lines": {
+  "Sources/App/MainWindow.swift": 1633,
+  "Sources/App/Probes.swift": 524,
+  "Sources/App/Store.swift": 582,
+  "Sources/App/main.swift": 626,
+  "Sources/UI/ArtifactView.swift": 518,
+  "Sources/UI/Layout.swift": 885,
+  "Sources/UI/SettingsWindow.swift": 1164,
+  "Sources/UI/Sidebar.swift": 760,
+  "Sources/UI/Terminal.swift": 622
+ },
+ "function-lines": {
+  "Sources/App/CLI.swift::runCLI": 95,
+  "Sources/App/MainWindow.swift::makeActions": 128,
+  "Sources/App/MainWindow.swift::render": 83,
+  "Sources/App/MainWindow.swift::wire": 98,
+  "Sources/App/main.swift::runTestHooks": 378,
+  "Sources/Model/Reducer.swift::reduce": 175,
+  "Sources/UI/ProjectLogo.swift::extract": 90
+ },
+ "hand-made-controls": {
+  "Sources/App/MainWindow.swift": 1,
+  "Sources/UI/FileTree.swift": 1,
+  "Sources/UI/NewSessionPanel.swift": 1,
+  "Sources/UI/Search.swift": 1,
+  "Sources/UI/SettingsWindow.swift": 1
+ },
+ "nesting": {},
+ "process-spawn": {
+  "Sources/App/Browsers.swift": 1,
+  "Sources/App/ClaudeCLI.swift": 1,
+  "Sources/App/Updater.swift": 2,
+  "Sources/Plugins/PluginConnection.swift": 1,
+  "Sources/UI/BottomPanel.swift": 1
+ },
+ "remembered-state": {
+  "Sources/App/MainWindow.swift": 5,
+  "Sources/UI/IconArt.swift": 3,
+  "Sources/UI/Layout.swift": 2,
+  "Sources/UI/PluginPanel.swift": 2,
+  "Sources/UI/Window.swift": 3
+ },
+ "test-flags": {
+  "Sources/App/ClaudeWeb.swift": 1,
+  "Sources/App/MainWindow.swift": 2,
+  "Sources/App/main.swift": 81,
+  "Sources/UI/IconArt.swift": 1
+ },
+ "timers": {
+  "Sources/App/ClaudeWeb.swift": 1,
+  "Sources/App/MainWindow.swift": 3,
+  "Sources/App/Store.swift": 1,
+  "Sources/App/Updater.swift": 1,
+  "Sources/App/main.swift": 37,
+  "Sources/Model/EventLog.swift": 1,
+  "Sources/Plugins/PluginConnection.swift": 4,
+  "Sources/Plugins/PluginHost.swift": 2,
+  "Sources/UI/ArtifactView.swift": 1,
+  "Sources/UI/Viewer.swift": 2,
+  "plugins/slack/Sources/Plugin.swift": 2
+ },
+ "ui-in-model": {}
+}
