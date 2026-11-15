@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-idle-sessions-free-their-memory",
     date: "2026-11-15",
-    versions: "VERSION",
+    versions: "0.1.46",
     title: "Idle sessions free their memory",
     figure: "",
     body: `

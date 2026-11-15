@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Idle sessions free their memory</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-idle-sessions-free-their-memory</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-idle-sessions-free-their-memory</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Claude Code stops a background session that has been idle for about an hour, to free memory, but only when no terminal is attached to it. Maxwell used to keep every session you opened attached until it quit, so none of them were ever stopped. Now Maxwell lets go of a session's terminal after 10 minutes off screen, and attaches again when you open it.&lt;/p&gt;
+&lt;p&gt;A session Claude Code stopped while it waited on you stays in Your turn or Needs you. Opening it shows its last reply and a Resume button, so moving through the list doesn't start every session it passes. &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;R&lt;/kbd&gt;&lt;/span&gt; resumes it too. Its conversation is kept, as always.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Grey text is easier to read in every theme and now meets WCAG AA contrast&lt;/li&gt;&lt;li&gt;A session waiting on you no longer disappears from the list when Claude Code stops it&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Side panels open one at a time</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs</guid>
