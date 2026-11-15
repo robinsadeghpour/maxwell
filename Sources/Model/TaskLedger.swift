@@ -53,14 +53,18 @@ struct TaskLedger: Codable {
     }
 
     /// Each "<task-id>X</task-id>" with a "<status>" before the next task id ends task X,
-    /// unless that status is "running".
+    /// unless that status is "running". An agent that stopped with background work of its own
+    /// is reported "completed" but resumes later under the same id, so it stays running until
+    /// a later notice ends it.
     private mutating func noteFinished(_ line: Data) {
         var from = line.startIndex
         while let open = line.range(of: Self.taskIdTag, in: from..<line.endIndex) {
             guard let close = line.range(of: Self.taskIdEnd, in: open.upperBound..<line.endIndex) else { return }
             let id = String(decoding: line[open.upperBound..<close.lowerBound], as: UTF8.self)
             let next = line.range(of: Self.taskIdTag, in: close.upperBound..<line.endIndex)?.lowerBound ?? line.endIndex
-            if let st = line.range(of: Self.statusTag, in: close.upperBound..<next),
+            if line.range(of: Self.waitingNote, in: close.upperBound..<next) != nil {
+                finished.remove(id)
+            } else if let st = line.range(of: Self.statusTag, in: close.upperBound..<next),
                let stEnd = line.range(of: Self.statusEnd, in: st.upperBound..<next),
                String(decoding: line[st.upperBound..<stEnd.lowerBound], as: UTF8.self) != "running" {
                 finished.insert(id)
@@ -73,6 +77,7 @@ struct TaskLedger: Codable {
     private static let statusTag = Data("<status>".utf8), statusEnd = Data("</status>".utf8)
     private static let startedKey = Data("\"backgroundTaskId\"".utf8), asyncKey = Data("\"isAsync\":true".utf8)
     private static let stoppedKey = Data("Successfully stopped task".utf8)
+    private static let waitingNote = Data("stopped with background work of its own still running".utf8)
     private static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
