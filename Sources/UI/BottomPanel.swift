@@ -290,8 +290,10 @@ final class SystemSampler {
 }
 
 extension ViewerPane: PanelContent {
-    var gripRect: NSRect { NSRect(x: 0, y: 0, width: max(0, bounds.width - headerButtonsWidth - 6), height: Metrics.header) }
-    var controlsInset: CGFloat { headerButtonsWidth }
+    /// The tabs take clicks and drags of their own; the empty header after them moves the panel.
+    var gripRect: NSRect {
+        NSRect(x: tabsEnd, y: 0, width: max(0, stripEnd - tabsEnd), height: Metrics.header)
+    }
     func preferredExtent(along d: Dock) -> CGFloat? { nil }
 }
 

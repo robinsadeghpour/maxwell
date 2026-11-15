@@ -54,6 +54,8 @@ final class ViewerController: NSObject, WKNavigationDelegate {
     private var themeJS: String?
     /// A web link clicked in a rendered file: artifacts open beside it, the rest in the browser.
     var onLink: ((URL) -> Void)?
+    /// A relative link in a rendered file: it opens in the viewer, as a tab.
+    var onFileLink: ((URL) -> Void)?
 
     override init() {
         super.init()
@@ -204,6 +206,6 @@ final class ViewerController: NSObject, WKNavigationDelegate {
     func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard a.navigationType == .linkActivated, let u = a.request.url else { return decisionHandler(.allow) }
         decisionHandler(.cancel)
-        if u.isFileURL { open(URL(fileURLWithPath: u.path)) } else { onLink?(u) }
+        if u.isFileURL { onFileLink?(URL(fileURLWithPath: u.path)) } else { onLink?(u) }
     }
 }

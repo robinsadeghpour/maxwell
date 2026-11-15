@@ -185,13 +185,17 @@ keybind = cmd+shift+j=next-needs-you</code></pre>
     figure: fig.artifact("An artifact opens signed in to the account its session runs on."),
     body: `
 <h2>Markdown files</h2>
-<p>When a session writes or mentions a Markdown file, it opens in the viewer, rendered. ${k("⌘")}-click any path in the terminal to open it. ${k("⌥ ⌘ P")} pins the current file so the next one doesn't replace it.</p>
+<p>When a session writes or mentions a Markdown file, it opens in the viewer, rendered. ${k("⌘")}-click any path in the terminal to open it.</p>
+<h2>Tabs</h2>
+<p>The viewer keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Double-click the tab, or press ${k("⌥ ⌘ P")}, to keep it. While you're reading a tab you kept, the session's next file waits in a preview tab behind it.</p>
+<p>A path you ${k("⌘")}-click gets a tab of its own. Files you click in the folder tree open in the preview tab. Click × or middle-click to close a tab, or press ${k("⌘ W")} while you're in the viewer. Drag tabs to reorder them. Right-click a tab for Close Others, Close All, Reveal in Finder and Copy Path.</p>
 <h2>Artifacts</h2>
-<p>When a session publishes a claude.ai artifact, it opens in the viewer signed in as that session's account. Publishing it again reloads it in place, even when it's pinned. ${k("⌘")}-click an artifact link to open it the same way.</p>
+<p>When a session publishes a claude.ai artifact, it opens in the viewer signed in as that session's account. Publishing it again reloads its tab in place. ${k("⌘")}-click an artifact link to open it the same way.</p>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌥ ⌘ R")}</td><td>Reload the artifact</td></tr>
 <tr><td>${k("⇧ ⌘ O")}</td><td>Open it in the account's browser</td></tr>
-<tr><td>${k("⌥ ⌘ P")}</td><td>Pin the file or artifact</td></tr>
+<tr><td>${k("⌥ ⌘ P")}</td><td>Keep the tab open</td></tr>
+<tr><td>${k("⌘ W")}</td><td>Close the tab (in the viewer)</td></tr>
 </tbody></table>
 <h2>Sign in once per account</h2>
 <ol class="steps">
@@ -364,7 +368,8 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌘ B")}, ${k("⌥ ⌘ B")}, ${k("⌥ ⌘ J")}</td><td>Toggle left, right, bottom panels</td></tr>
 <tr><td>${k("⌥ ⌘ 6")}</td><td>Plugins panel</td></tr>
-<tr><td>${k("⌥ ⌘ P")}</td><td>Pin the current file or artifact</td></tr>
+<tr><td>${k("⌥ ⌘ P")}</td><td>Keep the viewer tab open</td></tr>
+<tr><td>${k("⌘ W")}</td><td>Close the viewer tab, when the viewer has focus</td></tr>
 <tr><td>${k("⌥ ⌘ R")}</td><td>Reload the artifact</td></tr>
 <tr><td>${k("⇧ ⌘ O")}</td><td>Open the artifact in the account's browser, or the session's Linear ticket</td></tr>
 <tr><td>${k("Esc")}</td><td>Close search, the palette or a panel</td></tr>

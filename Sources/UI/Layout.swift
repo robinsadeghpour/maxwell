@@ -638,6 +638,7 @@ final class DockView: MXView {
                 let grip = v.gripRect
                 let w = c.preferredWidth
                 (v as? Sidebar)?.headerReserve = w + 4
+                (v as? ViewerPane)?.headerReserve = w + 4
                 c.isHidden = false
                 c.frame = NSRect(x: v.frame.maxX - v.controlsInset - w - 4, y: v.frame.minY + grip.minY + (grip.height - Metrics.control) / 2, width: w, height: Metrics.control)
                 addSubview(c, positioned: .above, relativeTo: nil)

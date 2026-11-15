@@ -1,0 +1,64 @@
+import Foundation
+
+/// The viewer's tabs: VS Code's preview tab for what the session opens, tabs of their own for what you open.
+func viewerTabsTests() {
+    let a = ViewerItem.file(URL(fileURLWithPath: "/p/a.md")), b = ViewerItem.file(URL(fileURLWithPath: "/p/b.md"))
+    let c = ViewerItem.file(URL(fileURLWithPath: "/p/c.md")), d = ViewerItem.file(URL(fileURLWithPath: "/q/a.md"))
+
+    var v = ViewerTabs()
+    v.sessionOpened(a)
+    check(v.tabs == [a] && v.active == 0 && v.preview == 0, "the session's first file opens in the preview tab")
+    v.sessionOpened(b)
+    check(v.tabs == [b] && v.active == 0 && v.preview == 0, "its next file replaces the preview tab")
+    v.keep(0)
+    check(v.preview == nil && v.kept, "double-click keeps the tab")
+    let moved = v.sessionOpened(c)
+    check(v.tabs == [b, c] && v.active == 0 && v.preview == 1 && !moved, "reading a kept tab: the next file waits in a new preview tab behind it")
+    v.select(1)
+    v.sessionOpened(a)
+    check(v.tabs == [b, a] && v.active == 1, "in front on the preview tab: the next file replaces it and shows")
+    v.sessionOpened(b)
+    check(v.tabs == [b, a] && v.active == 0, "a file that already has a tab: that tab comes to the front")
+
+    var w = ViewerTabs()
+    w.open(a, keep: true)
+    w.open(b, keep: true)
+    check(w.tabs == [a, b] && w.active == 1 && w.preview == nil, "⌘-click opens a tab of its own")
+    w.select(0)
+    w.open(c, keep: false)
+    check(w.tabs == [a, c, b] && w.active == 1 && w.preview == 1, "the tree opens a preview tab next to the active one")
+    w.open(d, keep: false)
+    check(w.tabs == [a, d, b] && w.preview == 1, "browsing the tree reuses the preview tab")
+    w.open(d, keep: true)
+    check(w.preview == nil && w.tabs.count == 3, "opening the preview tab's file for real keeps it")
+
+    w.close(1)
+    check(w.tabs == [a, b] && w.active == 1, "closing the active tab shows its right neighbour")
+    w.close(1)
+    check(w.tabs == [a] && w.active == 0, "or the left one at the end")
+    w.close(0)
+    check(w.tabs.isEmpty && w.active == nil && w.item == nil, "closing the last tab empties the viewer")
+
+    var m = ViewerTabs(tabs: [a, b, c], active: 2, preview: 0)
+    m.move(2, to: 0)
+    check(m.tabs == [c, a, b] && m.active == 0 && m.preview == 1, "dragging a tab keeps which one is active and which is the preview")
+    m.close(0)
+    check(m.tabs == [a, b] && m.active == 0 && m.preview == 0, "closing before the preview tab shifts it")
+    m.select(1)
+    m.toggleKeep()
+    check(m.tabs == [b] && m.preview == 0 && m.active == 0, "un-keeping a tab makes it the preview tab; the old preview tab closes")
+    m.toggleKeep()
+    check(m.preview == nil && m.kept, "the pin keeps it again")
+
+    var o = ViewerTabs(tabs: [a, b, c], active: 2, preview: 1)
+    o.closeOthers(1)
+    check(o.tabs == [b] && o.active == 0 && o.preview == 0, "close others keeps the one you right-clicked")
+
+    let link = ArtifactLink.parse("https://claude.ai/artifact/Dez5d8DPYa2wrqBrR3W2gs")!
+    var t = ViewerTabs()
+    t.sessionOpened(.artifact(link, title: nil))
+    t.sessionOpened(.artifact(link, title: "Ada owns the goal"))
+    check(t.tabs == [.artifact(link, title: "Ada owns the goal")] && t.tabs.count == 1, "the transcript names an untitled artifact tab")
+    t.setTitle("Something else", for: link)
+    check(t.tabs == [.artifact(link, title: "Ada owns the goal")], "a title only fills in a tab without one")
+}

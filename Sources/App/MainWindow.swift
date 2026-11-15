@@ -1,8 +1,5 @@
 import AppKit
 
-/// Per-session viewer state: the file or artifact shown, and whether it is pinned.
-struct ViewerState { var item: ViewerItem?; var pinned = false; var scanned = false }
-
 final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWindowDelegate {
     let store: Store
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
@@ -16,7 +13,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var shownShell: TerminalView? { shell(current) }
     private var visited: [SessionID] = []
     private(set) var current: SessionID?
-    private var viewers: [SessionID: ViewerState] = [:]
+    /// Per session: its open files and artifacts, as the viewer's tabs.
+    private var viewers: [SessionID: ViewerTabs] = [:]
     private let search = SearchPanel(frame: .zero)
     private let glass = NSVisualEffectView()
     private var doubleShift: DoubleShift?
@@ -136,9 +134,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.titleBar.gear.action = { [weak self] in self?.showSettings() }
         root.sessionPane.delegate = self
         root.viewerPane.pin.action = { [weak self] in self?.togglePin() }
-        root.viewerPane.clear.action = { [weak self] in self?.clearViewer() }
         root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
-        root.viewerPane.onTreeSelect = { [weak self] url in self?.showFile(url, for: self?.current) }
+        // Browsing the tree previews, as in VS Code's explorer; double-click the tab to keep it.
+        root.viewerPane.onTreeSelect = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
+        root.viewerPane.onTab = { [weak self] in self?.tabAction($0) }
+        root.viewerPane.onArtifactTitle = { [weak self] link, title in
+            guard let self, let id = self.current else { return }
+            self.viewers[id, default: ViewerTabs()].setTitle(title, for: link)
+            self.syncViewer()
+        }
+        // A relative link in a rendered file opens in the viewer, in the preview tab.
+        root.viewerPane.viewer.onFileLink = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
         store.onChange = { [weak self] in self?.render($0) }
         store.onViewerItem = { [weak self] id, item, reload in self?.itemSeen(id, item, reload: reload) }
         root.viewerPane.reload.action = { [weak self] in self?.reloadArtifact() }
@@ -864,8 +870,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// The viewer shows the current session's file or artifact and is open exactly when there is one,
     /// unless ⌘\\ overrode that for this session.
     private func syncViewer(reload: Bool = false) {
-        let v = current.flatMap { viewers[$0] } ?? ViewerState()
-        root.viewerPane.show(v.item, account: current.flatMap(account(of:)), pinned: v.pinned, reload: reload)
+        let v = current.flatMap { viewers[$0] } ?? ViewerTabs()
+        root.viewerPane.show(v, account: current.flatMap(account(of:)), reload: reload)
         root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
         updateDim()
     }
@@ -881,7 +887,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     private func showViewer(for id: SessionID) {
-        var v = viewers[id] ?? ViewerState()
+        var v = viewers[id] ?? ViewerTabs()
         syncViewer()
         guard !v.scanned, let s = store.state.sessions[id] else { return }
         v.scanned = true
@@ -893,32 +899,63 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// A session wrote or named a file, or published, opened or named an artifact.
-    /// A republish of what the viewer shows reloads it in place, pinned or not.
+    /// A session wrote or named a file, or published, opened or named an artifact. It goes in the
+    /// preview tab, in front unless you are reading a tab you kept. A republish of the tab on show
+    /// reloads it in place.
     private func itemSeen(_ id: SessionID, _ item: ViewerItem, reload: Bool) {
-        var v = viewers[id] ?? ViewerState()
-        if item.same(as: v.item) {
+        var v = viewers[id] ?? ViewerTabs()
+        if let i = v.index(of: item), i == v.active || !store.config.autoOpen {
             // Keep the title the page gave; take the transcript's when there was none.
-            if case .artifact(let l, let t?) = item, case .artifact(_, nil)? = v.item { v.item = .artifact(l, title: t) }
+            v.retitle(i, from: item)
             viewers[id] = v
-            if reload, id == current { syncViewer(reload: true) }
+            if id == current { syncViewer(reload: reload && i == v.active) }
             return
         }
-        guard store.config.autoOpen, !v.pinned else { return }
+        guard store.config.autoOpen else { return }
         if item.artifact != nil, store.config.artifacts != "viewer" { return }
-        v.item = item
+        let moved = v.sessionOpened(item)
         viewers[id] = v
+        if id == current {
+            if moved { viewerForced = nil }
+            syncViewer()
+        }
+    }
+
+    /// You opened it: a tab of its own (⌘-click, a link from the terminal), or the preview tab (the tree).
+    func showFile(_ url: URL, for id: SessionID?) { show(.file(url), for: id) }
+
+    func show(_ item: ViewerItem, for id: SessionID?, keep: Bool = true) {
+        guard let id else { return }
+        viewers[id, default: ViewerTabs()].open(item, keep: keep)
         if id == current { viewerForced = nil; syncViewer() }
     }
 
-    func showFile(_ url: URL, for id: SessionID?) { show(.file(url), for: id) }
-
-    func show(_ item: ViewerItem, for id: SessionID?) {
-        guard let id else { return }
-        var v = viewers[id] ?? ViewerState()
-        v.item = item
+    /// A click, drag or menu choice on a viewer tab.
+    private func tabAction(_ a: ViewerTabAction) {
+        guard let id = current, var v = viewers[id] else { return }
+        let at = { (i: Int) in v.tabs.indices.contains(i) ? v.tabs[i] : nil }
+        switch a {
+        case .select(let i): v.select(i)
+        case .close(let i): v.close(i)
+        case .keep(let i): v.keep(i)
+        case .move(let i, let to): v.move(i, to: to)
+        case .closeOthers(let i): v.closeOthers(i)
+        case .closeAll: v.closeAll()
+        case .reveal(let i):
+            if let u = at(i)?.file { NSWorkspace.shared.activateFileViewerSelecting([u]) }
+            return
+        case .copyPath(let i):
+            guard let item = at(i) else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(item.file?.path ?? item.artifact?.url.absoluteString ?? "", forType: .string)
+            return toast(item.file != nil ? "Path copied." : "Link copied.")
+        case .openInBrowser(let i):
+            if let link = at(i)?.artifact, let acc = account(of: id) { openExternally(link.url, account: acc) }
+            return
+        }
         viewers[id] = v
-        if id == current { viewerForced = nil; syncViewer() }
+        if v.tabs.isEmpty { viewerForced = nil }
+        syncViewer()
     }
 
     /// A web link from a session's terminal or file: an artifact opens beside the session, signed in
@@ -968,20 +1005,26 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         showFile(url, for: id)
     }
 
+    /// The pin keeps the active tab open, or lets the session's next file replace it again.
     func togglePin() {
         guard let id = current, var v = viewers[id], v.item != nil else { return }
-        v.pinned.toggle()
+        v.toggleKeep()
         viewers[id] = v
         syncViewer()
-        let what = v.item?.artifact != nil ? "artifacts" : "files"
-        toast(v.pinned ? "Pinned. New \(what) from this session wait until you unpin." : "Unpinned.")
+        let what = v.item?.artifact != nil ? "artifact" : "file"
+        toast(v.kept ? "Kept. The session's next \(what) opens in a tab of its own." : "The session's next file or artifact replaces this tab.")
     }
 
-    func clearViewer() {
-        guard let id = current else { return }
-        viewers[id] = ViewerState(item: nil, pinned: false, scanned: true)
-        viewerForced = nil
-        syncViewer()
+    /// ⌘W in the viewer: closes the tab on show, like an editor's.
+    func closeViewerTab() {
+        guard let id = current, let i = viewers[id]?.active else { return }
+        tabAction(.close(i))
+    }
+
+    /// Whether the keyboard is in the viewer (⌘W then closes its tab, not the session's).
+    var viewerHasFocus: Bool {
+        guard let fr = window?.firstResponder as? NSView else { return false }
+        return fr.isDescendant(of: root.viewerPane)
     }
 
     func toggleTree() {
@@ -1450,7 +1493,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             },
             Action(id: "close-all-safe", title: "Close All Safe Sessions", menu: "Session", shortcut: Shortcut("cmd+shift+x")) { [weak self] in self?.closeAllSafe() },
             Action(id: "close-tab", title: "Close Tab (session keeps running)", menu: "Session", shortcut: Shortcut("cmd+w"), isEnabled: hasCurrent) { [weak self] in
-                if let id = self?.current { self?.forget(id) }
+                guard let self else { return }
+                // In the viewer, ⌘W closes the file or artifact on show, the way an editor does.
+                if self.viewerHasFocus, self.current.flatMap({ self.viewers[$0]?.item }) != nil { return self.closeViewerTab() }
+                if let id = self.current { self.forget(id) }
             },
             Action(id: "recheck", title: "Re-run Done Checks", menu: "Session", shortcut: Shortcut("cmd+shift+d")) { [weak self] in
                 self?.store.recheckAll(); self?.toast("Checking worktrees and PRs…")
@@ -1465,7 +1511,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "reset-panels", title: "Reset Panel Layout", menu: "Panels") { [weak self] in self?.root.panels = PanelLayout() },
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
             Action(id: "toggle-viewer", title: "Show or Hide Viewer", menu: "View", shortcut: Shortcut("cmd+\\")) { [weak self] in self?.toggleViewer() },
-            Action(id: "pin", title: "Pin or Unpin File", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
+            Action(id: "pin", title: "Keep Viewer Tab Open", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
             Action(id: "reload-artifact", title: "Reload Artifact", menu: "View", shortcut: Shortcut("cmd+alt+r"), isEnabled: hasArtifact) { [weak self] in self?.reloadArtifact() },
             Action(id: "open-in-browser", title: "Open Artifact in Browser", menu: "View", shortcut: Shortcut("cmd+shift+o"), isEnabled: hasArtifact) { [weak self] in self?.openInBrowser() },
             Action(id: "toggle-tree", title: "Show or Hide File Tree", menu: "View", shortcut: Shortcut("cmd+shift+t")) { [weak self] in self?.toggleTree() },

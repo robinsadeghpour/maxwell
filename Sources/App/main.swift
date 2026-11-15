@@ -394,7 +394,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             after("--probe-after", 6) { self.main.root.viewerPane.viewer.probe(png: URL(fileURLWithPath: png)) { mark("viewer: \($0)") } }
         }
         // After --select (which waits for the first listing), or the viewer has no session to show it in.
-        if let f = arg("--open") { after("--open-after", 4) { self.main.showFile(URL(fileURLWithPath: f), for: self.main.current); mark("open \(f) for \(self.main.current ?? "no session")") } }
+        // --open a,b opens each in a tab of its own; --open-preview c as if the session opened it (the preview tab).
+        if let f = arg("--open") {
+            after("--open-after", 4) {
+                for p in f.split(separator: ",") { self.main.showFile(URL(fileURLWithPath: String(p)), for: self.main.current) }
+                if let pv = arg("--open-preview") { self.main.show(.file(URL(fileURLWithPath: pv)), for: self.main.current, keep: false) }
+                mark("open \(f) for \(self.main.current ?? "no session")")
+            }
+        }
         // --open-artifact <url>: as if the selected session published it. --artifact-probe logs what the artifact view shows.
         if let u = arg("--open-artifact") {
             after("--open-after", 4) {
@@ -409,7 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3 + Double(i) * 8) {
                     guard let a = self.store.state.accounts.first(where: { $0.name == name }), let l = ArtifactLink.parse("https://claude.ai/artifact/Dez5d8DPYa2wrqBrR3W2gs") else { return mark("no account \(name)") }
                     self.main.root.setViewer(open: true, animated: false)
-                    self.main.root.viewerPane.show(.artifact(l, title: nil), account: a, pinned: false)
+                    self.main.root.viewerPane.show(ViewerTabs(tabs: [.artifact(l, title: nil)], active: 0), account: a)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.main.root.viewerPane.viewer.artifact.signIn() }
                     mark("artifact page for \(name)")
                 }

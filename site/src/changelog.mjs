@@ -5,6 +5,21 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-viewer-tabs",
+    date: "2026-11-15",
+    versions: "0.1.36",
+    title: "The viewer has tabs",
+    figure: "",
+    body: `
+<p>The viewer now keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. Before, it showed one at a time.</p>
+<p>A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Double-click the tab, or press ${k("⌥ ⌘ P")}, to keep it. While you're reading a tab you kept, new files wait in a tab behind it.</p>
+<p>A path you ${k("⌘")}-click gets a tab of its own. Click × or middle-click to close a tab, or press ${k("⌘ W")} in the viewer. Drag tabs to reorder them, and right-click one for Close Others, Close All, Reveal in Finder and Copy Path.</p>`,
+    fixes: [
+      "The folder tree no longer squeezes in above an artifact",
+      "The viewer's ⋯ and × now sit at the panel's right edge, after the tab's own buttons",
+    ],
+  },
+  {
     slug: "2026-11-15-groups-you-can-trust",
     date: "2026-11-15",
     versions: "0.1.35",

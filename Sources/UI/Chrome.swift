@@ -1,45 +1,55 @@
 import AppKit
 
-/// Right pane: the selected session's file or artifact. Header with name, pin, tree toggle;
-/// an artifact adds reload and open-in-browser.
+/// Right pane: the selected session's open files and artifacts, as editor tabs. The header is the
+/// tab strip, then the active tab's buttons: keep, folder tree, and for an artifact reload and
+/// open-in-browser.
 final class ViewerPane: MXView {
     let viewer = ViewerController()
-    private let name = Label(color: { $0.fg2 })
-    let pin = IconButton(.pin, tip: Tip("Pin this file", action: "pin"))
+    let strip = ViewerTabStrip(frame: .zero)
+    private let name = Label(color: { $0.fg3 })
+    let pin = IconButton(.pin, tip: Tip("Keep this tab open", action: "pin"))
     let treeButton = IconButton(.tree, tip: Tip("Show the folder", action: "toggle-tree"))
-    let clear = IconButton(.close, tip: Tip("Close this file"))
     let reload = IconButton(.reload, tip: Tip("Reload the artifact", action: "reload-artifact"))
     let external = IconButton(.external, tip: Tip("Open in browser", action: "open-in-browser"))
     private let headerLine = Fill { $0.hair2 }
     private let treeLine = Fill { $0.hair2 }
     private let empty = EmptyState(frame: .zero)
     private var tree: FileTreeController?
-    private(set) var item: ViewerItem?
+    private(set) var tabs = ViewerTabs()
+    var item: ViewerItem? { tabs.item }
     private var account: Account?
     var showTree = false {
         didSet { needsLayout = true; treeButton.isOn = showTree; treeButton.tip.text = showTree ? "Hide the folder" : "Show the folder" }
     }
     var onTreeSelect: ((URL) -> Void)?
+    var onTab: ((ViewerTabAction) -> Void)?
+    /// The page named itself: the tab takes that title.
+    var onArtifactTitle: ((ArtifactLink, String) -> Void)?
+    /// Room the panel's own ⋯ and × take at the header's right edge (set by the dock).
+    var headerReserve: CGFloat = 52 { didSet { if headerReserve != oldValue { needsLayout = true } } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         name.font = Fonts.mono(Metrics.fontSize)
-        [viewer.container, empty, name, pin, treeButton, reload, external, clear, headerLine, treeLine].forEach(addSubview)
+        name.text = "viewer"
+        [viewer.container, empty, strip, name, pin, treeButton, reload, external, headerLine, treeLine].forEach(addSubview)
         empty.lines = ["Files and artifacts open here by themselves.", "", "When the session writes or names a .md file,", "or publishes a claude.ai artifact, it shows up",
                        "here. ⌘-click a path or an artifact link in the", "terminal to open it."]
         viewer.artifact.onTitle = { [weak self] title in
-            guard let self, case .artifact(let l, let old)? = self.item, old == nil else { return }
-            self.item = .artifact(l, title: title)
-            self.setName()
+            guard let self, case .artifact(let l, nil)? = self.item else { return }
+            self.onArtifactTitle?(l, title)
         }
-        show(nil, account: nil, pinned: false)
+        strip.onAction = { [weak self] in self?.onTab?($0) }
+        strip.menuFor = { [weak self] in self?.menu(for: $0) ?? NSMenu() }
+        show(ViewerTabs(), account: nil)
     }
     required init?(coder: NSCoder) { fatalError() }
 
     /// `reload`: the session published the artifact on show again.
-    func show(_ item: ViewerItem?, account: Account?, pinned: Bool, reload: Bool = false) {
+    func show(_ tabs: ViewerTabs, account: Account?, reload: Bool = false) {
+        let item = tabs.item
         let changed = !(item?.same(as: self.item) ?? (self.item == nil)) || account?.name != self.account?.name
-        self.item = item
+        self.tabs = tabs
         self.account = account
         switch item {
         case .file(let url)?:
@@ -49,15 +59,18 @@ final class ViewerPane: MXView {
         case nil:
             viewer.clear()
         }
-        setName()
+        strip.tabs = Self.stripTabs(tabs, account: account)
+        strip.active = tabs.active
+        strip.isHidden = tabs.tabs.isEmpty
+        name.isHidden = !tabs.tabs.isEmpty
         viewer.container.isHidden = item == nil
         empty.isHidden = item != nil
         let what = item?.artifact != nil ? "artifact" : "file"
-        pin.isOn = pinned
-        pin.tip.text = pinned ? "Unpin this \(what)\nThe next file or artifact the session makes replaces it" : "Pin this \(what)\nIt stays open when the session makes another"
-        clear.tip.text = "Close this \(what)"
+        pin.isOn = tabs.kept
+        pin.tip.text = tabs.kept
+            ? "Kept open\nThe next \(what) the session opens gets a tab of its own. Click to let it replace this one"
+            : "Keep this tab open\nNow the next file or artifact the session opens replaces it"
         pin.isHidden = item == nil
-        clear.isHidden = item == nil
         self.reload.isHidden = item?.artifact == nil
         external.isHidden = item?.artifact == nil
         treeButton.isHidden = item?.artifact != nil
@@ -65,23 +78,51 @@ final class ViewerPane: MXView {
         superview?.needsLayout = true
     }
 
-    /// The header buttons on show (an artifact has more); the panel's own controls sit left of them.
-    var headerButtonsWidth: CGFloat { CGFloat([clear, pin, treeButton, external, reload].filter { !$0.isHidden }.count) * 26 + 8 }
-
-    private func setName() {
-        switch item {
-        case .file(let url)?:
-            name.text = url.lastPathComponent
-            name.tip = Tip((url.path as NSString).abbreviatingWithTildeInPath)
-        case .artifact(let link, let title)?:
-            let a = account?.name ?? "?"
-            name.text = "\(title ?? "artifact \(link.id.prefix(8))") · \(a)"
-            name.tip = Tip("\(link.url.absoluteString)\nSigned in to claude.ai as \(a)")
-        case nil:
-            name.text = "viewer"
-            name.tip = nil
+    /// Titles as VS Code shows them: the file name, with its folder when two tabs share a name.
+    static func stripTabs(_ tabs: ViewerTabs, account: Account?) -> [ViewerTabStrip.Tab] {
+        let names = tabs.tabs.compactMap { $0.file?.lastPathComponent }
+        return tabs.tabs.enumerated().map { i, item in
+            switch item {
+            case .file(let url):
+                let n = url.lastPathComponent
+                let clash = names.filter { $0 == n }.count > 1
+                return .init(title: clash ? "\(n) · \(url.deletingLastPathComponent().lastPathComponent)" : n,
+                             detail: (url.path as NSString).abbreviatingWithTildeInPath, preview: tabs.isPreview(i))
+            case .artifact(let link, let title):
+                let a = account?.name ?? "?"
+                return .init(title: title ?? "artifact \(link.id.prefix(8))",
+                             detail: "\(link.url.absoluteString)\nSigned in to claude.ai as \(a)", preview: tabs.isPreview(i))
+            }
         }
     }
+
+    private func menu(for i: Int) -> NSMenu {
+        let m = NSMenu()
+        guard tabs.tabs.indices.contains(i) else { return m }
+        let send = { [weak self] (a: ViewerTabAction) -> () -> Void in { self?.onTab?(a) } }
+        if tabs.isPreview(i) { m.addItem(MenuAction("Keep Open", send(.keep(i)))) }
+        m.addItem(MenuAction("Close", send(.close(i))))
+        if tabs.tabs.count > 1 {
+            m.addItem(MenuAction("Close Others", send(.closeOthers(i))))
+            m.addItem(MenuAction("Close All", send(.closeAll)))
+        }
+        m.addItem(.separator())
+        if tabs.tabs[i].artifact != nil {
+            m.addItem(MenuAction("Open in Browser", send(.openInBrowser(i))))
+            m.addItem(MenuAction("Copy Link", send(.copyPath(i))))
+        } else {
+            m.addItem(MenuAction("Reveal in Finder", send(.reveal(i))))
+            m.addItem(MenuAction("Copy Path", send(.copyPath(i))))
+        }
+        return m
+    }
+
+
+    /// Where the tabs may run to: up to this tab's buttons, which sit left of the panel's ⋯ and ×.
+    var stripEnd: CGFloat { max(0, bounds.width - 4 - headerReserve - CGFloat([pin, treeButton, external, reload].filter { !$0.isHidden }.count) * 26 - 4) }
+
+    /// The empty end of the header, after the last tab: drag it to move the panel.
+    var tabsEnd: CGFloat { tabs.tabs.isEmpty ? 12 + Text.width(name.text, font: Fonts.mono()) + 8 : strip.usedWidth(in: stripEnd) }
 
     func setRoot(_ cwd: String?) {
         guard showTree, let cwd else { tree?.scroll.removeFromSuperview(); tree = nil; return }
@@ -97,21 +138,29 @@ final class ViewerPane: MXView {
     override func layout() {
         super.layout()
         let w = bounds.width, h = Metrics.header
-        var x = w - 4
-        for b in [clear, pin, treeButton, external, reload] where !b.isHidden {
+        // Right to left: the panel's ⋯ and × at the edge, then this tab's buttons, the way an editor's
+        // actions follow its tabs. The tabs take the rest.
+        var x = w - 4 - headerReserve
+        for b in [pin, treeButton, external, reload] where !b.isHidden {
             x -= 26
             b.frame = NSRect(x: x, y: 3, width: 26, height: Metrics.control)
         }
-        name.frame = NSRect(x: 12, y: 0, width: x - 18, height: h)
-        headerLine.frame = NSRect(x: 0, y: h - 1, width: w, height: 1)
+        strip.frame = NSRect(x: 0, y: 0, width: stripEnd, height: h)
+        name.frame = NSRect(x: 12, y: 0, width: max(0, stripEnd - 18), height: h)
+        // The strip draws its own bottom line, open under the active tab.
+        let lineFrom = strip.isHidden ? 0 : stripEnd
+        headerLine.frame = NSRect(x: lineFrom, y: h - 1, width: w - lineFrom, height: 1)
         var y = h
-        if showTree, let tree {
+        // An artifact is a whole page: the folder doesn't squeeze in above it.
+        if showTree, let tree, item?.artifact == nil {
             let th = min(220, bounds.height * 0.4)
+            tree.scroll.isHidden = false
             tree.scroll.frame = NSRect(x: 0, y: y, width: w, height: th)
             treeLine.frame = NSRect(x: 0, y: y + th, width: w, height: 1)
             treeLine.isHidden = false
             y += th + 1
         } else {
+            tree?.scroll.isHidden = true
             treeLine.isHidden = true
         }
         viewer.container.frame = NSRect(x: 0, y: y, width: w, height: bounds.height - y)
