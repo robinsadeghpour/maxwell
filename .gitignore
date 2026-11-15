@@ -1,5 +1,5 @@
 build/
-vendor/
+/vendor
 spike/vendor/
 spike/build/
 .DS_Store
