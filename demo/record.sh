@@ -12,6 +12,7 @@ OUT=${1:-build/demo/raw.mp4}
 ROOT=$HOME/demo
 FRAMES=build/demo/frames
 python3 demo/world.py "$ROOT" --live >/dev/null
+python3 demo/forget_tabs.py "$ROOT"
 rm -rf $FRAMES; mkdir -p $FRAMES "$(dirname $OUT)"
 
 # Times are seconds after launch.
