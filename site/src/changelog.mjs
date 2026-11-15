@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-update-from-the-dmg",
+    date: "2026-11-15",
+    versions: "0.1.30",
+    title: "Updates work when Maxwell runs from the DMG",
+    figure: "",
+    body: `
+<p>If you open Maxwell straight from the DMG without dragging it to Applications first, it runs from a disk macOS won't let it change. <strong>Restart to update</strong> then reopened the same old version and offered the same update again. Maxwell now installs the update into Applications and opens it from there.</p>
+<p>Still on an older version and stuck like this? Quit Maxwell, drag it from the DMG to Applications, and open it from there. Updates work from then on.</p>`,
+    fixes: [
+      "Fixed Restart to update reopening the old version when Maxwell ran from the DMG",
+      "Restart to update now says so when no Applications folder can be written, instead of quitting",
+    ],
+  },
+  {
     slug: "2026-11-15-setup-and-all-projects",
     date: "2026-11-15",
     versions: "0.1.29",

@@ -31,7 +31,7 @@ export const pages = {
 <p>The session hooks are how Maxwell learns what your sessions are doing. You can also install them with <strong>Maxwell › Install Hooks</strong> (${k("⇧ ⌘ H")}).</p>
 <p class="note">Install Hooks backs up each account's <code>settings.json</code> before it adds anything. <code>Maxwell uninstall-hooks</code> restores them exactly. See <a href="/docs/privacy">What Maxwell touches</a>.</p>
 <h2>Updates</h2>
-<p>Maxwell checks GitHub for a new release every few hours. When one is ready, the bottom bar shows <strong>Restart to update</strong>. Nothing changes until you click it. Then Maxwell quits, swaps in the new version and opens again.</p>
+<p>Maxwell checks GitHub for a new release every few hours. When one is ready, the bottom bar shows <strong>Restart to update</strong>. Nothing changes until you click it. Then Maxwell quits, swaps in the new version and opens again. If you opened Maxwell straight from the DMG, the update goes to Applications, and Maxwell opens from there from then on.</p>
 <p>Your Claude sessions keep running the whole time, because they are background sessions. <strong>Maxwell › Check for Updates…</strong> checks right away. Every release is listed in the <a href="/changelog">changelog</a>.</p>
 <h2>Homebrew</h2>
 <p>A Maxwell installed with Homebrew updates itself the same way. Its cask is marked <code>auto_updates</code>, so <code>brew upgrade</code> leaves it alone. To update through Homebrew instead, run <code>brew upgrade --greedy maxwell</code>. Every release reaches Homebrew on its own.</p>
