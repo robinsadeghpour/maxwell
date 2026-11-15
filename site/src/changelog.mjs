@@ -7,12 +7,22 @@ export default [
   {
     slug: "2026-11-15-safe-to-close-trusts-the-session",
     date: "2026-11-15",
-    versions: "0.1.45",
+    versions: "0.1.46",
     title: "Safe to close trusts the session's own word",
     figure: "",
     body: `
 <p>When a session ends its reply with <strong>Safe to close</strong> and every other check passes (nothing running, git clean and pushed, the PR merged), it now goes straight to Safe to close. Before, Haiku read the reply once more and could hold it back as <em>unsure</em> or <em>pending</em> over a caveat or a note, and it answered differently for the same reply.</p>
 <p>Replies without a status line still get the Haiku read.</p>`,
+    fixes: [],
+  },
+  {
+    slug: "2026-11-15-side-panels-are-tabs",
+    date: "2026-11-15",
+    versions: "0.1.45",
+    title: "Side panels open one at a time",
+    figure: "",
+    body: `
+<p>Panels on the same side now work like tabs. Opening the plugins panel closes the viewer beside it, and opening the viewer closes the plugins panel. The usage and system widgets at the bottom still sit side by side.</p>`,
     fixes: [],
   },
   {
