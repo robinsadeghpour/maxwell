@@ -95,6 +95,7 @@ jobs:
           CERT_P12: ${{ secrets.MAXWELL_CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.MAXWELL_CERT_PASSWORD }}
         run: |
+          [[ -n $CERT_P12 ]] || { echo "::error::The release environment has no MAXWELL_CERT_P12: run packaging/ci/set-release-secrets.sh cert on a Mac with the certificate."; exit 1; }
           KC=$RUNNER_TEMP/release.keychain-db
           KC_PASSWORD=$(uuidgen)
           security create-keychain -p "$KC_PASSWORD" "$KC"
