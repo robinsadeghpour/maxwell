@@ -74,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if !Updater.isRelease { NSApp.dockTile.badgeLabel = "dev" }
         }
         UNUserNotificationCenter.current().delegate = self
+        if quietTest { handFocusBack() }
         watchConfig()
         // Follow macOS light/dark when the config says appearance = system.
         appearanceWatch = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
@@ -83,16 +84,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         IconArt.apply(dark: theme.dark)
     }
 
+    /// macOS still brings a quiet run to the front when it is `open`ed or reopened (AppKit doesn't
+    /// even report it active), so it watches every app switch and gives the front back at once.
+    private var userApp = NSWorkspace.shared.frontmostApplication
+    private func handFocusBack() {
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
+            guard let self, let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            guard app == .current else { return self.userApp = app }
+            guard let back = self.userApp, back != .current else { return }
+            NSApp.yieldActivation(to: back)
+            mark("front handed back to \(back.localizedName ?? "?"): \(back.activate(from: .current))")
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ n: Notification) { store?.plugins.shutdownAll() }
-    /// `open Maxwell.app` while a test run of the same bundle is up reopens that instance
-    /// instead of launching a new one; you asked for the app, so it stays.
+    /// `open Maxwell.app` while a run of the same bundle is up reopens that instance. A quiet run
+    /// stays quiet and still quits on time: a reopened test run once sat in front for an hour.
     func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if let q = quitAfter, !q.isCancelled { q.cancel(); mark("--quit-after cancelled: reopened") }
+        if quietTest { mark("reopen ignored: quiet run"); return false }
         main.showWindow(nil)
         return true
     }
-    private var quitAfter: DispatchWorkItem?
 
     func applicationDidBecomeActive(_ n: Notification) {
         main?.recheckNotifications()
@@ -144,10 +157,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     // MARK: test hooks (used by measure.sh and screenshots.sh)
 
     private func runTestHooks() {
-        if let q = arg("--quit-after"), let s = Double(q) {
-            let quit = DispatchWorkItem { NSApp.terminate(nil) }
-            quitAfter = quit
-            DispatchQueue.main.asyncAfter(deadline: .now() + s, execute: quit)
+        // A quiet run started without --quit-after (a session checking its work) ends after 10 minutes.
+        if let s = arg("--quit-after").flatMap(Double.init) ?? (quietTest ? 600 : nil) {
+            mark("quits after \(Int(s)) s")
+            DispatchQueue.main.asyncAfter(deadline: .now() + s) { NSApp.terminate(nil) }
         }
         // --retina or --plain: put the window on a 2x or a 1x display for the capture, unless the
         // parked window already has that scale.
@@ -160,13 +173,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             w.setFrame(NSRect(x: w.frame.minX, y: w.frame.maxY - size[1], width: size[0], height: size[1]), display: true)
             mark("window frame \(NSStringFromRect(w.frame)) on \(w.screen?.localizedName ?? "?")")
         }
+        // Full screen takes over a Space on the user's screen, so a quiet run never enters it.
         if CommandLine.arguments.contains("--fullscreen") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { NSApp.activate(ignoringOtherApps: true); self.main.window?.toggleFullScreen(nil) }
+            if quietTest { mark("--fullscreen skipped: quiet run") } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { NSApp.activate(ignoringOtherApps: true); self.main.window?.toggleFullScreen(nil) }
+            }
         }
         if let p = arg("--project") { main.setScope(p == "all" ? nil : p) }
         if let name = arg("--select") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                if let s = self.store.state.sessions.values.first(where: { $0.name == name || $0.id.hasPrefix(name) }) { self.main.open(s.id) }
+                guard let s = self.store.state.sessions.values.first(where: { $0.title == name || $0.name == name || $0.id.hasPrefix(name) }) else {
+                    return mark("select \(name): no such session")
+                }
+                self.main.open(s.id)
                 mark("selected \(name)")
             }
         }
