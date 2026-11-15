@@ -83,7 +83,8 @@ export const pages = {
 <p>${k("J")} and ${k("K")} move up and down the list, and ${k("⏎")} opens a session. ${k("⌘ J")} jumps to the next session that needs you, across every project.</p>
 <p>${k("⇧ ⌘ I")} shows or hides Idle. How long a stopped session waits before it folds into Idle is set by <code>idle-after</code>, 24 hours by default.</p>
 <h2>Right-click a session</h2>
-<p>The row menu opens, renames, moves the session to another project, brings it in from a terminal, or closes it.</p>`,
+<p>The row menu opens, renames, moves the session to another project, pins it, marks it, brings it in from a terminal, or closes it.</p>
+<p><strong>Pin to Top</strong> lists the session first, under Pinned, and Close all leaves it alone until you unpin it. <strong>Mark As</strong> puts a session under Your turn, Safe to close or Idle when you disagree with Maxwell. The mark holds until the session's next turn, then Maxwell decides again. A working session can't be marked.</p>`,
   },
 
   "safe-to-close": {
@@ -99,12 +100,13 @@ export const pages = {
 <li><strong>You see the evidence.</strong> Each safe session lists every check and where its result came from.</li>
 <li><strong>Checked again at the moment of closing.</strong> If anything changed, that session is skipped.</li>
 <li><strong>Closing never deletes.</strong> Maxwell only runs <code>claude stop</code>, which keeps the conversation.</li>
-<li><strong>"Not safe" teaches it.</strong> Mark a wrong call and it becomes a test case, so the mistake can't repeat.</li>
+<li><strong>"Not safe" teaches it.</strong> Mark a wrong call and it becomes a test case, so the mistake can't repeat. The session stays under Your turn until its next turn.</li>
+<li><strong>You have the last word.</strong> Right-click › Mark As › Safe to close puts a session there although a check fails. Its banner says which checks still fail, and closing it doesn't stop on them.</li>
 </ol>
 <h2>The status line</h2>
-<p>Every new session is asked to end each reply with one line: <strong>Safe to close</strong>, <strong>Not done</strong> or <strong>Needs you</strong>, and a few words. Maxwell shows it on the row. <strong>Needs you</strong> moves the session to Needs you, and <strong>Not done</strong> keeps it out of Safe to close. A <strong>Safe to close</strong> line is one more piece of evidence, never enough alone. <code>wrap-line = off</code> turns it off.</p>
+<p>Every session is asked to end each reply with one line: <strong>Safe to close</strong>, <strong>Not done</strong> or <strong>Needs you</strong>, and a few words. Maxwell shows it on the row. <strong>Needs you</strong> moves the session to Needs you, and <strong>Not done</strong> keeps it out of Safe to close. A <strong>Safe to close</strong> line is one more piece of evidence, never enough alone. A session that started before Maxwell asked gets the request with your next prompt. <code>wrap-line = off</code> turns it off.</p>
 <h2>Close sessions</h2>
-<p>${k("⇧ ⌘ X")} closes every safe session. It shows the list and asks first. ${k("⇧ ⌘ ⌫")} closes the selected session: at once when it's safe, otherwise after saying what's still open.</p>
+<p>${k("⇧ ⌘ X")} closes every safe session in the project you're in (every project under All projects), except pinned ones. It shows the list and asks first. ${k("⇧ ⌘ ⌫")} closes the selected session: at once when it's safe, otherwise after saying what's still open.</p>
 <p>${k("⌘ Z")} undoes a close for 10 seconds. Anything closed in the last 7 days can be reopened from <strong>Recently closed</strong>.</p>
 <h2>Plugin checks</h2>
 <p>Plugins can add checks, and the same rules apply. A plugin that isn't running can't vouch, so its checks turn unknown. A check from before the session's last activity doesn't count. The Linear plugin adds "Linear ticket done". The Slack plugin adds "Replied on Slack" to sessions started from a message.</p>

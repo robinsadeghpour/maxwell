@@ -161,7 +161,9 @@ final class SessionPane: MXView {
             banner.configure(group: group, text: text, tint: { $0.chk })
         case .safeToClose:
             let note = s.lastMessage.flatMap(Wrap.parse).flatMap { $0.state == .safe && !$0.note.isEmpty ? $0.note : nil }
-            let text = note.map { "Safe to close · \($0) · every check passed" } ?? "Safe to close · every check passed; → on its row lists them"
+            // Only your mark puts a session here with checks still failing: say what they found.
+            let text = !blockers.isEmpty ? "Safe to close · you marked it; Maxwell still sees: " + blockers.joined(separator: " · ")
+                : note.map { "Safe to close · \($0) · every check passed" } ?? "Safe to close · every check passed; → on its row lists them"
             banner.configure(group: group, text: text, tint: { $0.safe })
             banner.add(MXButton("Not safe") { [weak self] in self?.delegate?.notSafe(s.id) })
             if case .background = s.reach {

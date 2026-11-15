@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-pin-and-mark-sessions",
+    date: "2026-11-15",
+    versions: "0.1.44",
+    title: "Pin sessions, and overrule a verdict",
+    figure: "",
+    body: `
+<p>Right-click a session and choose <strong>Pin to Top</strong>. Pinned sessions are listed first, under Pinned, and Close all leaves them alone.</p>
+<p><strong>Mark As</strong> puts a session under Your turn, Safe to close or Idle when you disagree with Maxwell. The mark holds until the session's next turn. A session you mark safe says which checks still fail.</p>
+<p>${k("⇧ ⌘ X")} now closes only the safe sessions of the project you're in, so a session from another project never lands in the list.</p>`,
+    fixes: [
+      "Sessions that started before Maxwell asked for the status line now get the request with your next prompt",
+    ],
+  },
+  {
     slug: "2026-11-15-claude-in-a-maxwell-terminal",
     date: "2026-11-15",
     versions: "0.1.43",
