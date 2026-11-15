@@ -13,16 +13,6 @@ export default [
     body: `
 <p>${k("⌥ ⌘ T")} now opens a terminal inside Maxwell, not in a window of its own. It gets a row under <strong>Terminals</strong> at the top of the sidebar and runs in the middle pane, like a session. The row shows the folder the shell is in, and follows it when you <code>cd</code>.</p>
 <p>Open as many as you like: with <strong>new</strong> on the Terminals header, from ${k("⌘ K")}, or by right-clicking a session and choosing <strong>Open Terminal Here</strong>. ${k("J")} ${k("K")} and ${k("⌘ [")} ${k("⌘ ]")} step through them with your sessions. × on the row, ${k("⌘ W")} or <code>exit</code> ends one.</p>`,
-    fixes: [],
-  },
-  {
-    slug: "2026-11-15-close-all-placement",
-    date: "2026-11-15",
-    versions: "0.1.32",
-    title: "Close all stays on its header",
-    figure: "",
-    body: `
-<p>When Maxwell opened with sessions already safe to close, the <strong>close all</strong> button could sit on top of the first safe session until the list changed. It now moves with its group header while rows slide into place, and lands next to it. The same goes for <strong>stop all</strong> on Idle.</p>`,
     fixes: [
       "Fixed close all and stop all covering a row after launch",
     ],
