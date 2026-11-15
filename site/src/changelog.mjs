@@ -5,6 +5,18 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-close-all-placement",
+    date: "2026-11-15",
+    versions: "0.1.32",
+    title: "Close all stays on its header",
+    figure: "",
+    body: `
+<p>When Maxwell opened with sessions already safe to close, the <strong>close all</strong> button could sit on top of the first safe session until the list changed. It now moves with its group header while rows slide into place, and lands next to it. The same goes for <strong>stop all</strong> on Idle.</p>`,
+    fixes: [
+      "Fixed close all and stop all covering a row after launch",
+    ],
+  },
+  {
     slug: "2026-11-15-update-from-the-dmg",
     date: "2026-11-15",
     versions: "0.1.30 – 0.1.31",
