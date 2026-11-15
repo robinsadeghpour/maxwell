@@ -31,7 +31,6 @@ export const safe = (caption) => plate(`<div class="w mid">
       <li><i>✓</i><span>Status line: Safe to close</span><span>last reply</span></li>
       <li><i>✓</i><span>Git clean and pushed</span><span>git 15:01</span></li>
       <li><i>✓</i><span>PR #208 merged</span><span>gh 15:01</span></li>
-      <li><i>✓</i><span>Haiku read: finished</span><span>$0.0002</span></li>
     </ul>
     <span class="btnm">Close</span> <span class="btnm" style="color:var(--dim)">Not safe</span>
   </div>

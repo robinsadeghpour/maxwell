@@ -596,7 +596,7 @@ final class SettingsView: MXView {
         form.toggle("Skip permission prompts", c.skipPermissions, note: "Sessions Maxwell starts or brings in run with --dangerously-skip-permissions, so Claude edits files and runs commands without asking. Off: Claude asks as usual.") { [weak self] in self?.set("skip-permissions", $0 ? "on" : "off") }
         form.choice("Move quiet sessions to Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter),
                     note: "Idle is folded away at the bottom of the list. Nothing is stopped.") { [weak self] in self?.set("idle-after", $0) }
-        form.toggle("Check finished work with Haiku", c.judge, note: "Before a session counts as Safe to close, Haiku reads its last reply once, for about $0.0002 on the account with the most usage left. Off: no session is ever marked Safe to close.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
+        form.toggle("Check finished work with Haiku", c.judge, note: "When a session's reply doesn't end in Safe to close, Haiku reads it once before it counts as safe, for about $0.0002 on the account with the most usage left. Off: no session is ever marked Safe to close.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
         form.choice("Session list", [("compact", "One line"), ("detail", "Two lines")], current: c.rowStyle,
                     note: "Two lines adds the account, branch and anything running under each title.") { [weak self] in self?.set("row-style", $0) }
     }

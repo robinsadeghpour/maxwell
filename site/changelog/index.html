@@ -34,7 +34,18 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-claude-in-a-maxwell-terminal">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-safe-to-close-trusts-the-session">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.44</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-safe-to-close-trusts-the-session">Safe to close trusts the session's own word</a></h2>
+    
+    <div class="prose"><p>When a session ends its reply with <strong>Safe to close</strong> and every other check passes (nothing running, git clean and pushed, the PR merged), it now goes straight to Safe to close. Before, Haiku read the reply once more and could hold it back as <em>unsure</em> or <em>pending</em> over a caveat or a note, and it answered differently for the same reply.</p>
+<p>Replies without a status line still get the Haiku read.</p></div>
+    
+    
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-claude-in-a-maxwell-terminal">
   <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.43</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-15-claude-in-a-maxwell-terminal">Claude in a Maxwell terminal is one row</a></h2>

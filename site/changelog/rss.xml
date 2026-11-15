@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Safe to close trusts the session's own word</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-safe-to-close-trusts-the-session</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-safe-to-close-trusts-the-session</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;When a session ends its reply with &lt;strong&gt;Safe to close&lt;/strong&gt; and every other check passes (nothing running, git clean and pushed, the PR merged), it now goes straight to Safe to close. Before, Haiku read the reply once more and could hold it back as &lt;em&gt;unsure&lt;/em&gt; or &lt;em&gt;pending&lt;/em&gt; over a caveat or a note, and it answered differently for the same reply.&lt;/p&gt;
+&lt;p&gt;Replies without a status line still get the Haiku read.&lt;/p&gt;</description>
+</item>
+<item>
 <title>Claude in a Maxwell terminal is one row</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-claude-in-a-maxwell-terminal</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-claude-in-a-maxwell-terminal</guid>

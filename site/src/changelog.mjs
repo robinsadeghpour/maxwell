@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-safe-to-close-trusts-the-session",
+    date: "2026-11-15",
+    versions: "0.1.44",
+    title: "Safe to close trusts the session's own word",
+    figure: "",
+    body: `
+<p>When a session ends its reply with <strong>Safe to close</strong> and every other check passes (nothing running, git clean and pushed, the PR merged), it now goes straight to Safe to close. Before, Haiku read the reply once more and could hold it back as <em>unsure</em> or <em>pending</em> over a caveat or a note, and it answered differently for the same reply.</p>
+<p>Replies without a status line still get the Haiku read.</p>`,
+    fixes: [],
+  },
+  {
     slug: "2026-11-15-claude-in-a-maxwell-terminal",
     date: "2026-11-15",
     versions: "0.1.43",

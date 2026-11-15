@@ -258,8 +258,8 @@ struct Config: Equatable {
     # project-logo = Acme ~/projects/acme/apps/web/app/icon.png
     # "Says done" sessions quiet for longer than this fold into a collapsed Idle group.
     idle-after = 24h
-    # Last step before Safe to close: one small model read (claude -p, haiku, on the account
-    # with the most 5-hour room) of the last reply. off = nothing is ever safe to close.
+    # Last step before Safe to close, for replies that don't end in Safe to close: one small model
+    # read (claude -p, haiku, on the account with the most 5-hour room). off = nothing is ever safe to close.
     judge = on
     # New sessions end every reply with a status line (Safe to close / Not done / Needs you) that
     # Maxwell shows and checks. off = sessions are not asked for it.
