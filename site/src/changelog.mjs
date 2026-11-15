@@ -5,6 +5,18 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-panel-tabs-stay",
+    date: "2026-11-15",
+    versions: "0.1.42",
+    title: "Panel tabs stay on the edge",
+    figure: "",
+    body: `
+<p>Every panel now keeps its tab on the window's edge. An open panel's tab is lit. Click it to hide the panel, and click again to bring it back. Tabs no longer disappear when you open the panel they belong to.</p>`,
+    fixes: [
+      "Fixed the Viewer tab showing nothing when no file was open",
+    ],
+  },
+  {
     slug: "2026-11-15-new-sessions-start-in-the-right-project",
     date: "2026-11-15",
     versions: "0.1.41",

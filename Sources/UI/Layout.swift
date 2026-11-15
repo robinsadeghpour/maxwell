@@ -114,8 +114,8 @@ final class RootView: MXView {
     var panels = PanelLayout() { didSet { if panels != oldValue { sync(animated: true); onLayoutChanged?() } } }
     var onLayoutChanged: (() -> Void)?
     var onWidthsChanged: (() -> Void)?
-    /// Called when a stripe or menu shows a panel, so the controller can focus it.
-    var onShowPanel: ((PanelID) -> Void)?
+    /// A stripe tab was clicked: the controller shows the panel, or hides it if it is open.
+    var onStripe: ((PanelID) -> Void)?
 
     enum RailMode { case auto, shown, off }
     var railMode = RailMode.auto { didSet { railReveal.set(railMode == .shown ? 1 : 0, animated: false); needsLayout = true } }
@@ -167,7 +167,7 @@ final class RootView: MXView {
         viewerDim.isHidden = true
         drop.isHidden = true
         for s in [leftStripe, rightStripe] {
-            s.onToggle = { [weak self] p in self?.setHidden(p, false); self?.onShowPanel?(p) }
+            s.onToggle = { [weak self] p in self?.onStripe?(p) }
             s.onMenu = { [weak self] p, e in self?.showMenu(for: p, event: e) }
         }
         railReveal.step = { [weak self] _ in self?.needsLayout = true }
@@ -256,12 +256,14 @@ final class RootView: MXView {
         needsLayout = true
     }
 
+    /// Every panel of a side stays on its stripe, lit while it is open, like JetBrains tool window buttons.
     private func stripeItems(_ side: Dock) -> [Stripe.Item] {
-        let hidden = { (d: Dock) in self.panels.panels(d).filter { self.panels.hidden.contains($0) && ($0 != .plugins || self.hasPluginPanels) } }
-        var items = hidden(side).map { Stripe.Item(panel: $0, lower: false) }
+        let items = { (d: Dock, lower: Bool) in
+            self.panels.panels(d).filter { $0 != .plugins || self.hasPluginPanels }
+                .map { Stripe.Item(panel: $0, lower: lower, open: self.shown(d).contains($0)) }
+        }
         // JetBrains keeps bottom tool windows on the lower part of the left stripe.
-        if side == .left { items += hidden(.bottom).map { Stripe.Item(panel: $0, lower: true) } }
-        return items
+        return items(side, false) + (side == .left ? items(.bottom, true) : [])
     }
 
     // MARK: layout
@@ -783,7 +785,6 @@ final class DropPreview: MXView {
     override func hitTest(_ p: NSPoint) -> NSView? { nil }
 }
 
-/// A collapsed area: a 20 pt column with one vertical button per hidden panel.
 /// A hidden rail's grip on the window's left edge: a faint mark that brightens as the pointer
 /// arrives, and opens the rail on click.
 final class RailHandle: MXView, TipSource {
@@ -802,9 +803,10 @@ final class RailHandle: MXView, TipSource {
     }
 }
 
+/// A 20 pt column beside an area with one vertical button per panel; an open panel's button is lit.
 final class Stripe: MXView, TipSource {
     var tipsBeside: Bool { side != .bottom }
-    struct Item: Equatable { var panel: PanelID; var lower: Bool }
+    struct Item: Equatable { var panel: PanelID; var lower: Bool; var open: Bool }
     static let width: CGFloat = 20
     let side: Dock
     var items: [Item] = [] { didSet { if items != oldValue { needsDisplay = true } } }
@@ -833,14 +835,15 @@ final class Stripe: MXView, TipSource {
 
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         guard let i = index(at: p) else { return nil }
-        return (Tip("Show the \(items[i].panel.title.lowercased()) panel", action: "panel-\(items[i].panel.rawValue)"), rects()[i])
+        let it = items[i]
+        return (Tip("\(it.open ? "Hide" : "Show") the \(it.panel.title.lowercased()) panel", action: "panel-\(it.panel.rawValue)"), rects()[i])
     }
 
     override func draw(_ r: NSRect) {
         t.plane.setFill(); bounds.fill()
         for (i, (it, rr)) in zip(items, rects()).enumerated() {
-            if pressed == i { t.rowSel.setFill(); NSBezierPath(roundedRect: rr, xRadius: 3, yRadius: 3).fill() }
-            else if hover == i { t.hover.setFill(); NSBezierPath(roundedRect: rr, xRadius: 3, yRadius: 3).fill() }
+            if pressed == i || it.open { t.rowSel.setFill(); NSBezierPath(roundedRect: rr, xRadius: 3, yRadius: 3).fill() }
+            if hover == i, !it.open { t.hover.setFill(); NSBezierPath(roundedRect: rr, xRadius: 3, yRadius: 3).fill() }
             NSGraphicsContext.saveGraphicsState()
             let xf = NSAffineTransform()
             xf.translateX(by: rr.midX, yBy: rr.midY)
@@ -848,7 +851,7 @@ final class Stripe: MXView, TipSource {
             xf.concat()
             let s = it.panel.title
             let w = Text.width(s, font: font)
-            Text.draw(s, in: NSRect(x: -w / 2, y: -8, width: w + 2, height: 16), color: hover == i ? t.fg : t.fg2, font: font)
+            Text.draw(s, in: NSRect(x: -w / 2, y: -8, width: w + 2, height: 16), color: hover == i || it.open ? t.fg : t.fg2, font: font)
             NSGraphicsContext.restoreGraphicsState()
         }
     }

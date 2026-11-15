@@ -71,7 +71,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
         root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim() }
         root.onSettled = { [weak self] in self?.updateDim() }
-        root.onShowPanel = { [weak self] p in self?.focusPanel(p) }
+        root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
             guard let self else { return }
             self.root.rail.needsDisplay = true; self.root.sidebar.mark.needsDisplay = true
@@ -450,6 +450,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// ⌥⌘ number, JetBrains style: shows a hidden panel and focuses it; hides a focused one.
+    /// A stripe tab: an open panel closes, a closed one opens and takes focus.
+    private func stripeClicked(_ p: PanelID) {
+        guard root.isShown(p) else { return togglePanel(p) }
+        root.setHidden(p, true)
+        if p == .viewer { viewerForced = nil }
+        focusMain()
+    }
+
     func togglePanel(_ p: PanelID) {
         if !root.isShown(p) {
             root.setHidden(p, false)
