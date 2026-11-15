@@ -86,5 +86,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 cp vendor/ghostty/LICENSE "$APP/Contents/Resources/ghostty/LICENSE-ghostty" 2>/dev/null || true
-codesign --force --sign - "$APP" >/dev/null
+# Sign with a certificate when this Mac has one, so macOS sees every build as the same app and
+# Keychain access allowed once stays allowed. Ad-hoc signing ties the app to its binary's hash,
+# which changes with every build and update. MAXWELL_SIGN_ID picks the identity; "-" is ad-hoc.
+SIGN_ID=${MAXWELL_SIGN_ID:-$(security find-identity -p codesigning -v 2>/dev/null | awk -F'"' '/Apple Development|Developer ID Application/ {print $2; exit}')}
+codesign --force --sign "${SIGN_ID:--}" "$APP" >/dev/null
 echo "built $APP ($(du -sh "$APP" | cut -f1))"

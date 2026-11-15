@@ -14,9 +14,12 @@ func mark(_ what: String) {
     let line = String(format: "[maxwell] %@  %.1f ms\n", what as NSString, (Date().timeIntervalSince1970 - launchStart) * 1000)
     FileHandle.standardError.write(line.data(using: .utf8)!)
 }
-/// A scripted test run (it quits by itself): no Dock icon, never takes focus, window kept
-/// behind the user's windows. Keys and clicks come from --keys and --click, not the real input.
+/// A scripted test run (it quits by itself), or Maxwell Dev started by a Claude session to check
+/// its work: no Dock icon, never takes focus, window kept behind the user's windows, no Keychain.
+/// Keys and clicks come from --keys and --click, not the real input. Read before
+/// ClaudeCLI.scrubOwnEnvironment removes CLAUDECODE.
 let quietTest = CommandLine.arguments.contains("--quit-after")
+    || (Bundle.main.bundleIdentifier != Updater.releaseID && ProcessInfo.processInfo.environment["CLAUDECODE"] != nil)
 
 func arg(_ name: String) -> String? {
     let a = CommandLine.arguments

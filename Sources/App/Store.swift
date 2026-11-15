@@ -34,7 +34,8 @@ final class Store {
             bundled: Bundle.main.resourceURL?.appendingPathComponent("plugins"),
             logs: Paths.stateDir.appendingPathComponent("plugins"),
             data: Paths.stateDir.appendingPathComponent("plugins")),
-            secrets: KeychainSecrets(),
+            // Test and agent runs never touch the Keychain: a rebuilt app is a new app to macOS and would ask.
+            secrets: quietTest ? MemorySecrets() : KeychainSecrets(),
             version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")
         state = log.readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
     }
