@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+<title>Maxwell changelog</title>
+<link>https://www.runmaxwell.com/changelog</link>
+<atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
+<description>New features, fixes and improvements in Maxwell.</description>
+<item>
+<title>Terminal keys that work like Ghostty</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-terminal-keys</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-terminal-keys</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;The terminal in Maxwell now edits the way Ghostty and Warp do. &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;⌫&lt;/kbd&gt;&lt;/span&gt; deletes to the start of the line, &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌥&lt;/kbd&gt;&lt;kbd&gt;⌫&lt;/kbd&gt;&lt;/span&gt; deletes a word, and &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;V&lt;/kbd&gt;&lt;/span&gt; with a screenshot on the clipboard pastes it into Claude as an image.&lt;/p&gt;
+&lt;p&gt;Close Session moves to &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⇧&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;⌫&lt;/kbd&gt;&lt;/span&gt; to make room.&lt;/p&gt;
+&lt;h3&gt;Permission prompts are off for new sessions&lt;/h3&gt;
+&lt;p&gt;Sessions Maxwell starts or brings in now run with &lt;code&gt;--dangerously-skip-permissions&lt;/code&gt; instead of auto mode, so they don't stop to ask before every command. Turn it off in &lt;strong&gt;Settings › General › Sessions&lt;/strong&gt;, or with &lt;code&gt;skip-permissions = off&lt;/code&gt; in the config.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;C&lt;/kbd&gt;&lt;/span&gt; in the terminal no longer clears Claude Code's highlighted selection&lt;/li&gt;&lt;li&gt;Fixed a white strip covering the title bar in full screen. Tabs, new session, search and settings stay visible&lt;/li&gt;&lt;li&gt;Copied files paste as their paths, and files dropped on the terminal paste the same way&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
+<title>Plugins: Linear and Slack</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-plugins</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-plugins</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Maxwell now has plugins, and two ship with it. They live in one &lt;strong&gt;Plugins&lt;/strong&gt; panel (&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌥&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;6&lt;/kbd&gt;&lt;/span&gt;) with a tab each, and dock left, right or bottom like every other panel.&lt;/p&gt;
+&lt;h3&gt;Linear&lt;/h3&gt;
+&lt;p&gt;Each session's ticket and status show on its row, read from the branch name or the transcript. &quot;Linear ticket done&quot; joins the Safe to close checks, so a session isn't safe until its ticket is. When the work moves, Linear suggests the matching ticket move: In Progress when a session starts, a comment when the PR opens, Done when it merges.&lt;/p&gt;
+&lt;h3&gt;Slack&lt;/h3&gt;
+&lt;p&gt;Slack lists who is waiting on a reply from you: DMs, mentions and threads, with bugs and customers first. It only reads. &lt;strong&gt;Start Session&lt;/strong&gt; starts a Claude session from a message and links the two, and that session isn't safe to close until you've replied in the thread.&lt;/p&gt;
+&lt;h3&gt;Write your own&lt;/h3&gt;
+&lt;p&gt;A plugin is a folder with a manifest and a program in any language. It talks to Maxwell with JSON lines over stdin and stdout, and Maxwell draws its panels with its own components, so every plugin looks native in every theme. A plugin that crashes is shown as stopped with a Restart button. It can't take Maxwell down. &lt;a href=&quot;/docs/write-a-plugin&quot;&gt;Read the plugin guide&lt;/a&gt;.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Connect Slack with ⌘K › Connect Slack…, which opens Slack's app page with the manifest filled in&lt;/li&gt;&lt;li&gt;Plugin secrets live in the Keychain and only the plugin that declared them can read them&lt;/li&gt;&lt;li&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⇧&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;O&lt;/kbd&gt;&lt;/span&gt; opens the selected session's Linear ticket&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
+<title>Artifacts open beside the session</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-14-artifacts</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-14-artifacts</guid>
+<pubDate>Sat, 14 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;When a session publishes a claude.ai artifact, it now opens on the right, next to the session that made it, signed in as that session's account. Publishing again reloads it in place, even when it's pinned.&lt;/p&gt;
+&lt;p&gt;Each account signs in once, on claude.ai's own page, and keeps its own login. Maxwell already knows which account every session runs on, so it always picks the right one. &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⇧&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;O&lt;/kbd&gt;&lt;/span&gt; opens the artifact in that account's browser profile or container instead.&lt;/p&gt;
+&lt;h3&gt;Bring terminal sessions into Maxwell&lt;/h3&gt;
+&lt;p&gt;A session running in another terminal now has a &lt;strong&gt;Bring into Maxwell&lt;/strong&gt; button. Maxwell ends the terminal's process and resumes the same conversation as a background session, with the same id, account, folder and permission mode. A session in the middle of a turn moves when the turn ends. &lt;strong&gt;Session › Bring Terminal Sessions into Maxwell…&lt;/strong&gt; moves all of them at once.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Close any session from its right-click menu. If it isn't safe yet, Maxwell says what's still open and asks first&lt;/li&gt;&lt;li&gt;Sessions named only by a slug or their first words get a readable name from Haiku, once, for about $0.0003&lt;/li&gt;&lt;li&gt;Right-click a session to rename it. Your name always wins&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
+<title>Maxwell is public</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-14-first-public-release</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-14-first-public-release</guid>
+<pubDate>Sat, 14 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Maxwell is a native Mac app for running many Claude Code sessions at once. It reads what every session is doing, sorts them by what they need from you, and only calls a session safe to close when it can prove it.&lt;/p&gt;
+&lt;p&gt;The first public release covers the core: the six groups, projects on a Dock-style rail, the real Claude session attached in a Ghostty terminal, Markdown files rendered beside it, usage for every account, and search across everything with &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;P&lt;/kbd&gt;&lt;/span&gt;.&lt;/p&gt;
+&lt;h3&gt;Safe to close means safe&lt;/h3&gt;
+&lt;p&gt;Unknown is never safe. A session needs proof that its task is finished: nothing running, two quiet hours, a last message that asks nothing, git clean and pushed, the PR merged. Then Haiku reads the last message once and has to answer &lt;code&gt;finished&lt;/code&gt;. Closing only runs &lt;code&gt;claude stop&lt;/code&gt;, with Undo for 10 seconds. &lt;a href=&quot;/docs/safe-to-close&quot;&gt;How Safe to close works&lt;/a&gt;.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Updates come straight from GitHub's public releases. No GitHub login needed&lt;/li&gt;&lt;li&gt;Needs a Mac with Apple silicon and macOS 14 or later&lt;/li&gt;&lt;li&gt;Free and open source under the MIT licence&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+</channel>
+</rss>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Changelog · Maxwell</title>
+<meta name="description" content="New features, fixes and improvements in Maxwell, the session manager for Claude Code.">
+<meta property="og:title" content="Changelog · Maxwell">
+<meta property="og:description" content="New features, fixes and improvements in Maxwell, the session manager for Claude Code.">
+<meta property="og:image" content="https://www.runmaxwell.com/og.png">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.runmaxwell.com/changelog">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="canonical" href="https://www.runmaxwell.com/changelog">
+<link rel="alternate" type="application/rss+xml" title="Maxwell changelog" href="/changelog/rss.xml">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 9 9'%3E%3Crect x='-1' y='-1' width='9' height='9' rx='2' fill='%230a0a0b'/%3E%3Cpath fill='%23ededef' d='M0 0h1v1H0zM6 0h1v1H6zM0 1h2v1H0zM5 1h2v1H5zM1 2h5v1H1zM1 3h1v1H1zM3 3h1v1H3zM5 3h1v1H5zM1 4h5v1H1zM2 5h3v1H2zM2 6h1v1H2zM4 6h1v1H4z'/%3E%3Cpath fill='%23f0a33a' d='M2 3h1v1H2zM4 3h1v1H4z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/assets/pages.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="demon" viewBox="0 0 7 7"><path fill="currentColor" d="M0 0h1v1H0zM6 0h1v1H6zM0 1h2v1H0zM5 1h2v1H5zM1 2h5v1H1zM1 3h1v1H1zM3 3h1v1H3zM5 3h1v1H5zM1 4h5v1H1zM2 5h3v1H2zM2 6h1v1H2zM4 6h1v1H4z"/></symbol>
+  <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 0Z"/></symbol>
+  <symbol id="rss" viewBox="0 0 16 16"><path fill="currentColor" d="M2 2.5a.5.5 0 0 1 .5-.5A11.5 11.5 0 0 1 14 13.5a.5.5 0 0 1-1 0A10.5 10.5 0 0 0 2.5 3a.5.5 0 0 1-.5-.5Zm0 4.5a.5.5 0 0 1 .5-.5 7 7 0 0 1 7 7 .5.5 0 0 1-1 0 6 6 0 0 0-6-6A.5.5 0 0 1 2 7Zm1.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/></symbol>
+  <symbol id="find" viewBox="0 0 16 16"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Zm4-1.5 3.5 3.5"/></symbol>
+</svg>
+<main>
+  <div class="band" style="border-top:0"><div class="frame">
+    <header class="nav"><a href="/"><svg aria-hidden="true"><use href="#demon"/></svg>Maxwell</a><nav><a class="hide-s" href="/#features">Features</a><a href="/docs">Docs</a><a href="/changelog" aria-current="page">Changelog</a><a class="hide-s" href="https://github.com/robinsadeghpour/maxwell">GitHub</a></nav></header>
+  </div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
+  <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
+  <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-terminal-keys">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.15 – v0.1.18</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-terminal-keys">Terminal keys that work like Ghostty</a></h2>
+    <figure class="fig"><div class="plate" aria-hidden="true"><div class="stack">
+  <div class="caps">
+    <div class="cap"><div class="keys"><kbd>⌘</kbd><kbd>⌫</kbd></div><span>Delete to the start of the line</span></div>
+    <div class="cap"><div class="keys"><kbd>⌥</kbd><kbd>⌫</kbd></div><span>Delete a word</span></div>
+    <div class="cap"><div class="keys"><kbd>⌘</kbd><kbd>V</kbd></div><span>Paste a screenshot as an image</span></div>
+  </div>
+  <div class="w mid"><div class="scr"><span class="m">›</span> <span class="p">[Image #1]</span> the button sits under the header here <span class="cur"></span></div></div>
+</div></div></figure>
+    <div class="prose"><p>The terminal in Maxwell now edits the way Ghostty and Warp do. <span class="kc"><kbd>⌘</kbd><kbd>⌫</kbd></span> deletes to the start of the line, <span class="kc"><kbd>⌥</kbd><kbd>⌫</kbd></span> deletes a word, and <span class="kc"><kbd>⌘</kbd><kbd>V</kbd></span> with a screenshot on the clipboard pastes it into Claude as an image.</p>
+<p>Close Session moves to <span class="kc"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>⌫</kbd></span> to make room.</p>
+<h3>Permission prompts are off for new sessions</h3>
+<p>Sessions Maxwell starts or brings in now run with <code>--dangerously-skip-permissions</code> instead of auto mode, so they don't stop to ask before every command. Turn it off in <strong>Settings › General › Sessions</strong>, or with <code>skip-permissions = off</code> in the config.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span><span class="kc"><kbd>⌘</kbd><kbd>C</kbd></span> in the terminal no longer clears Claude Code's highlighted selection</span></li><li><span>Fixed a white strip covering the title bar in full screen. Tabs, new session, search and settings stay visible</span></li><li><span>Copied files paste as their paths, and files dropped on the terminal paste the same way</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-plugins">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.14</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-plugins">Plugins: Linear and Slack</a></h2>
+    <figure class="fig"><div class="plate" aria-hidden="true"><div class="w lg"><div class="split2">
+  <div>
+    <div class="wh"><span class="tl"><i></i><i></i><i></i></span><b>Acme</b><span class="sp"></span></div>
+    <div class="gh" style="--c:var(--turn)"><i class="d" style="--c:var(--turn)"></i> Your turn <span>2</span></div>
+    <div class="row sel" style="--c:var(--turn)"><i class="d" style="--c:var(--turn)"></i><b>Billing totals <em>4m</em></b><small>PR #212 is open</small><span class="badge wa">ACME-56 · In Progress</span></div>
+    <div class="row"><i class="d" style="--c:var(--turn)"></i><b>Reply to Mara <em>9m</em></b><small>Draft reply is ready</small><span class="badge">Slack · Mara</span></div>
+    <div class="gh" style="--c:var(--safe)"><i class="d o" style="--c:var(--safe)"></i> Safe to close <span>1</span></div>
+    <div class="row" style="padding-bottom:12px"><i class="d o" style="--c:var(--safe)"></i><b>Fix flaky login test <em>3h</em></b><small>Merged #208</small><span class="badge ok">ACME-41 · Done</span></div>
+  </div>
+  <div>
+    <div class="wh"><b>SLACK</b> <span>3</span><span class="sp"></span><span>LINEAR</span></div>
+    <div class="gh" style="--c:var(--need)">Answer first</div>
+    <div class="row"><i class="d" style="--c:var(--need)"></i><b>Mara <em>12m</em></b><small>Checkout is double-charging in EU</small><span class="btnm">Start Session</span></div>
+    <div class="gh" style="--c:var(--dim)">Questions and requests</div>
+    <div class="row"><i class="d" style="--c:var(--turn)"></i><b>Jonas <em>1h</em></b><small>Can you look at the pricing copy?</small></div>
+    <div class="row" style="padding-bottom:12px"><i class="d" style="--c:var(--turn)"></i><b>#design <em>3h</em></b><small>Which icon set did we pick?</small></div>
+  </div>
+</div></div></div></figure>
+    <div class="prose"><p>Maxwell now has plugins, and two ship with it. They live in one <strong>Plugins</strong> panel (<span class="kc"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>6</kbd></span>) with a tab each, and dock left, right or bottom like every other panel.</p>
+<h3>Linear</h3>
+<p>Each session's ticket and status show on its row, read from the branch name or the transcript. "Linear ticket done" joins the Safe to close checks, so a session isn't safe until its ticket is. When the work moves, Linear suggests the matching ticket move: In Progress when a session starts, a comment when the PR opens, Done when it merges.</p>
+<h3>Slack</h3>
+<p>Slack lists who is waiting on a reply from you: DMs, mentions and threads, with bugs and customers first. It only reads. <strong>Start Session</strong> starts a Claude session from a message and links the two, and that session isn't safe to close until you've replied in the thread.</p>
+<h3>Write your own</h3>
+<p>A plugin is a folder with a manifest and a program in any language. It talks to Maxwell with JSON lines over stdin and stdout, and Maxwell draws its panels with its own components, so every plugin looks native in every theme. A plugin that crashes is shown as stopped with a Restart button. It can't take Maxwell down. <a href="/docs/write-a-plugin">Read the plugin guide</a>.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Connect Slack with ⌘K › Connect Slack…, which opens Slack's app page with the manifest filled in</span></li><li><span>Plugin secrets live in the Keychain and only the plugin that declared them can read them</span></li><li><span><span class="kc"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>O</kbd></span> opens the selected session's Linear ticket</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-14-artifacts">
+  <aside><div><time datetime="2026-11-14">Nov 14, 2026</time><span class="ver">v0.1.13</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-14-artifacts">Artifacts open beside the session</a></h2>
+    <figure class="fig"><div class="plate" aria-hidden="true"><div class="w lg"><div class="split2">
+  <div>
+    <div class="wh"><b>Pricing page</b><span class="sp"></span><span class="acct">work</span></div>
+    <div class="scr"><span class="m">⏺</span> Published the pricing draft.
+  <span class="m">⎿</span> claude.ai/artifact/7c2e…
+
+<span class="m">›</span> <span class="cur"></span></div>
+  </div>
+  <div>
+    <div class="wh"><b>Pricing draft</b><span class="sp"></span><span class="acct"><i class="d" style="--c:var(--safe)"></i> work · signed in</span></div>
+    <div class="md"><h5>Pricing</h5><p>Three plans, one table.</p><div class="bar t"></div><div class="bar"></div><div class="bar s"></div><div class="bar t"></div><div class="bar s"></div></div>
+  </div>
+</div></div></div></figure>
+    <div class="prose"><p>When a session publishes a claude.ai artifact, it now opens on the right, next to the session that made it, signed in as that session's account. Publishing again reloads it in place, even when it's pinned.</p>
+<p>Each account signs in once, on claude.ai's own page, and keeps its own login. Maxwell already knows which account every session runs on, so it always picks the right one. <span class="kc"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>O</kbd></span> opens the artifact in that account's browser profile or container instead.</p>
+<h3>Bring terminal sessions into Maxwell</h3>
+<p>A session running in another terminal now has a <strong>Bring into Maxwell</strong> button. Maxwell ends the terminal's process and resumes the same conversation as a background session, with the same id, account, folder and permission mode. A session in the middle of a turn moves when the turn ends. <strong>Session › Bring Terminal Sessions into Maxwell…</strong> moves all of them at once.</p></div>
+    <div style="margin-top:28px"><figure class="fig"><div class="plate" aria-hidden="true"><div class="stack">
+  <div class="w sm">
+    <div class="row sel" style="--c:var(--turn);margin:7px"><i class="d" style="--c:var(--turn)"></i><b>Search index rebuild <em>read-only</em></b><small>Running in Terminal · pid 48211</small><span class="btnm on">Bring into Maxwell</span></div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="w sm">
+    <div class="row" style="margin:7px"><i class="d" style="--c:var(--turn)"></i><b>Search index rebuild <em>now</em></b><small>Same conversation · claude --bg --resume</small></div>
+  </div>
+</div></div></figure></div>
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Close any session from its right-click menu. If it isn't safe yet, Maxwell says what's still open and asks first</span></li><li><span>Sessions named only by a slug or their first words get a readable name from Haiku, once, for about $0.0003</span></li><li><span>Right-click a session to rename it. Your name always wins</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-14-first-public-release">
+  <aside><div><time datetime="2026-11-14">Nov 14, 2026</time><span class="ver">v0.1.12</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-14-first-public-release">Maxwell is public</a></h2>
+    <figure class="fig"><div class="plate" aria-hidden="true"><div class="stack">
+  <div style="display:flex;gap:14px;align-items:center;color:var(--ink)"><svg viewBox="0 0 7 7" style="width:44px;height:44px"><use href="#demon"/></svg></div>
+  <div class="w" style="max-width:520px;padding:6px 0">
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0">
+      <div style="padding:12px 14px;"><span style="display:flex;gap:8px;align-items:center;color:var(--need)"><i class="d" style="--c:var(--need)"></i>Needs you</span><span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">1 session</span></div><div style="padding:12px 14px;border-left:1px solid var(--line);"><span style="display:flex;gap:8px;align-items:center;color:var(--turn)"><i class="d" style="--c:var(--turn)"></i>Your turn</span><span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">3 sessions</span></div><div style="padding:12px 14px;border-left:1px solid var(--line);"><span style="display:flex;gap:8px;align-items:center;color:var(--work)"><i class="d" style="--c:var(--work)"></i>Working</span><span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">4 sessions</span></div><div style="padding:12px 14px;border-top:1px solid var(--line);"><span style="display:flex;gap:8px;align-items:center;color:var(--limit)"><i class="d" style="--c:var(--limit)"></i>Limited</span><span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">1 session</span></div><div style="padding:12px 14px;border-left:1px solid var(--line);border-top:1px solid var(--line);"><span style="display:flex;gap:8px;align-items:center;color:var(--safe)"><i class="d o" style="--c:var(--safe)"></i>Safe to close</span><span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">6 sessions</span></div><div style="padding:12px 14px;border-left:1px solid var(--line);border-top:1px solid var(--line);"><span style="display:flex;gap:8px;align-items:center;color:var(--work)"><i class="d o" style="--c:var(--work)"></i>Idle</span><span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">12 sessions</span></div>
+    </div>
+  </div>
+</div></div></figure>
+    <div class="prose"><p>Maxwell is a native Mac app for running many Claude Code sessions at once. It reads what every session is doing, sorts them by what they need from you, and only calls a session safe to close when it can prove it.</p>
+<p>The first public release covers the core: the six groups, projects on a Dock-style rail, the real Claude session attached in a Ghostty terminal, Markdown files rendered beside it, usage for every account, and search across everything with <span class="kc"><kbd>⌘</kbd><kbd>P</kbd></span>.</p>
+<h3>Safe to close means safe</h3>
+<p>Unknown is never safe. A session needs proof that its task is finished: nothing running, two quiet hours, a last message that asks nothing, git clean and pushed, the PR merged. Then Haiku reads the last message once and has to answer <code>finished</code>. Closing only runs <code>claude stop</code>, with Undo for 10 seconds. <a href="/docs/safe-to-close">How Safe to close works</a>.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Updates come straight from GitHub's public releases. No GitHub login needed</span></li><li><span>Needs a Mac with Apple silicon and macOS 14 or later</span></li><li><span>Free and open source under the MIT licence</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><footer class="foot"><span>Maxwell is free and open source under the MIT licence. Named after Maxwell's demon.</span><nav><a href="/docs">Docs</a><a href="/changelog">Changelog</a><a href="https://github.com/robinsadeghpour/maxwell">GitHub</a><a href="https://github.com/robinsadeghpour/maxwell/releases">Releases</a></nav></footer></div></div>
+</main>
+
+</body>
+</html>

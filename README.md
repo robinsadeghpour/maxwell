@@ -214,7 +214,7 @@ Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the w
 | `examples/plugins/` | A complete plugin in 55 lines of Python |
 | `hook/` | The hook and status-line tap, in C |
 | `docs/` | Config reference and the images in this README |
-| `site/` | The website, [runmaxwell.com](https://www.runmaxwell.com) |
+| `site/` | The website, [runmaxwell.com](https://www.runmaxwell.com). Docs and changelog live in `site/src/`; `node site/src/build.mjs` writes the pages |
 
 Ghostty is pinned to `8046a2360340ec9788e0089da5a9ed0378adf0ea`. To upgrade, change the commit in `build.sh`, rebuild and re-run both commands above.
 
