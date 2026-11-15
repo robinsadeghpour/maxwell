@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-pin-and-mark-sessions",
     date: "2026-11-15",
-    versions: "0.1.45",
+    versions: "0.1.46",
     title: "Pin sessions, and overrule a verdict",
     figure: "",
     body: `
@@ -17,6 +17,16 @@ export default [
     fixes: [
       "Sessions that started before Maxwell asked for the status line now get the request with your next prompt",
     ],
+  },
+  {
+    slug: "2026-11-15-side-panels-are-tabs",
+    date: "2026-11-15",
+    versions: "0.1.45",
+    title: "Side panels open one at a time",
+    figure: "",
+    body: `
+<p>Panels on the same side now work like tabs. Opening the plugins panel closes the viewer beside it, and opening the viewer closes the plugins panel. The usage and system widgets at the bottom still sit side by side.</p>`,
+    fixes: [],
   },
   {
     slug: "2026-11-15-open-a-folder-with-maxwell",
