@@ -505,6 +505,15 @@ wrapped.sessions["s1"]!.lastMessage = "Shipped.\n\n**Safe to close** · v0.1.17 
 wrapped = reduce(wrapped, .judged(hash: Reply.hash(wrapped.sessions["s1"]!.lastMessage!), Judgment(verdict: .finished, at: t0, account: "work", costUSD: nil)))
 check(verdictOf(wrapped, "s1", at: later).first { $0.kind == .wrap } == Check(kind: .wrap, outcome: .pass, detail: "v0.1.17 shipped", source: "session's status line"), "safe status line passes")
 check(groupOf(wrapped, "s1", at: later) == .safeToClose, "a safe status line plus every check is safe to close")
+for v in [Judgment.Verdict.pending, .unsure] {
+    var said = wrapped
+    said = reduce(said, .judged(hash: Reply.hash(said.sessions["s1"]!.lastMessage!), Judgment(verdict: v, at: t0, account: "work", costUSD: nil)))
+    check(groupOf(said, "s1", at: later) == .safeToClose, "a model read of \(v.rawValue) doesn't overrule a session that says safe to close")
+}
+var saidUnread = evidence(s, "s1", at: later, verdict: nil)
+saidUnread.sessions["s1"]!.lastMessage = "Shipped. One caveat: old sessions keep the old behavior.\n\n**Safe to close** · v0.1.17 shipped"
+check(groupOf(saidUnread, "s1", at: later) == .safeToClose && saidUnread.judgeCandidates(now: t0.addingTimeInterval(later), rules: rules).isEmpty,
+      "a session that says safe to close is safe without a model read, and none is asked")
 wrapped.sessions["s1"]!.lastMessage = "Shipped.\n\n**Not done** · PR #25 waiting on CI"
 wrapped = reduce(wrapped, .judged(hash: Reply.hash(wrapped.sessions["s1"]!.lastMessage!), Judgment(verdict: .finished, at: t0, account: "work", costUSD: nil)))
 check(verdictOf(wrapped, "s1", at: later).first { $0.kind == .wrap }.map { [$0.outcome.rawValue, $0.detail] } == ["fail", "Not done · PR #25 waiting on CI"], "not done fails the status line check")

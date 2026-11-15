@@ -96,7 +96,7 @@ export const pages = {
 <ol class="steps">
 <li><strong>Unknown is never safe.</strong> If Maxwell can't check something, the session isn't safe.</li>
 <li><strong>It needs proof of a finished task.</strong> Nothing is running, including background tasks and subagents. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.</li>
-<li><strong>A final read by a small model.</strong> Only for sessions that passed everything else, Haiku reads the last message once and has to answer <code>finished</code>. Each read costs about $0.0002.</li>
+<li><strong>A final read by a small model, when the session didn&rsquo;t say.</strong> A reply that ends in <strong>Safe to close</strong> is taken at its word once every other check passes. Otherwise, only for sessions that passed everything else, Haiku reads the last message once and has to answer <code>finished</code>. Each read costs about $0.0002.</li>
 <li><strong>You see the evidence.</strong> Each safe session lists every check and where its result came from.</li>
 <li><strong>Checked again at the moment of closing.</strong> If anything changed, that session is skipped.</li>
 <li><strong>Closing never deletes.</strong> Maxwell only runs <code>claude stop</code>, which keeps the conversation.</li>
@@ -461,7 +461,7 @@ linear.sync = suggest</code></pre>
 <p>One pure reducer turns that log into the state of every session. The app folds it at launch and follows it live. Nothing else changes session state.</p>
 <h2>What leaves your Mac</h2>
 <ul>
-<li><strong>Haiku reads</strong>, through your own Claude account: the final Safe to close check, and names for sessions without a readable title.</li>
+<li><strong>Haiku reads</strong>, through your own Claude account: the final Safe to close check for replies without a status line, and names for sessions without a readable title.</li>
 <li><strong>Linear</strong>, once you add a key: reads tickets and makes the moves you accept.</li>
 <li><strong>Slack</strong>, once you add a token: reads your DMs, mentions and threads.</li>
 </ul>`,

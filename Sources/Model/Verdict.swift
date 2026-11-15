@@ -133,7 +133,10 @@ extension AppState {
         out += pluginChecks(s)
 
         let judgeSource = "claude -p --model haiku"
-        if !rules.judge {
+        if rules.judge, out.contains(where: { $0.kind == .wrap && $0.outcome == .pass }) {
+            // The session said Safe to close with its whole context; a small model reading only
+            // the reply second-guessed it on caveats and notes, and gave different answers to the same reply.
+        } else if !rules.judge {
             add(.judge, .fail, "model read is off (judge = off)", "config")
         } else if let m = s.lastMessage, let j = judgments[Reply.hash(m)] {
             let cost = j.costUSD.map { String(format: ", $%.4f", $0) } ?? ""
@@ -149,7 +152,10 @@ extension AppState {
         guard rules.judge else { return [] }
         var seen = Set<String>()
         return sessions.values.compactMap { s in
-            guard s.phase == .yourTurn, let m = s.lastMessage, Check.candidate(checks(s, now: now, rules: rules)) else { return nil }
+            guard s.phase == .yourTurn, let m = s.lastMessage else { return nil }
+            let cs = checks(s, now: now, rules: rules)
+            // No judge check: the status line already said Safe to close, so there is nothing to read.
+            guard Check.candidate(cs), cs.contains(where: { $0.kind == .judge }) else { return nil }
             let h = Reply.hash(m)
             guard judgments[h] == nil, seen.insert(h).inserted else { return nil }
             return (s, h)

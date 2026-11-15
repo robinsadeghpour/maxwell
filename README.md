@@ -73,7 +73,7 @@ Closing a session that's still working, or that's waiting on you, costs you work
 1. **Unknown is never safe.** If Maxwell can't check something, the session isn't safe.
 2. **It needs proof of a finished task.** Nothing is running, including background tasks and subagents. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.
 3. **The session says where it stands.** Every session is told to end each reply with one status line: **Safe to close**, **Not done** or **Needs you**, and a few words. Maxwell shows it on the session, and "Not done" or "Needs you" keeps it from being safe. `wrap-line = off` stops asking for it.
-4. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
+4. **A final read by a small model, when the session didn't say.** A reply that ends in **Safe to close** is taken at its word once every other check passes. Otherwise, only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
 5. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" covers the open project, leaves pinned sessions alone, and shows the list first.
 6. **Checked again at the moment of closing.** If anything changed, that session is skipped.
 7. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days. You can close any session yourself too, from its right-click menu or ⇧⌘⌫. If it isn't safe yet, Maxwell says what's still open and asks first.

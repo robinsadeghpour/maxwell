@@ -50,7 +50,6 @@
       <li><i>✓</i><span>Status line: Safe to close</span><span>last reply</span></li>
       <li><i>✓</i><span>Git clean and pushed</span><span>git 15:01</span></li>
       <li><i>✓</i><span>PR #208 merged</span><span>gh 15:01</span></li>
-      <li><i>✓</i><span>Haiku read: finished</span><span>$0.0002</span></li>
     </ul>
     <span class="btnm">Close</span> <span class="btnm" style="color:var(--dim)">Not safe</span>
   </div>
@@ -59,7 +58,7 @@
 <ol class="steps">
 <li><strong>Unknown is never safe.</strong> If Maxwell can't check something, the session isn't safe.</li>
 <li><strong>It needs proof of a finished task.</strong> Nothing is running, including background tasks and subagents. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.</li>
-<li><strong>A final read by a small model.</strong> Only for sessions that passed everything else, Haiku reads the last message once and has to answer <code>finished</code>. Each read costs about $0.0002.</li>
+<li><strong>A final read by a small model, when the session didn&rsquo;t say.</strong> A reply that ends in <strong>Safe to close</strong> is taken at its word once every other check passes. Otherwise, only for sessions that passed everything else, Haiku reads the last message once and has to answer <code>finished</code>. Each read costs about $0.0002.</li>
 <li><strong>You see the evidence.</strong> Each safe session lists every check and where its result came from.</li>
 <li><strong>Checked again at the moment of closing.</strong> If anything changed, that session is skipped.</li>
 <li><strong>Closing never deletes.</strong> Maxwell only runs <code>claude stop</code>, which keeps the conversation.</li>
