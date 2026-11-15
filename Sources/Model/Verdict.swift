@@ -76,6 +76,8 @@ extension AppState {
         let listing = "claude agents --json (\(acct))"
         if s.phase == .ended {
             add(.listed, .fail, "no longer listed", listing)
+        } else if let at = s.parkedAt {
+            add(.listed, .pass, "stopped while idle \(Reply.span(now.timeIntervalSince(at))) ago, conversation kept", listing)
         } else if let at = s.listedAt, at == listedAt[s.accountId] {
             let age = now.timeIntervalSince(at)
             if age > rules.listingFresh { add(.listed, .unknown, "last listing \(Reply.span(age)) old", listing) }

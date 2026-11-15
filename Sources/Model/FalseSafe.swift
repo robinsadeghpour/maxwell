@@ -8,7 +8,7 @@ enum FalseSafe {
         func ts(_ d: Date?) -> Any { d.map { $0.timeIntervalSince1970 } ?? NSNull() }
         var facts: [String: Any] = [
             "prompted": s.prompted, "lastMessage": s.lastMessage ?? NSNull(), "lastEventAt": ts(s.lastEventAt),
-            "listedAt": ts(s.listedAt), "accountListedAt": ts(state.listedAt[s.accountId]),
+            "listedAt": ts(s.listedAt), "parkedAt": ts(s.parkedAt), "accountListedAt": ts(state.listedAt[s.accountId]),
             "runningTasks": s.runningTasks.map { $0.map { t -> [String: Any] in ["id": t.id, "kind": t.kind.rawValue, "label": t.label ?? NSNull(), "startedAt": ts(t.startedAt)] } } ?? NSNull(),
             "hookSeenAt": ts(s.hookSeenAt),
         ]
@@ -58,6 +58,7 @@ enum FalseSafe {
         s.lastMessage = f["lastMessage"] as? String
         s.phase = .yourTurn
         s.listedAt = date(f["listedAt"])
+        s.parkedAt = date(f["parkedAt"])
         s.runningTasks = (f["runningTasks"] as? [[String: Any]])?.map {
             BackgroundTask(id: $0["id"] as? String ?? "", kind: BackgroundTask.Kind(rawValue: $0["kind"] as? String ?? "") ?? .shell,
                            label: $0["label"] as? String, startedAt: date($0["startedAt"]) ?? .distantPast)

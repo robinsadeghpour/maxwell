@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-idle-sessions-free-their-memory",
+    date: "2026-11-15",
+    versions: "VERSION",
+    title: "Idle sessions free their memory",
+    figure: "",
+    body: `
+<p>Claude Code stops a background session that has been idle for about an hour, to free memory, but only when no terminal is attached to it. Maxwell used to keep every session you opened attached until it quit, so none of them were ever stopped. Now Maxwell lets go of a session's terminal after 10 minutes off screen, and attaches again when you open it.</p>
+<p>A session Claude Code stopped while it waited on you stays in Your turn or Needs you. Opening it shows its last reply and a Resume button, so moving through the list doesn't start every session it passes. ${k("⌘ R")} resumes it too. Its conversation is kept, as always.</p>`,
+    fixes: [
+      "Grey text is easier to read in every theme and now meets WCAG AA contrast",
+      "A session waiting on you no longer disappears from the list when Claude Code stops it",
+    ],
+  },
+  {
     slug: "2026-11-15-side-panels-are-tabs",
     date: "2026-11-15",
     versions: "0.1.45",

@@ -105,6 +105,12 @@ final class SessionPane: MXView {
             } else {
                 banner.add(MXButton("Bring into Maxwell", primary: true) { [weak self] in self?.delegate?.bringIn(s.id, force: false) })
             }
+        } else if s.parkedAt != nil && terminal == nil {
+            empty.isHidden = true
+            message.scroll.isHidden = false
+            message.show(note: "Claude Code stopped this session while it waited, to free memory. The conversation is kept; Resume starts it again.",
+                         text: s.lastMessage ?? "No reply yet.")
+            banner.add(MXButton("Resume", hint: "⌘R", primary: true) { [weak self] in self?.delegate?.reattach(s.id) })
         } else {
             empty.isHidden = terminal != nil
             empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R reattaches."]

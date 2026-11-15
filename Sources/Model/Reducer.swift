@@ -40,6 +40,7 @@ func reduce(into s: inout AppState, _ event: Event) {
             session.reach = e.reach
             session.accountId = snap.accountId
             session.listedAt = snap.at
+            session.parkedAt = nil
             // A turn that began without a prompt hook (a background task's report, a wake) starts when the process goes busy.
             if e.status == .busy, session.listedStatus != .busy {
                 let began = e.statusAt ?? snap.at
@@ -66,8 +67,13 @@ func reduce(into s: inout AppState, _ event: Event) {
             }
             s.sessions[e.sessionId] = session
         }
-        // A session of this account that is no longer listed has exited.
+        // A session of this account that is no longer listed has exited, unless it was a background
+        // session waiting on you: Claude Code stops those when idle and keeps the conversation.
         for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended {
+            if sess.parkable {
+                if sess.parkedAt == nil { s.sessions[id]?.parkedAt = snap.at }
+                continue
+            }
             s.sessions[id]?.phase = .ended
             s.sessions[id]?.phaseSource = "no longer in claude agents --json"
             s.sessions[id]?.waitingOn = nil
@@ -152,6 +158,8 @@ private func reduce(hook h: Hook, into s: inout AppState) {
     if session.phase == .ended { guard case .sessionStart = h.kind else { return } }
     session.lastEventAt = max(session.lastEventAt, h.at)
     session.hookSeenAt = max(session.hookSeenAt ?? h.at, h.at)
+    // A hook comes from a running process: whatever stopped it, it runs again.
+    if let parked = session.parkedAt, h.at > parked { session.parkedAt = nil }
     if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
     if let t = h.transcriptPath { session.transcriptPath = t }
     if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }

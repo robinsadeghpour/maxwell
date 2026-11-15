@@ -38,6 +38,8 @@ Hooks (session start, stop, notification, prompt submit) and the status-line tap
 
 Known failure: after a Mac or login crash, the service can stay attached to the dead login session. Every session it runs then loses macOS services: `id -un` prints a number, `launchctl` says "141: Reentrancy avoided", audio and the iOS Simulator fail. The fix is to end that `claude daemon run` process and resume the sessions. Maxwell doesn't detect this yet (clean-up plan, step 5).
 
+The service stops an idle background session to free memory: one that is finished or waiting for your reply, has nothing running, and has had nothing attached for about an hour (sooner when memory runs low). Its log says `bg retire <shortId>: idle-prompt, idle 116m` or `settled`. A stopped session leaves `claude agents --json` and is listed only by `--all`, as `done`. `claude attach` resumes it, and `claude stop` on it exits 0. A session with a `claude attach` running is never stopped, so Maxwell lets go of terminals that have been off screen for 10 minutes (`TerminalRelease`), and keeps a session that leaves the listing while it waits on you where it was, parked, instead of ending it. Seen in 2.1.325.
+
 Processes a background session starts are their own "responsible process" for macOS privacy. They don't get the permissions you gave Warp or Terminal (Files & Folders, Automation, Accessibility). `osascript` to System Events fails with -1743.
 
 ## Timing seen in a soak test (2.1.325, 15 Nov 2026)
