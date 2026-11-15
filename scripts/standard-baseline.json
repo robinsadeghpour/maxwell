@@ -26,11 +26,11 @@
  "file-lines": {
   "Sources/App/MainWindow.swift": 1644,
   "Sources/App/Probes.swift": 540,
-  "Sources/App/Store.swift": 593,
+  "Sources/App/Store.swift": 595,
   "Sources/App/main.swift": 626,
   "Sources/UI/ArtifactView.swift": 518,
   "Sources/UI/Layout.swift": 885,
-  "Sources/UI/SettingsWindow.swift": 1164,
+  "Sources/UI/SettingsWindow.swift": 1161,
   "Sources/UI/Sidebar.swift": 760,
   "Sources/UI/Terminal.swift": 622
  },
@@ -38,7 +38,7 @@
   "Sources/App/MainWindow.swift::makeActions": 128,
   "Sources/App/MainWindow.swift::render": 84,
   "Sources/App/MainWindow.swift::wire": 98,
-  "Sources/App/main.swift::runTestHooks": 378,
+  "Sources/App/main.swift::runTestHooks": 380,
   "Sources/Model/Reducer.swift::reduce": 130,
   "Sources/UI/ProjectLogo.swift::extract": 90
  },
@@ -67,7 +67,7 @@
  "test-flags": {
   "Sources/App/ClaudeWeb.swift": 1,
   "Sources/App/MainWindow.swift": 2,
-  "Sources/App/main.swift": 81,
+  "Sources/App/main.swift": 80,
   "Sources/UI/IconArt.swift": 1
  },
  "timers": {

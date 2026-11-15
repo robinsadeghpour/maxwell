@@ -61,10 +61,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         main.root.viewerPane.showTree = config.showTree
         main.applyLayout(config)
         mark("render start"); main.render(store.state); mark("render end")
-        if quietTest { main.window?.orderBack(nil) } else {
-            main.showWindow(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        (main.window as? MXWindow)?.present()
+        if !quietTest { NSApp.activate(ignoringOtherApps: true) }
         mark("window ordered front (id \(main.window?.windowNumber ?? 0))")
         DispatchQueue.main.async {
             mark("first runloop after window")
@@ -151,9 +149,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             quitAfter = quit
             DispatchQueue.main.asyncAfter(deadline: .now() + s, execute: quit)
         }
-        // --retina or --plain: put the window on a 2x or a 1x display for the capture.
-        if CommandLine.arguments.contains("--retina") || CommandLine.arguments.contains("--plain"), let w = main.window,
-           let s = NSScreen.screens.first(where: { ($0.backingScaleFactor > 1) == CommandLine.arguments.contains("--retina") }) {
+        // --retina or --plain: put the window on a 2x or a 1x display for the capture, unless the
+        // parked window already has that scale.
+        let retina = CommandLine.arguments.contains("--retina")
+        if retina || CommandLine.arguments.contains("--plain"), let w = main.window, (w.backingScaleFactor > 1) != retina,
+           let s = NSScreen.screens.first(where: { ($0.backingScaleFactor > 1) == retina }) {
             w.setFrameOrigin(NSPoint(x: s.visibleFrame.minX + 20, y: s.visibleFrame.maxY - w.frame.height - 20))
         }
         if let size = arg("--size")?.split(separator: "x").compactMap({ Double($0) }), size.count == 2, let w = main.window {
