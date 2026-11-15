@@ -20,12 +20,14 @@ enum ClaudeCLI {
         return (FileManager.default.isExecutableFile(atPath: f[2]) ? f[2] : nil, f[3].isEmpty ? nil : f[3])
     }()
 
-    static let claudePath: String = usualClaude ?? loginShell.claude ?? "claude"
+    /// MAXWELL_CLAUDE and MAXWELL_GH replace the real tools; demo/ uses them to run the app on an invented world.
+    static let claudePath: String = ProcessInfo.processInfo.environment["MAXWELL_CLAUDE"].flatMap { $0.isEmpty ? nil : $0 }
+        ?? usualClaude ?? loginShell.claude ?? "claude"
 
     /// False when no `claude` was found: nothing can be listed or started.
     static var claudeFound: Bool { FileManager.default.isExecutableFile(atPath: claudePath) }
 
-    static let ghPath: String = [Paths.home.appendingPathComponent(".local/bin/gh").path, "/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
+    static let ghPath: String = ProcessInfo.processInfo.environment["MAXWELL_GH"].flatMap { $0.isEmpty ? nil : $0 } ?? [Paths.home.appendingPathComponent(".local/bin/gh").path, "/opt/homebrew/bin/gh", "/usr/local/bin/gh"]
         .first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/false"
 
     /// Removes Claude Code session markers from Maxwell's own environment once at

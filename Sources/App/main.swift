@@ -194,6 +194,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             }
         }
+        if let dir = arg("--record") {
+            // --record <dir>: window frames, about --record-fps a second (default 30), for --record-for
+            // seconds (default 30). Each file is named by its time in ms, so slow frames keep real time;
+            // demo/record.sh turns them into a video.
+            let fps = Double(arg("--record-fps") ?? "") ?? 30, length = Double(arg("--record-for") ?? "") ?? 30
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            let start = Date()
+            func next() {
+                let t = Date().timeIntervalSince(start)
+                guard t < length else { return mark("recorded \(dir)") }
+                self.snapshot(to: String(format: "%@/%07d.tiff", dir, Int(t * 1000)), quiet: true)
+                let wait = max(0, 1 / fps - (Date().timeIntervalSince(start) - t))
+                DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: next)
+            }
+            mark("recording")
+            next()
+        }
         if let id = arg("--bring-in") {
             // --bring-in <session id prefix>: the "Bring into Maxwell" button for that session.
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
@@ -422,7 +439,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     /// Captures Maxwell's own window (no screen-recording permission needed for own windows).
-    private func snapshot(to path: String) {
+    private func snapshot(to path: String, quiet: Bool = false) {
         let target = arg("--settings") != nil ? NSApp.windows.first { $0.title == "Maxwell Settings" && $0.isVisible }
             : arg("--type-shell") != nil ? NSApp.windows.last { $0.isVisible && $0.contentView is TerminalView } : main.window
         guard let w = target else { return mark("snapshot failed") }
@@ -435,8 +452,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Captures carry the display's profile; PNG viewers often ignore it, so store sRGB.
         let raw = NSBitmapImageRep(cgImage: img)
         let rep = raw.converting(to: .sRGB, renderingIntent: .default) ?? raw
-        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
-        mark("snapshot \(path)")
+        // Recordings write uncompressed TIFF: PNG compression halves the frame rate.
+        let type: NSBitmapImageRep.FileType = path.hasSuffix(".tiff") ? .tiff : .png
+        try? rep.representation(using: type, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        if !quiet { mark("snapshot \(path)") }
     }
 
     /// Open menus are windows of their own; a locked-screen capture draws them over the window.
@@ -503,7 +522,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
     private static let keyCodes: [String: UInt16] = ["a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12,
-        "w": 13, "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46]
+        "w": 13, "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46,
+        "1": 18, "2": 19, "3": 20, "4": 21]
 
     private func mainTerminalText(_ id: SessionID) -> String? {
         (main.root.sessionPane.content.subviews.first { !$0.isHidden } as? TerminalView)?.viewportText()

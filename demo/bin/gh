@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# Stand-in for `gh pr view <branch>` in the demo world: merged PRs for sessions that have one.
+import json, os, sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sessions = json.load(open(os.path.join(ROOT, ".sessions.json"))).values()
+if sys.argv[1:3] == ["pr", "view"]:
+    for s in sessions:
+        if s.get("branch") == sys.argv[3] and s.get("pr"):
+            print(json.dumps({"state": "MERGED", "number": s["pr"]}))
+            sys.exit(0)
+    print(f'no pull requests found for branch "{sys.argv[3]}"', file=sys.stderr)
+    sys.exit(1)
+sys.exit(1)

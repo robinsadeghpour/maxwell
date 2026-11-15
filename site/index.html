@@ -52,14 +52,15 @@ canvas { display: block; max-width: 100%; }
 .nav nav a:hover { color: var(--ink); }
 @media (max-width: 640px) { .nav nav a.hide-s { display: none; } }
 
-.hero { padding: 96px clamp(20px, 5vw, 64px) 56px; }
-.new { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; box-sizing: border-box; margin-bottom: 28px; padding: 6px 12px 6px 6px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); font: 400 13px/1.2 var(--sans); color: var(--dim); text-decoration: none; transition: box-shadow .15s, color .15s; }
+.hero { padding: 56px clamp(20px, 5vw, 64px) 36px; }
+.hero .lede { max-width: 60ch; }
+.new { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; box-sizing: border-box; margin-bottom: 22px; padding: 6px 12px 6px 6px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); font: 400 13px/1.2 var(--sans); color: var(--dim); text-decoration: none; transition: box-shadow .15s, color .15s; }
 .new:hover { box-shadow: inset 0 0 0 1px var(--tick); color: var(--ink); }
 .new b { flex: none; padding: 4px 8px; border-radius: 999px; background: var(--raise); box-shadow: inset 0 0 0 1px var(--line); font: 500 11.5px/1 var(--gmono); color: var(--ink); }
 .new span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .new i { font-style: normal; color: var(--faint); transition: transform .15s; }
 .new:hover i { transform: translateX(2px); }
-h1 { margin: 0; font: 500 clamp(36px, 5.4vw, 64px)/1.04 var(--sans); letter-spacing: -.035em; max-width: 16ch; text-wrap: balance; }
+h1 { margin: 0; font: 500 clamp(34px, 4.6vw, 54px)/1.06 var(--sans); letter-spacing: -.035em; max-width: 23ch; text-wrap: balance; }
 .lede { margin: 22px 0 0; max-width: 52ch; font-size: 18px; line-height: 1.55; color: var(--dim); }
 .ctas { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 32px; }
 .btn { display: inline-flex; align-items: center; gap: 9px; padding: 11px 16px; border-radius: 8px; background: var(--ink); color: var(--bg); text-decoration: none; font: 500 14px/1 var(--sans); transition: opacity .15s; }
@@ -68,6 +69,11 @@ h1 { margin: 0; font: 500 clamp(36px, 5.4vw, 64px)/1.04 var(--sans); letter-spac
 .btn.ghost { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .btn.ghost:hover { box-shadow: inset 0 0 0 1px var(--tick); opacity: 1; }
 .meta { margin-top: 18px; font: 400 12.5px/1.5 var(--gmono); color: var(--faint); }
+
+/* the recording, right under the hero */
+.demo { margin: 0; padding: clamp(12px, 3vw, 40px) clamp(12px, 3vw, 40px) 20px; }
+.demo video { display: block; width: 100%; height: auto; aspect-ratio: 1920 / 1344; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); background: var(--raise); }
+.demo figcaption { margin-top: 12px; font: 400 12px/1.5 var(--gmono); color: var(--faint); text-align: center; }
 
 /* the animated band */
 .flow { position: relative; height: clamp(300px, 38vw, 420px); }
@@ -271,22 +277,22 @@ h2 { margin: 0; font: 500 clamp(28px, 3.4vw, 40px)/1.1 var(--sans); letter-spaci
       <!-- latest -->
       <a class="new" href="/changelog/2026-11-15-update-from-the-dmg"><b>v0.1.31</b><span>Updates work when Maxwell runs from the DMG</span><i aria-hidden="true">→</i></a>
       <!-- /latest -->
-      <h1>The session manager for Claude Code</h1>
-      <p class="lede">See every Claude Code session across your projects and accounts: which ones need you, which are still working, and which you can close.</p>
+      <h1>Every Claude Code session, sorted by what it needs from you</h1>
+      <p class="lede">A Mac app for running many Claude Code sessions at once. The ones waiting on you come first, across every project and account. None is called safe to close until Maxwell can prove it.</p>
       <div class="ctas">
         <a class="btn" href="https://github.com/robinsadeghpour/maxwell/releases/latest/download/Maxwell.dmg"><svg aria-hidden="true"><use href="#apple"/></svg>Download for macOS</a>
         <a class="btn ghost" href="https://github.com/robinsadeghpour/maxwell"><svg aria-hidden="true"><use href="#gh"/></svg>View on GitHub</a>
       </div>
-      <p class="meta">Free and open source · MIT · macOS</p>
+      <p class="meta">Free and open source · MIT · macOS 14+ on Apple Silicon</p>
     </div>
   </div></div>
 
   <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
-    <div class="flow" id="flow">
-      <canvas id="flow-cv" role="img" aria-label="Animation: session events flow in from the left, pass through Maxwell, and leave sorted into four lines: needs you, your turn, working, safe to close."></canvas>
-      <div class="gate" id="gate"></div>
-      <div id="lbls"></div>
-    </div>
+    <figure class="demo">
+      <video src="/assets/demo.mp4" poster="/assets/demo-poster.jpg" autoplay muted loop playsinline preload="auto"
+        aria-label="34-second recording of Maxwell on made-up projects: a session asks for permission and moves to Needs you, it is answered in place, a Safe to close row shows its ten checks, and three safe sessions close at once."></video>
+      <figcaption>The real app, recorded on made-up projects and sessions.</figcaption>
+    </figure>
   </div></div>
 
   <div class="band" id="features"><div class="frame"><i class="x l"></i><i class="x r"></i>
@@ -299,6 +305,11 @@ h2 { margin: 0; font: 500 clamp(28px, 3.4vw, 40px)/1.1 var(--sans); letter-spaci
   <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i>
     <div class="in" style="padding-bottom:40px">
       <div class="sec-h"><h2>Sorted by what they need</h2><p>Each session is in exactly one group. You only have to look at the first two.</p></div>
+    </div>
+    <div class="flow" id="flow">
+      <canvas id="flow-cv" role="img" aria-label="Animation: session events flow in from the left, pass through Maxwell, and leave sorted into four lines: needs you, your turn, working, safe to close."></canvas>
+      <div class="gate" id="gate"></div>
+      <div id="lbls"></div>
     </div>
     <div class="groups">
       <div style="--c:var(--need)"><b><i></i>Needs you</b><p>Asked a question or wants a permission.</p></div>

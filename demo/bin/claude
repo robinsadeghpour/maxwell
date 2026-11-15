@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+# Stand-in for `claude` in the demo world: lists, attaches, stops and judges invented sessions only.
+import json, os, sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+args = sys.argv[1:]
+acct = os.environ.get("CLAUDE_CONFIG_DIR", "")
+agents_file = os.path.join(acct, "agents.json")
+
+if args[:2] == ["agents", "--json"]:
+    print(open(agents_file).read() if os.path.exists(agents_file) else "[]")
+elif args[:1] == ["attach"]:
+    os.execv(sys.executable, [sys.executable, os.path.join(ROOT, ".bin", "tui.py"), args[1]])
+elif args[:1] == ["stop"]:
+    entries = [e for e in json.load(open(agents_file)) if e["id"] != args[1]]
+    json.dump(entries, open(agents_file, "w"), indent=1)
+    open(os.path.join(acct, "sessions", ".touch"), "w").write("x")
+    print(f"stopped {args[1]}")
+elif "-p" in args and any("finished, pending or unsure" in a for a in args):
+    print(json.dumps({"result": "finished", "total_cost_usd": 0.0002}))
+elif "-p" in args:
+    # Auto-titles: the demo session whose first prompt is in the request keeps its own title.
+    sessions = json.load(open(os.path.join(ROOT, ".sessions.json"))).values()
+    title = next((s["title"] for s in sessions if s["prompt"] in args[-1]), "Demo Session")
+    print(json.dumps({"result": title, "total_cost_usd": 0.0003}))
+else:
+    sys.exit("demo claude: not part of the demo: " + " ".join(args))

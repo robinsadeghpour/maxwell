@@ -138,8 +138,9 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private var slideFrom: [String: CGFloat] = [:]
     private lazy var slide: Tween = {
         let t = Tween(1)
-        t.step = { [weak self] _ in self?.needsDisplay = true }
-        t.done = { [weak self] in self?.slideFrom = [:]; self?.needsDisplay = true }
+        // The group buttons ride along with their header, or a launch-time slide leaves them mid-way.
+        t.step = { [weak self] _ in self?.needsDisplay = true; self?.layoutCloseAll() }
+        t.done = { [weak self] in self?.slideFrom = [:]; self?.needsDisplay = true; self?.layoutCloseAll() }
         return t
     }()
 
