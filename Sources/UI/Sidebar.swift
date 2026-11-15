@@ -11,6 +11,13 @@ struct Row: Equatable {
     var badges: [RowBadge] = []   // from plugins, e.g. "ACME-56 · In Review"
 }
 
+/// A plain terminal Maxwell runs, listed above the sessions.
+struct ShellRow: Equatable {
+    var id: String
+    var title: String      // the folder it is in now
+    var detail: String     // that folder's path
+}
+
 /// A plugin's badge on a session row; a click runs its action for that session.
 struct RowBadge: Equatable {
     var plugin: PluginID
@@ -28,7 +35,7 @@ extension NSPasteboard.PasteboardType {
 /// close row expands (click, or →) to its checklist and a "Not safe" action; a Recently
 /// closed row reopens on click.
 final class SessionList: MXView, NSDraggingSource, TipSource {
-    enum Item { case group(PhaseGroup, Int), session(Row), check(Check), notSafe(SessionID) }
+    enum Item { case shells(Int), shell(ShellRow), group(PhaseGroup, Int), session(Row), check(Check), notSafe(SessionID) }
     private(set) var items: [Item] = []
     var current: SessionID? { didSet { if current != oldValue, current != nil { cursor = current }; needsDisplay = true } }
     var compact = false { didSet { relayout(); needsDisplay = true } }
@@ -36,6 +43,10 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private var cursor: SessionID?
     private var hoverIndex: Int?
     var onOpen: ((SessionID) -> Void)?
+    /// Plain terminals, drawn first under their own header; × on a row ends it.
+    var shells: [ShellRow] = [] { didSet { if shells != oldValue { rebuildItems() } } }
+    var onCloseShell: ((String) -> Void)?
+    var onNewShell: (() -> Void)?
     var onCloseAllSafe: (() -> Void)?
     /// Stops the idle sessions Maxwell can stop (background ones); Undo reopens them.
     var onStopIdle: (([SessionID]) -> Void)?
@@ -53,6 +64,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private(set) var expanded = Set<SessionID>()
     private let closeAll = MXButton("close all", hint: "⇧⌘X", small: true)
     private let stopIdle = MXButton("stop all", small: true)
+    private let newShell = MXButton("new", hint: "⌥⌘T", small: true)
     private var spinAngle: CGFloat = 0
     private var timer: Timer?
     private var lastGroup: [SessionID: PhaseGroup] = [:]
@@ -68,6 +80,10 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         stopIdle.action = { [weak self] in guard let self else { return }; self.onStopIdle?(self.stoppableIdle) }
         stopIdle.isHidden = true
         addSubview(stopIdle)
+        newShell.action = { [weak self] in self?.onNewShell?() }
+        newShell.isHidden = true
+        newShell.tip = Tip("Open another terminal")
+        addSubview(newShell)
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -95,7 +111,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         let oldKeys = items.map(Self.key)
         let safeIds = Set(groups.first { $0.0 == .safeToClose }?.1.map(\.session.id) ?? [])
         expanded.formIntersection(safeIds)
-        items = groups.flatMap { g, rows -> [Item] in
+        let shellItems: [Item] = shells.isEmpty ? [] : [.shells(shells.count)] + shells.map(Item.shell)
+        items = shellItems + groups.flatMap { g, rows -> [Item] in
             guard !g.folds || unfolded.contains(g) else { return [.group(g, rows.count)] }
             return [.group(g, rows.count)] + rows.flatMap { r -> [Item] in
                 guard expanded.contains(r.session.id) else { return [.session(r)] }
@@ -108,7 +125,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             slideFrom = before
             slide.set(1)
         }
-        if let c = cursor, !sessionIds.contains(c) { cursor = nil }
+        if let c = cursor, !rowIds.contains(c) { cursor = nil }
         relayout()
         updateTimer()
         needsDisplay = true
@@ -121,6 +138,16 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     }
 
     var sessionIds: [SessionID] { items.compactMap { if case .session(let r) = $0 { return r.session.id }; return nil } }
+    /// Every row J/K and ⌘[ ⌘] step through: terminals, then sessions.
+    var rowIds: [String] {
+        items.compactMap {
+            switch $0 {
+            case .shell(let r): return r.id
+            case .session(let r): return r.session.id
+            default: return nil
+            }
+        }
+    }
 
     private var rowHeight: CGFloat { compact ? Metrics.row : Metrics.row2 }
     private static let groupHeight: CGFloat = 26
@@ -129,6 +156,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
 
     private static func key(_ it: Item) -> String {
         switch it {
+        case .shells: return "gshells"
+        case .shell(let r): return r.id
         case .group(let g, _): return "g\(g.rawValue)"
         case .session(let r): return r.session.id
         case .check(let c): return "c\(c.kind.rawValue)\(c.title)\(c.detail)"
@@ -151,8 +180,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         for (i, it) in items.enumerated() {
             let h: CGFloat
             switch it {
-            case .group: y += i == 0 ? 0 : 8; h = Self.groupHeight
-            case .session: h = rowHeight
+            case .group, .shells: y += i == 0 ? 0 : 8; h = Self.groupHeight
+            case .session, .shell: h = rowHeight
             case .check: h = Self.checkHeight
             case .notSafe: h = Self.notSafeHeight
             }
@@ -188,6 +217,13 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             b.isHidden = false
         }
         place(closeAll, on: .safeToClose)
+        if let i = items.firstIndex(where: { if case .shells = $0 { return true }; return false }) {
+            let size = newShell.intrinsicContentSize
+            newShell.frame = NSRect(x: bounds.width - size.width - 10, y: rects[i].midY - size.height / 2, width: size.width, height: size.height)
+            newShell.isHidden = false
+        } else {
+            newShell.isHidden = true
+        }
         let n = stoppableIdle.count
         let idleCount = groups.first { $0.0 == .idle }?.1.count ?? 0
         stopIdle.title = n == idleCount ? "stop all" : "stop \(n)"
@@ -234,6 +270,10 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             let a = fade(it)
             if a < 1 { NSGraphicsContext.current?.cgContext.saveGState(); NSGraphicsContext.current?.cgContext.setAlpha(a) }
             switch it {
+            case .shells(let n):
+                drawHeader("Terminals", n, color: t.fg2, in: r)
+            case .shell(let row):
+                drawShell(row, in: r, hovered: hoverIndex == i, cursor: focused && row.id == cursor)
             case .group(let g, let n):
                 drawGroup(g, n, in: r, hovered: hoverIndex == i)
             case .session(let row):
@@ -283,6 +323,52 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             Text.draw(idleNote, in: NSRect(x: right - 106, y: r.minY, width: 106, height: r.height), color: t.fg3.withAlphaComponent(0.8), font: Fonts.mono(Metrics.fontSize - 2.5), align: .right)
         }
     }
+
+    private func drawHeader(_ title: String, _ n: Int, color: NSColor, in r: NSRect) {
+        let font = Fonts.mono(Metrics.fontSize - 1, .semibold)
+        let w = Text.draw(title, in: NSRect(x: 14, y: r.minY, width: 160, height: r.height), color: color, font: font)
+        Text.draw("\(n)", in: NSRect(x: 14 + w + 7, y: r.minY, width: 40, height: r.height), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 1))
+    }
+
+    /// A terminal row: a prompt mark where sessions have their state glyph, the folder, its path,
+    /// and × to end it while the pointer is on the row.
+    private func drawShell(_ row: ShellRow, in r: NSRect, hovered: Bool, cursor: Bool) {
+        let box = r.insetBy(dx: 6, dy: compact ? 1 : 1.5)
+        let path = NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5)
+        let isCurrent = row.id == current
+        if isCurrent {
+            t.rowSel.setFill(); path.fill()
+            t.fg3.setFill()
+            NSBezierPath(roundedRect: NSRect(x: box.minX, y: box.minY + 5, width: 2.5, height: box.height - 10), xRadius: 1.25, yRadius: 1.25).fill()
+        } else if hovered || cursor {
+            t.hover.setFill(); path.fill()
+        }
+        if cursor {
+            t.hair.setStroke(); let p = NSBezierPath(roundedRect: box.insetBy(dx: 0.5, dy: 0.5), xRadius: 5, yRadius: 5); p.lineWidth = 1; p.stroke()
+        }
+        let small = Fonts.mono(Metrics.fontSize - 2)
+        let line1 = compact ? r : NSRect(x: r.minX, y: r.minY + 3, width: r.width, height: 18)
+        Text.draw("❯", in: NSRect(x: box.minX + 8, y: line1.minY, width: 12, height: line1.height), color: isCurrent ? t.fg : t.fg2,
+                  font: Fonts.mono(Metrics.fontSize - 1, .semibold), align: .center)
+        let titleX = box.minX + 28
+        let close = shellCloseRect(in: r)
+        let right = (hovered || isCurrent ? close.minX : box.maxX - 10) - 6
+        if hovered || isCurrent {
+            Text.draw("×", in: close, color: closeHover == row.id ? t.fg : t.fg3, font: Fonts.mono(Metrics.fontSize), align: .center)
+        }
+        if compact {
+            Text.draw(row.title, in: NSRect(x: titleX, y: r.minY, width: right - titleX, height: r.height), color: t.fg)
+        } else {
+            Text.draw(row.title, in: NSRect(x: titleX, y: line1.minY, width: right - titleX, height: line1.height), color: t.fg)
+            Text.draw(row.detail, in: NSRect(x: titleX, y: line1.maxY - 1, width: right - titleX, height: 15), color: t.fg3, font: small)
+        }
+    }
+
+    private func shellCloseRect(in r: NSRect) -> NSRect {
+        let box = r.insetBy(dx: 6, dy: 0)
+        return NSRect(x: box.maxX - 26, y: r.midY - 10, width: 20, height: 20)
+    }
+    private var closeHover: String?
 
     private func drawRow(_ row: Row, in r: NSRect, hovered: Bool, cursor: Bool, now: Date) {
         let s = row.session, g = row.group
@@ -448,16 +534,22 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         let bh = badge(at: convert(e.locationInWindow, from: nil)).flatMap { b, row, _ in b.badge.action == nil ? nil : BadgeHover(session: row.session.id, badge: b) }
         if bh != badgeHover { badgeHover = bh; needsDisplay = true }
         let i = index(at: convert(e.locationInWindow, from: nil))
+        let p = convert(e.locationInWindow, from: nil)
+        let ch: String? = i.flatMap { i in
+            if case .shell(let r) = items[i], shellCloseRect(in: rowRects()[i]).contains(p) { return r.id }
+            return nil
+        }
+        if ch != closeHover { closeHover = ch; needsDisplay = true }
         let h = i.flatMap { i -> Int? in
             switch items[i] {
-            case .session, .notSafe: return i
+            case .session, .notSafe, .shell: return i
             case .group(let g, _) where g.folds: return i
             default: return nil
             }
         }
         if h != hoverIndex { hoverIndex = h; needsDisplay = true }
     }
-    override func mouseExited(with e: NSEvent) { hoverIndex = nil; chipHover = nil; badgeHover = nil; needsDisplay = true }
+    override func mouseExited(with e: NSEvent) { hoverIndex = nil; chipHover = nil; badgeHover = nil; closeHover = nil; needsDisplay = true }
     func toggleIdle() { toggle(.idle) }
 
     func toggle(_ g: PhaseGroup) {
@@ -487,6 +579,10 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         guard let i = index(at: p) else { return }
         if case .session(let r) = items[i], r.group != .recentlyClosed { downAt = (p, r) }
         switch items[i] {
+        case .shell(let r):
+            if shellCloseRect(in: rowRects()[i]).contains(p) { onCloseShell?(r.id); return }
+            cursor = r.id
+            onOpen?(r.id)
         case .group(let g, _) where g.folds: toggle(g)
         case .notSafe(let id): onNotSafe?(id)
         case .session(let r) where r.group == .recentlyClosed: onReopen?(r.session.id)
@@ -544,7 +640,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
 
     override var acceptsFirstResponder: Bool { true }
     override func becomeFirstResponder() -> Bool {
-        if cursor == nil { cursor = current ?? sessionIds.first }
+        if cursor == nil { cursor = current ?? rowIds.first }
         needsDisplay = true
         return true
     }
@@ -555,6 +651,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         case "j", String(UnicodeScalar(NSDownArrowFunctionKey)!): move(1)
         case "k", String(UnicodeScalar(NSUpArrowFunctionKey)!): move(-1)
         case "\r", "o", " ":
+            if let c = cursor, shells.contains(where: { $0.id == c }) { onOpen?(c); break }
             guard let r = row(cursor) else { break }
             if r.group == .recentlyClosed { onReopen?(r.session.id) } else { onOpen?(r.session.id) }
         case String(UnicodeScalar(NSRightArrowFunctionKey)!), "l":
@@ -566,11 +663,11 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     }
 
     func move(_ d: Int) {
-        let ids = sessionIds
+        let ids = rowIds
         guard !ids.isEmpty else { return }
         let from = ids.firstIndex(of: cursor ?? current ?? "") ?? (d > 0 ? -1 : ids.count)
         cursor = ids[max(0, min(ids.count - 1, from + d))]
-        if let i = items.firstIndex(where: { if case .session(let r) = $0 { return r.session.id == cursor }; return false }) {
+        if let i = items.firstIndex(where: { Self.key($0) == cursor }) {
             scrollToVisible(rowRects()[i].insetBy(dx: 0, dy: -rowHeight))
         }
         needsDisplay = true

@@ -34,7 +34,18 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-close-all-placement">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-terminals-in-sidebar">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.33</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-terminals-in-sidebar">Terminals sit with your sessions</a></h2>
+    
+    <div class="prose"><p><span class="kc"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd></span> now opens a terminal inside Maxwell, not in a window of its own. It gets a row under <strong>Terminals</strong> at the top of the sidebar and runs in the middle pane, like a session. The row shows the folder the shell is in, and follows it when you <code>cd</code>.</p>
+<p>Open as many as you like: with <strong>new</strong> on the Terminals header, from <span class="kc"><kbd>⌘</kbd><kbd>K</kbd></span>, or by right-clicking a session and choosing <strong>Open Terminal Here</strong>. <span class="kc"><kbd>J</kbd></span> <span class="kc"><kbd>K</kbd></span> and <span class="kc"><kbd>⌘</kbd><kbd>[</kbd></span> <span class="kc"><kbd>⌘</kbd><kbd>]</kbd></span> step through them with your sessions. × on the row, <span class="kc"><kbd>⌘</kbd><kbd>W</kbd></span> or <code>exit</code> ends one.</p></div>
+    
+    
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-close-all-placement">
   <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.32</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-15-close-all-placement">Close all stays on its header</a></h2>
@@ -90,7 +101,7 @@
   <article>
     <h2><a href="/changelog/2026-11-15-terminal-window">A plain terminal, one key away</a></h2>
     
-    <div class="prose"><p><span class="kc"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd></span> opens a plain terminal in its own window, in the folder of the session you're looking at. It's in the <span class="kc"><kbd>⌘</kbd><kbd>K</kbd></span> actions and the Session menu as <strong>New Terminal Window</strong>. Right-click any session and choose <strong>Open Terminal Here</strong> to open one in that session's folder. The window follows Maxwell's theme and closes when the shell exits.</p>
+    <div class="prose"><p><span class="kc"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd></span> opens a plain terminal in the folder of the session you're looking at. Right-click any session and choose <strong>Open Terminal Here</strong> to open one in that session's folder.</p>
 <p>Maxwell now finds <code>claude</code> wherever your shell does. Installs through npm, nvm, Volta or bun keep it outside the usual folders, and Maxwell then listed no background sessions. It now asks your login shell once. If it still can't find <code>claude</code>, it says so when it opens.</p></div>
     
     <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Fixed sessions missing from the list when claude was installed with npm, nvm, Volta or bun</span></li><li><span>Maxwell state now prints the claude it uses and any account whose listing failed</span></li></ul></div>

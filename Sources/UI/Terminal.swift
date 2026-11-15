@@ -83,7 +83,9 @@ final class GhosttyRuntime {
             return true
         case GHOSTTY_ACTION_PWD:
             let pwd = String(cString: action.action.pwd.pwd)
-            view(target)?.cwd = pwd
+            guard let v = view(target) else { return true }
+            v.cwd = pwd
+            DispatchQueue.main.async { v.onCwd?() }
             return true
         case GHOSTTY_ACTION_SHOW_CHILD_EXITED:
             // `claude attach` ended (detached, or the session stopped): the pane shows Reattach.
@@ -209,6 +211,8 @@ final class TerminalView: NSView, NSTextInputClient {
     var cwd: String?
     var onOpenURL: ((String, String?) -> Void)?
     var onExit: (() -> Void)?
+    /// The shell reported a new working folder.
+    var onCwd: (() -> Void)?
     /// App shortcuts win over Ghostty's own bindings (cmd+k, cmd+n ...).
     static var isAppShortcut: ((NSEvent) -> Bool)?
 

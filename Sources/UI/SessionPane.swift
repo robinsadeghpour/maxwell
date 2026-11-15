@@ -30,6 +30,9 @@ final class SessionPane: MXView {
     private let message = MessageView()
     private let overview = Overview(frame: .zero)
     private var terminal: TerminalView?
+    private let prompt = Label("❯", font: Fonts.mono(Metrics.fontSize, .semibold), color: { $0.fg2 })
+    /// A plain terminal is on screen: no state, banner or pills, just its folder.
+    private var shellShown = false
 
     /// The setup checklist on the no-session overview; empty once everything is done or hidden.
     var setup: [SetupStep] {
@@ -43,8 +46,9 @@ final class SessionPane: MXView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [glyph, title, project, pills, headerLine, banner, content, empty, message.scroll, overview].forEach(addSubview)
+        [glyph, prompt, title, project, pills, headerLine, banner, content, empty, message.scroll, overview].forEach(addSubview)
         banner.isHidden = true
+        prompt.isHidden = true
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -52,14 +56,9 @@ final class SessionPane: MXView {
               terminal: TerminalView?, summary: [(PhaseGroup, Int)]) {
         session = s
         self.account = account
-        // Every visited terminal stays a subview; only the selected one is visible and rendering.
-        if let terminal, terminal.superview !== content { content.addSubview(terminal) }
-        for case let v as TerminalView in content.subviews {
-            let visible = v === terminal
-            v.isHidden = !visible
-            v.setVisible(visible)
-        }
-        self.terminal = terminal
+        shellShown = false
+        prompt.isHidden = true
+        select(terminal)
         overview.isHidden = s != nil
         message.scroll.isHidden = true
         guard let s else {
@@ -96,6 +95,30 @@ final class SessionPane: MXView {
             empty.lines = ["Detached. The session keeps running in the background.", "", "⌘R reattaches."]
         }
         needsLayout = true
+    }
+
+    /// A plain terminal: the folder it is in, its path, and the shell.
+    func showShell(title folder: String, path: String, terminal: TerminalView) {
+        session = nil
+        shellShown = true
+        select(terminal)
+        [overview, banner, empty, glyph, pills, message.scroll].forEach { $0.isHidden = true }
+        [prompt, title, project, headerLine].forEach { $0.isHidden = false }
+        title.text = folder
+        project.text = path
+        pills.text = ""
+        needsLayout = true
+    }
+
+    /// Every visited terminal stays a subview; only the selected one is visible and rendering.
+    private func select(_ terminal: TerminalView?) {
+        if let terminal, terminal.superview !== content { content.addSubview(terminal) }
+        for case let v as TerminalView in content.subviews {
+            let visible = v === terminal
+            v.isHidden = !visible
+            v.setVisible(visible)
+        }
+        self.terminal = terminal
     }
 
     private func updateBanner(_ s: Session, group: PhaseGroup, blockers: [String]) {
@@ -157,6 +180,7 @@ final class SessionPane: MXView {
         super.layout()
         let w = bounds.width, h = Metrics.header
         glyph.frame = NSRect(x: 8, y: 0, width: 16, height: h)
+        prompt.frame = NSRect(x: 10, y: 0, width: 14, height: h)
         let tw = min(title.textWidth + 2, w * 0.45)
         title.frame = NSRect(x: 28, y: 0, width: tw, height: h)
         let pw = project.textWidth + 2
@@ -164,11 +188,11 @@ final class SessionPane: MXView {
         pills.frame = NSRect(x: project.frame.maxX + 10, y: 0, width: max(0, w - project.frame.maxX - 22), height: h)
         headerLine.frame = NSRect(x: 0, y: h - 1, width: w, height: 1)
         var y = h
-        if !banner.isHidden && session != nil {
+        if !banner.isHidden && session != nil && !shellShown {
             banner.frame = NSRect(x: 0, y: y, width: w, height: Metrics.header)
             y += Metrics.header
         }
-        if session == nil { y = 0 }
+        if session == nil && !shellShown { y = 0 }
         content.frame = NSRect(x: 0, y: y, width: w, height: bounds.height - y)
         content.subviews.forEach { $0.frame = content.bounds }
         empty.frame = content.frame

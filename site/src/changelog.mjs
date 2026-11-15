@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-terminals-in-sidebar",
+    date: "2026-11-15",
+    versions: "0.1.33",
+    title: "Terminals sit with your sessions",
+    figure: "",
+    body: `
+<p>${k("⌥ ⌘ T")} now opens a terminal inside Maxwell, not in a window of its own. It gets a row under <strong>Terminals</strong> at the top of the sidebar and runs in the middle pane, like a session. The row shows the folder the shell is in, and follows it when you <code>cd</code>.</p>
+<p>Open as many as you like: with <strong>new</strong> on the Terminals header, from ${k("⌘ K")}, or by right-clicking a session and choosing <strong>Open Terminal Here</strong>. ${k("J")} ${k("K")} and ${k("⌘ [")} ${k("⌘ ]")} step through them with your sessions. × on the row, ${k("⌘ W")} or <code>exit</code> ends one.</p>`,
+    fixes: [],
+  },
+  {
     slug: "2026-11-15-close-all-placement",
     date: "2026-11-15",
     versions: "0.1.32",
@@ -66,7 +77,7 @@ export default [
     title: "A plain terminal, one key away",
     figure: "",
     body: `
-<p>${k("⌥ ⌘ T")} opens a plain terminal in its own window, in the folder of the session you're looking at. It's in the ${k("⌘ K")} actions and the Session menu as <strong>New Terminal Window</strong>. Right-click any session and choose <strong>Open Terminal Here</strong> to open one in that session's folder. The window follows Maxwell's theme and closes when the shell exits.</p>
+<p>${k("⌥ ⌘ T")} opens a plain terminal in the folder of the session you're looking at. Right-click any session and choose <strong>Open Terminal Here</strong> to open one in that session's folder.</p>
 <p>Maxwell now finds <code>claude</code> wherever your shell does. Installs through npm, nvm, Volta or bun keep it outside the usual folders, and Maxwell then listed no background sessions. It now asks your login shell once. If it still can't find <code>claude</code>, it says so when it opens.</p>`,
     fixes: [
       "Fixed sessions missing from the list when claude was installed with npm, nvm, Volta or bun",

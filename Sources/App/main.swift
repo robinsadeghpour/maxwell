@@ -269,11 +269,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         if let text = arg("--type-shell") {
-            // Types into the newest plain terminal window (New Terminal Window), never into a session.
+            // Types into the plain terminal on screen (New Terminal), never into a session.
             DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--type-after") ?? "4") ?? 4)) {
-                let shell = NSApp.windows.last { $0.isVisible && $0.contentView is TerminalView }
-                (shell?.contentView as? TerminalView)?.sendLine(text)
-                mark(shell == nil ? "no terminal window" : "typed in terminal window")
+                let shell = self.main.shownShell
+                shell?.sendLine(text)
+                mark(shell == nil ? "no terminal on screen" : "typed in terminal")
             }
         }
         if let spec = arg("--start") {
@@ -441,7 +441,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Captures Maxwell's own window (no screen-recording permission needed for own windows).
     private func snapshot(to path: String, quiet: Bool = false) {
         let target = arg("--settings") != nil ? NSApp.windows.first { $0.title == "Maxwell Settings" && $0.isVisible }
-            : arg("--type-shell") != nil ? NSApp.windows.last { $0.isVisible && $0.contentView is TerminalView } : main.window
+            : main.window
         guard let w = target else { return mark("snapshot failed") }
         // With the screen locked the window server hands back a blank image; render the layer tree instead.
         let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true

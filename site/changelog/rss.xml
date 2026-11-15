@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Terminals sit with your sessions</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-terminals-in-sidebar</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-terminals-in-sidebar</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌥&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;T&lt;/kbd&gt;&lt;/span&gt; now opens a terminal inside Maxwell, not in a window of its own. It gets a row under &lt;strong&gt;Terminals&lt;/strong&gt; at the top of the sidebar and runs in the middle pane, like a session. The row shows the folder the shell is in, and follows it when you &lt;code&gt;cd&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Open as many as you like: with &lt;strong&gt;new&lt;/strong&gt; on the Terminals header, from &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;K&lt;/kbd&gt;&lt;/span&gt;, or by right-clicking a session and choosing &lt;strong&gt;Open Terminal Here&lt;/strong&gt;. &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;J&lt;/kbd&gt;&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;K&lt;/kbd&gt;&lt;/span&gt; and &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;[&lt;/kbd&gt;&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;]&lt;/kbd&gt;&lt;/span&gt; step through them with your sessions. × on the row, &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;W&lt;/kbd&gt;&lt;/span&gt; or &lt;code&gt;exit&lt;/code&gt; ends one.&lt;/p&gt;</description>
+</item>
+<item>
 <title>Close all stays on its header</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-close-all-placement</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-close-all-placement</guid>
@@ -41,7 +49,7 @@
 <link>https://www.runmaxwell.com/changelog/2026-11-15-terminal-window</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-terminal-window</guid>
 <pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
-<description>&lt;p&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌥&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;T&lt;/kbd&gt;&lt;/span&gt; opens a plain terminal in its own window, in the folder of the session you're looking at. It's in the &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;K&lt;/kbd&gt;&lt;/span&gt; actions and the Session menu as &lt;strong&gt;New Terminal Window&lt;/strong&gt;. Right-click any session and choose &lt;strong&gt;Open Terminal Here&lt;/strong&gt; to open one in that session's folder. The window follows Maxwell's theme and closes when the shell exits.&lt;/p&gt;
+<description>&lt;p&gt;&lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌥&lt;/kbd&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;T&lt;/kbd&gt;&lt;/span&gt; opens a plain terminal in the folder of the session you're looking at. Right-click any session and choose &lt;strong&gt;Open Terminal Here&lt;/strong&gt; to open one in that session's folder.&lt;/p&gt;
 &lt;p&gt;Maxwell now finds &lt;code&gt;claude&lt;/code&gt; wherever your shell does. Installs through npm, nvm, Volta or bun keep it outside the usual folders, and Maxwell then listed no background sessions. It now asks your login shell once. If it still can't find &lt;code&gt;claude&lt;/code&gt;, it says so when it opens.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed sessions missing from the list when claude was installed with npm, nvm, Volta or bun&lt;/li&gt;&lt;li&gt;Maxwell state now prints the claude it uses and any account whose listing failed&lt;/li&gt;&lt;/ul&gt;</description>
 </item>
 <item>

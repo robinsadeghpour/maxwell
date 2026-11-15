@@ -8,8 +8,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
     private var terminals: [SessionID: TerminalView] = [:]
     private var detached = Set<SessionID>()
-    /// Plain shells, each in its own window, for work that isn't a Claude session.
-    private var shells: [NSWindow] = []
+    /// Plain terminals, listed above the sessions and shown in the session pane. They end with Maxwell.
+    private var shells: [(id: String, view: TerminalView)] = []
+    private var shellsMade = 0
+    private func shell(_ id: String?) -> TerminalView? { shells.first { $0.id == id }?.view }
+    /// The terminal on screen when it is a plain one (test runs type into it).
+    var shownShell: TerminalView? { shell(current) }
     private var visited: [SessionID] = []
     private(set) var current: SessionID?
     private var viewers: [SessionID: ViewerState] = [:]
@@ -87,6 +91,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
+        root.sidebar.list.onCloseShell = { [weak self] in self?.closeShell($0) }
+        root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
         root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
         root.sessionPane.onHideSetup = { [weak self] in self?.hideSetup() }
@@ -232,6 +238,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             : ["No sessions in \(scope!).", "", "⌘N starts one."]
         var perAccount: [AccountID: Int] = [:]
         for s in state.sessions.values where s.phase != .ended { perAccount[s.accountId, default: 0] += 1 }
+        root.sidebar.list.shells = shellRows()
         root.sidebar.update(scope: scope ?? "All projects", groups: rows)
         root.sidebar.mark.roots = every.first { $0.name == scope }?.roots ?? []
         root.sidebar.mark.monogram = scope.map { String($0.prefix(2)) } ?? ""
@@ -249,7 +256,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                               account: s.flatMap { state.account($0.accountId) },
                               terminal: current.flatMap { detached.contains($0) ? nil : terminals[$0] },
                               summary: PhaseGroup.allCases.filter { !$0.folds }.map { g in (g, (scope == nil ? all : shown).first { $0.0 == g }?.1.count ?? 0) })
-        root.viewerPane.setRoot(s?.cwd)
+        if let t = shell(current) {
+            let row = shellRows().first { $0.id == current }
+            root.sessionPane.showShell(title: row?.title ?? "", path: row?.detail ?? "", terminal: t)
+        }
+        root.viewerPane.setRoot(s?.cwd ?? shell(current)?.cwd)
         NSApp.dockTile.badgeLabel = (all.first { $0.0 == .needsYou }?.1.count).map { "\($0)" }
     }
 
@@ -491,6 +502,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     // MARK: sessions
 
     func open(_ id: SessionID) {
+        if let t = shell(id) {
+            current = id
+            render(store.state)
+            syncViewer()
+            window?.makeFirstResponder(t)
+            return
+        }
         guard let s = store.state.sessions[id] else { return }
         current = id
         // Opening a session from another project switches the rail to it, so its row is in the list.
@@ -524,21 +542,19 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         detached.remove(id)
     }
 
-    /// A plain shell in its own window: in the session's folder, or the folder ⌘T would start in.
+    /// A new terminal at the top of the sidebar, in the session's folder (or the one ⌘T would start in), opened in the pane.
     func openShell(in folder: String? = nil) {
         dismissOverlays()
         let state = store.state
-        let fallback = current.flatMap { state.sessions[$0]?.cwd }.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } ?? folderHere(state)
-        let dir = folder.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } ?? fallback ?? Paths.home.path
-        let t = TerminalView(frame: NSRect(x: 0, y: 0, width: 860, height: 540), workingDirectory: dir)
-        let w = NSWindow(contentRect: t.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        w.title = (dir as NSString).abbreviatingWithTildeInPath
-        w.appearance = window?.appearance
-        w.isReleasedWhenClosed = false
-        w.contentView = t
-        w.setFrameTopLeftPoint(shells.last.map { w.cascadeTopLeft(from: NSPoint(x: $0.frame.minX, y: $0.frame.maxY)) }
-                               ?? NSPoint(x: (window?.frame.midX ?? 400) - 430, y: (window?.frame.midY ?? 600) + 270))
-        t.onExit = { [weak w] in w?.close() }
+        let here = current.flatMap { state.sessions[$0]?.cwd } ?? shell(current)?.cwd
+        let usable = { (f: String?) in f.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } }
+        let dir = usable(folder) ?? usable(here) ?? folderHere(state) ?? Paths.home.path
+        let size = root.sessionPane.content.bounds.size
+        let t = TerminalView(frame: NSRect(origin: .zero, size: size == .zero ? NSSize(width: 800, height: 600) : size), workingDirectory: dir)
+        shellsMade += 1
+        let id = "shell-\(shellsMade)"
+        t.onExit = { [weak self] in self?.closeShell(id) }
+        t.onCwd = { [weak self] in if let self { self.render(self.store.state) } }
         t.onOpenURL = { raw, cwd in
             if raw.hasPrefix("http://") || raw.hasPrefix("https://") { if let u = URL(string: raw) { NSWorkspace.shared.open(u) }; return }
             var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
@@ -547,12 +563,24 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if !path.hasPrefix("/") { path = ((cwd ?? dir) as NSString).appendingPathComponent(path) }
             if FileManager.default.fileExists(atPath: path) { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
         }
-        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] n in
-            self?.shells.removeAll { $0 === n.object as? NSWindow }
+        shells.append((id, t))
+        open(id)
+    }
+
+    /// Ends a terminal's shell and drops its row; the pane goes to the last terminal or session.
+    func closeShell(_ id: String) {
+        guard let i = shells.firstIndex(where: { $0.id == id }) else { return }
+        shells.remove(at: i).view.removeFromSuperview()
+        if current == id { current = shells.last?.id ?? visited.first }
+        if let next = current { open(next) } else { render(store.state); syncViewer() }
+    }
+
+    private func shellRows() -> [ShellRow] {
+        shells.map { sh in
+            let dir = sh.view.cwd ?? Paths.home.path
+            let title = dir == Paths.home.path ? "~" : (dir as NSString).lastPathComponent
+            return ShellRow(id: sh.id, title: title, detail: (dir as NSString).abbreviatingWithTildeInPath)
         }
-        shells.append(w)
-        w.makeKeyAndOrderFront(nil)
-        w.makeFirstResponder(t)
     }
 
     func reattach(_ id: SessionID) {
@@ -563,6 +591,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Closing a tab frees its terminal; the session keeps running.
     func forget(_ id: SessionID) {
+        if shell(id) != nil { return closeShell(id) }
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         visited.removeAll { $0 == id }
         if current == id { current = visited.first }
@@ -571,7 +600,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func step(_ d: Int) {
-        let ids = root.sidebar.list.sessionIds
+        let ids = root.sidebar.list.rowIds
         guard !ids.isEmpty else { return }
         let i = ids.firstIndex(of: current ?? "") ?? (d > 0 ? -1 : ids.count)
         open(ids[(i + d + ids.count) % ids.count])
@@ -1252,7 +1281,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func focusMain() {
-        if let id = current, let t = terminals[id], !detached.contains(id) { window?.makeFirstResponder(t) }
+        if let id = current, let t = terminals[id] ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
         else { window?.makeFirstResponder(root.sidebar.list) }
     }
 
@@ -1346,8 +1375,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         window?.appearance = theme.appearance
         root.viewerPane.viewer.setTheme(theme, fontSize: Metrics.fontSize, prose: c.viewerFont)
         root.viewerPane.showTree = c.showTree
-        GhosttyRuntime.shared.update(configText: Self.ghosttyConfig(theme, fontSize: CGFloat(c.terminalFontSize)), surfaces: Array(terminals.values) + shells.compactMap { $0.contentView as? TerminalView })
-        shells.forEach { $0.appearance = theme.appearance }
+        GhosttyRuntime.shared.update(configText: Self.ghosttyConfig(theme, fontSize: CGFloat(c.terminalFontSize)), surfaces: Array(terminals.values) + shells.map(\.view))
         root.needsLayout = true
         root.needsDisplay = true
         render(store.state)
@@ -1375,7 +1403,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         var list: [Action] = [
             Action(id: "new-session", title: "New Session…", menu: "Session", shortcut: Shortcut("cmd+n")) { [weak self] in self?.showNewSession() },
             Action(id: "new-session-here", title: "New Session Here", menu: "Session", shortcut: Shortcut("cmd+t")) { [weak self] in self?.newSessionHere() },
-            Action(id: "new-terminal", title: "New Terminal Window", menu: "Session", shortcut: Shortcut("cmd+alt+t")) { [weak self] in self?.openShell() },
+            Action(id: "new-terminal", title: "New Terminal", menu: "Session", shortcut: Shortcut("cmd+alt+t")) { [weak self] in self?.openShell() },
             Action(id: "search", title: "Search Everywhere…", menu: "View", shortcut: Shortcut("cmd+p")) { [weak self] in self?.showSearch() },
             Action(id: "palette", title: "All Actions…", menu: "View", shortcut: Shortcut("cmd+k")) { [weak self] in self?.showPalette() },
             Action(id: "next-session", title: "Next Session", menu: "Session", shortcut: Shortcut("cmd+]")) { [weak self] in self?.step(1) },
