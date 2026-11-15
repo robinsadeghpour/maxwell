@@ -968,6 +968,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         v.onAddAccount = { [weak self] in self?.addAccount() }
         v.onBrowser = { [weak self] account, choice in self?.onConfigEdit?("browser:\(account)", choice?.line ?? "") }
         v.onRunAction = { [weak self] id in self?.actions.first { $0.id == id }?.run() }
+        recheckNotifications()
         v.onPluginSecret = { [weak self] id, key, value in
             self?.store.plugins.setSecret(id, key, value)
             self?.refreshSettings()
@@ -980,7 +981,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         SettingsModel(config: store.config, hookStatus: hookStatus, accounts: store.state.accounts, projects: projectNames, projectRoots: projectRoots,
                       actions: actions.map { ($0.id, $0.title, $0.menu, $0.shortcut?.display ?? "") }.sorted { $0.menu < $1.menu },
                       themeName: Look.theme.name, systemDark: SystemAppearance.isDark,
-                      updateReady: updater.ready?.version, updateStatus: updateStatus,
+                      updateReady: updater.ready?.version, updateStatus: updateStatus, notificationsAllowed: notificationsAllowed,
                       plugins: store.plugins.manifests.map { m in
                           PluginInfo(manifest: m, status: store.plugins.status[m.id] ?? PluginStatus(run: .off),
                                      secretsSet: Set(m.settings.filter { $0.type == .secret && store.plugins.secrets.get(m.id, $0.key) != nil }.map(\.key)))
@@ -1048,6 +1049,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     private var updateStatus: String?
+
+    /// Asked again whenever Settings opens or Maxwell comes back to the front, which is when someone
+    /// returns from System Settings › Notifications.
+    private var notificationsAllowed: Bool?
+    func recheckNotifications() {
+        store.notificationsAllowed { [weak self] ok in
+            guard let self, ok != self.notificationsAllowed else { return }
+            self.notificationsAllowed = ok
+            self.refreshSettings()
+        }
+    }
 
     func checkForUpdates() {
         guard Updater.isRelease else { return toast("Maxwell Dev doesn't update itself. Releases go to Maxwell.") }

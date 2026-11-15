@@ -50,6 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         mark("event log folded (\(store.state.sessions.count) sessions)")
         main = MainWindowController(store: store)
         main.onConfigEdit = { [weak self] k, v in self?.edit(k, v) }
+        store.isOnScreen = { [weak self] id in
+            guard let self, NSApp.isActive, self.main.window?.isMiniaturized == false else { return false }
+            return self.main.current == id
+        }
         NSApp.mainMenu = MenuBuilder.build(main.actions)
         main.window?.appearance = theme.appearance
         main.root.viewerPane.viewer.setTheme(theme, fontSize: Metrics.fontSize, prose: config.viewerFont)
@@ -89,7 +93,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
     private var quitAfter: DispatchWorkItem?
 
-    /// Clicking a "needs you" notification opens that session.
+    func applicationDidBecomeActive(_ n: Notification) {
+        main?.recheckNotifications()
+    }
+
+    /// Clicking a notification opens that session.
     func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse, withCompletionHandler done: @escaping () -> Void) {
         if let id = r.notification.request.content.userInfo["session"] as? String {
             DispatchQueue.main.async { self.main.showWindow(nil); NSApp.activate(ignoringOtherApps: true); self.main.open(id) }  // only from a real click

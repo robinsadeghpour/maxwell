@@ -233,6 +233,8 @@ for handBack in [
 check(Config.parse("project = Orbit ~/projects/orbit*").projects == [ProjectRule(name: "Orbit", glob: "~/projects/orbit*")], "project rules parse")
 check(Config.parse("safe-after = 90m\nidle-after = 2d").idleAfter == 2 * 86400, "an old safe-after line is ignored")
 check(Config().skipPermissions && Config.parse(Config.starter).skipPermissions && !Config.parse("skip-permissions = off").skipPermissions, "skip-permissions defaults on, off turns it off")
+check({ let c = Config.parse("notify-sound = Glass\nnotify-done = true\nnotify-done-sound = none"); return c.notifySound == "Glass" && c.notifyDone && c.notifyDoneSound == "none" }()
+      && Config.parse("notify-sound = Nope").notifySound == "Funk" && !Config.parse(Config.starter).notifyDone, "notification sounds parse; unknown sounds and the starter keep the defaults")
 check(Config().theme(systemDark: true) == "graphite" && Config().theme(systemDark: false) == "paper", "the pair follows the system")
 check(Config.parse("appearance = light").theme(systemDark: true) == "paper" && Config.parse("theme-dark = silver\nappearance = dark").theme(systemDark: false) == "silver", "appearance pins a side")
 check(Config.parse("theme = silver\nappearance = light").theme(systemDark: false) == "silver", "theme = stays a fixed override")

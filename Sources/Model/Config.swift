@@ -13,7 +13,12 @@ struct Config: Equatable {
     /// The interface: lists, panels, viewer. The terminal has its own size.
     var fontSize: Double = 13
     var terminalFontSize: Double = 12
+    /// A notification when a session asks something, and when one finishes a turn. Each plays its own
+    /// sound: a name from `Config.sounds`, or "none".
     var notify = true
+    var notifySound = "Funk"
+    var notifyDone = false
+    var notifyDoneSound = "Submarine"
     var autoOpen = true
     /// Where claude.ai artifact links from a session open: "viewer" (beside the session, signed in
     /// to its account) or "browser" (the account's `browser` choice).
@@ -71,6 +76,8 @@ struct Config: Equatable {
         return out
     }
 
+    /// Notification sounds: the ones in /System/Library/Sounds, which every Mac has.
+    static let sounds = ["none", "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero", "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink"]
     static let lightThemes = ["paper", "silver-light"]
     static let darkThemes = ["graphite", "silver"]
     static let themes = lightThemes + darkThemes
@@ -108,6 +115,9 @@ struct Config: Equatable {
             case "font-size": if let v = Double(value), (9...24).contains(v) { c.fontSize = v }
             case "terminal-font-size": if let v = Double(value), (8...28).contains(v) { c.terminalFontSize = v }
             case "notify": c.notify = value != "false"
+            case "notify-sound": if sounds.contains(value) { c.notifySound = value }
+            case "notify-done": c.notifyDone = value == "true"
+            case "notify-done-sound": if sounds.contains(value) { c.notifyDoneSound = value }
             case "auto-open": c.autoOpen = value != "false"
             case "artifacts": if ["viewer", "browser"].contains(value) { c.artifacts = value }
             case "browser":
@@ -223,7 +233,10 @@ struct Config: Equatable {
     # theme = silver                         one fixed theme, ignores appearance
     font-size = 13                           # lists, panels and the viewer
     terminal-font-size = 12                  # ⌘− and ⌘= change this one
-    notify = true
+    notify = true                            # a session needs you
+    # notify-sound = Funk                    none, or a macOS sound: \(sounds.dropFirst().joined(separator: ", "))
+    # notify-done = true                     a session finished its turn
+    # notify-done-sound = Submarine
     auto-open = true
     # artifacts = viewer | browser     claude.ai artifact links: beside the session, or in the account's browser
     file-tree = false

@@ -169,3 +169,13 @@ export const wrapLine = (caption) => plate(`<div class="w lg"><div class="split2
     <div class="row sel" style="--c:${C.safe};margin-bottom:10px">${dot("safe", true)}<b>Billing totals <em>now</em></b><small>Safe to close · PR merged, ticket done</small></div>
   </div>
 </div></div>`, caption);
+
+export const notifications = (caption) => plate(`<div class="w mid">
+  ${chrome("Settings › Notifications", "<span>⌘,</span>")}
+  <ul class="checks" style="margin:10px 14px 12px">
+    <li><i>✓</i><span>macOS: allowed</span><span>Maxwell's icon</span></li>
+    <li><i>✓</i><span>Needs you</span><span>Glass ▾</span></li>
+    <li><i>✓</i><span>Turn finished</span><span>Submarine ▾</span></li>
+    <li><i style="color:var(--faint)">–</i><span style="color:var(--dim)">The session you're looking at stays quiet</span><span></span></li>
+  </ul>
+</div>`, caption);

@@ -5,6 +5,20 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-notification-sounds",
+    date: "2026-11-15",
+    versions: "0.1.26",
+    title: "Pick a sound for each notification",
+    figure: fig.notifications("Each notification has its own sound, and Settings shows whether macOS lets Maxwell notify."),
+    body: `
+<p><strong>Settings › General › Notifications</strong> now has two notifications, each with its own sound. <strong>Needs you</strong> is on as before. <strong>Turn finished</strong> is new: Maxwell tells you when a session stops and the next move is yours. Choose any macOS sound, or None. Picking one plays it.</p>
+<p>Neither one shows for the session you're looking at. The notification sound now comes from Maxwell, so if you set up sounds in Claude Code hooks, you can remove them.</p>
+<p>When macOS hasn't allowed Maxwell to notify, its notifications show Script Editor's icon and clicking one opens nothing. Settings now says so and opens <strong>System Settings › Notifications</strong> for you.</p>`,
+    fixes: [
+      "New config keys: notify-sound, notify-done and notify-done-sound",
+    ],
+  },
+  {
     slug: "2026-11-15-bring-in-for-real",
     date: "2026-11-15",
     versions: "0.1.24 – 0.1.25",

@@ -17,6 +17,8 @@ struct SettingsModel {
     /// The version a download is ready for, and what the last manual check said.
     var updateReady: String?
     var updateStatus: String?
+    /// Whether macOS lets Maxwell post notifications; nil until asked.
+    var notificationsAllowed: Bool?
     var plugins: [PluginInfo] = []
     var brokenPlugins: [(folder: String, why: String)] = []
     var pluginsFolder = ""
@@ -474,8 +476,8 @@ final class SettingsView: MXView {
             form.row("Version", [(Label("\(Updater.current)", font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), 70), (check, check.intrinsicContentSize.width)],
                      note: model.updateStatus ?? "Checked every 4 hours. A new version waits for your click.")
         }
-        form.header("Attention")
-        form.toggle("Notifications", c.notify, note: "A macOS notification when a session needs you.") { [weak self] in self?.set("notify", $0 ? "true" : "false") }
+        notifications()
+        form.header("Viewer")
         form.toggle("Open files automatically", c.autoOpen, note: "Markdown files a session writes or mentions open in the viewer.") { [weak self] in self?.set("auto-open", $0 ? "true" : "false") }
         form.toggle("File tree", c.showTree, note: "Shows the session's folder above the viewer. ⇧⌘T toggles it.") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
         form.header("Sessions")
@@ -483,6 +485,45 @@ final class SettingsView: MXView {
         form.choice("Fold into Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter)) { [weak self] in self?.set("idle-after", $0) }
         form.toggle("Final model check", c.judge, note: "Haiku reads the last reply once. If off, nothing is ever safe.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
         form.choice("Rows", [("detail", "Two lines"), ("compact", "One line")], current: c.rowStyle) { [weak self] in self?.set("row-style", $0) }
+    }
+
+    private func notifications() {
+        form.header("Notifications")
+        let mono = Fonts.mono(Metrics.fontSize - 1)
+        switch model.notificationsAllowed {
+        case true?:
+            form.text("macOS", "Allowed")
+        case false?:
+            let open = MXButton("Open System Settings…", small: true) {
+                let id = Bundle.main.bundleIdentifier ?? "dev.maxwell.app"
+                if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") { NSWorkspace.shared.open(url) }
+            }
+            form.row("macOS", [(Label("Not allowed", font: mono, color: { $0.fg2 }), Text.width("Not allowed", font: mono) + 12), (open, open.intrinsicContentSize.width)],
+                     note: "Until you allow Maxwell, its notifications show Script Editor's icon and clicking one doesn't open the session.")
+        case nil:
+            form.text("macOS", "Checking…")
+        }
+        form.toggle("Needs you", c.notify, note: "A session asks you something.") { [weak self] in self?.set("notify", $0 ? "true" : "false") }
+        soundRow(key: "notify-sound", current: c.notifySound)
+        form.toggle("Turn finished", c.notifyDone, note: "A session stopped and the next move is yours.") { [weak self] in self?.set("notify-done", $0 ? "true" : "false") }
+        soundRow(key: "notify-done-sound", current: c.notifyDoneSound)
+        form.paragraph("Neither one shows for the session you're looking at.")
+    }
+
+    /// A menu of `Config.sounds`; picking one plays it.
+    private func soundRow(key: String, current: String) {
+        let pick = MXButton((current == "none" ? "None" : current) + "  ▾")
+        pick.action = { [weak self, weak pick] in
+            guard let self, let pick else { return }
+            let m = NSMenu()
+            for s in Config.sounds {
+                let i = MenuAction(s == "none" ? "None" : s) { [weak self] in Store.play(s); self?.set(key, s) }
+                i.state = s == current ? .on : .off
+                m.addItem(i)
+            }
+            m.popUp(positioning: nil, at: NSPoint(x: 0, y: pick.bounds.height + 2), in: pick)
+        }
+        form.row("  sound", [(pick, max(120, pick.intrinsicContentSize.width))])
     }
 
     private func appearance() {

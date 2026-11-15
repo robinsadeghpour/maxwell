@@ -34,7 +34,27 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-bring-in-for-real">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-notification-sounds">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.26</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-notification-sounds">Pick a sound for each notification</a></h2>
+    <figure class="fig"><div class="plate" aria-hidden="true"><div class="w mid">
+  <div class="wh"><span class="tl"><i></i><i></i><i></i></span><b>Settings › Notifications</b><span class="sp"></span><span>⌘,</span></div>
+  <ul class="checks" style="margin:10px 14px 12px">
+    <li><i>✓</i><span>macOS: allowed</span><span>Maxwell's icon</span></li>
+    <li><i>✓</i><span>Needs you</span><span>Glass ▾</span></li>
+    <li><i>✓</i><span>Turn finished</span><span>Submarine ▾</span></li>
+    <li><i style="color:var(--faint)">–</i><span style="color:var(--dim)">The session you're looking at stays quiet</span><span></span></li>
+  </ul>
+</div></div><figcaption>Each notification has its own sound, and Settings shows whether macOS lets Maxwell notify.</figcaption></figure>
+    <div class="prose"><p><strong>Settings › General › Notifications</strong> now has two notifications, each with its own sound. <strong>Needs you</strong> is on as before. <strong>Turn finished</strong> is new: Maxwell tells you when a session stops and the next move is yours. Choose any macOS sound, or None. Picking one plays it.</p>
+<p>Neither one shows for the session you're looking at. The notification sound now comes from Maxwell, so if you set up sounds in Claude Code hooks, you can remove them.</p>
+<p>When macOS hasn't allowed Maxwell to notify, its notifications show Script Editor's icon and clicking one opens nothing. Settings now says so and opens <strong>System Settings › Notifications</strong> for you.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>New config keys: notify-sound, notify-done and notify-done-sound</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-bring-in-for-real">
   <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.24 – v0.1.25</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-15-bring-in-for-real">Terminal sessions move into Maxwell</a></h2>

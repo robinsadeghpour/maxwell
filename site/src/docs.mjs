@@ -381,7 +381,9 @@ idle-after = 24h              <span class="c"># quiet time before a stopped sess
 judge = on                    <span class="c"># off skips the model read, so nothing is ever safe</span>
 skip-permissions = on         <span class="c"># off keeps Claude's own permission mode</span>
 wrap-line = on                <span class="c"># off: replies don't end with a status line</span>
-notify = true
+notify = true                 <span class="c"># a notification when a session needs you</span>
+notify-sound = Funk           <span class="c"># none, or a macOS sound: Glass, Ping, Submarine…</span>
+notify-done = false           <span class="c"># true: also one when a session finishes its turn</span>
 auto-open = true              <span class="c"># open .md files and artifacts a session writes</span>
 artifacts = viewer            <span class="c"># viewer | browser</span></code></pre>
 <h2>Plugin settings</h2>

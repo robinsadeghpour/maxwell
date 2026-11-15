@@ -53,7 +53,10 @@ final class Store {
         recheckAll()
         plugins.apply = { [weak self] in self?.apply($0) }
         plugins.onChange = { [weak self] in self?.onPluginsChanged?() }
-        plugins.onNotify = { [weak self] title, body, sid in self?.post(title: title, subtitle: nil, body: body, session: sid) }
+        plugins.onNotify = { [weak self] title, body, sid in
+            guard let self, self.config.notify else { return }
+            self.post(title: title, subtitle: nil, body: body, session: sid, sound: self.config.notifySound)
+        }
         plugins.onOpen = { NSWorkspace.shared.open($0) }
         plugins.reload(config)
         syncPlugins()
@@ -75,6 +78,7 @@ final class Store {
             if case .needsYou(let q) = s.phase, !(old.map { if case .needsYou = $0 { return true }; return false } ?? false) {
                 notify(s, question: q)
             }
+            if s.phase == .yourTurn, old == .working { notifyDone(s) }
         }
         bringInQueued()
         queuePluginSync()
@@ -221,21 +225,50 @@ final class Store {
     }
 
     private func notify(_ s: Session, question: String) {
-        // The first listings after launch would re-announce every waiting session.
-        guard let quiet = notifyAfter, Date() > quiet else { return }
+        guard config.notify, announcing(s) else { return }
         post(title: s.title, subtitle: "Needs you · \(state.account(s.accountId)?.name ?? s.accountId)", body: question, session: s.id,
-             key: "needs-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))")
+             sound: config.notifySound, key: "needs-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))")
     }
 
-    /// A macOS notification; clicking it opens the session. Off with `notify = false`.
-    func post(title: String, subtitle: String?, body: String, session: SessionID?, key: String = UUID().uuidString) {
-        guard config.notify else { return }
+    private func notifyDone(_ s: Session) {
+        guard config.notifyDone, announcing(s) else { return }
+        // The status line a session ends its reply with says it best; otherwise the reply's first line.
+        let wrap = s.lastMessage.flatMap(Wrap.parse)
+        let body = wrap.map { $0.note.isEmpty ? $0.state.rawValue : "\($0.state.rawValue) · \($0.note)" }
+            ?? s.lastMessage?.split(separator: "\n").first.map(String.init) ?? "Finished its turn."
+        post(title: s.title, subtitle: "Done · \(state.account(s.accountId)?.name ?? s.accountId)", body: body, session: s.id,
+             sound: config.notifyDoneSound, key: "done-\(s.id)-\(Int(s.lastEventAt.timeIntervalSince1970))")
+    }
+
+    /// Whether a change to this session is news. The first listings after launch would re-announce every
+    /// waiting session, and the session on screen in the front window needs no banner.
+    private func announcing(_ s: Session) -> Bool {
+        guard let quiet = notifyAfter, Date() > quiet else { return false }
+        return !(isOnScreen?(s.id) ?? false)
+    }
+
+    /// The session shown in Maxwell's window while Maxwell is the front app.
+    var isOnScreen: ((SessionID) -> Bool)?
+
+    /// Whether macOS lets Maxwell post its own notifications. Until it does, they go through osascript
+    /// and show Script Editor's icon.
+    func notificationsAllowed(_ done: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let ok = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+            DispatchQueue.main.async { done(ok) }
+        }
+    }
+
+    /// A macOS notification; clicking it opens the session. Maxwell plays the sound itself, so it is the
+    /// same whether macOS has allowed Maxwell or not.
+    func post(title: String, subtitle: String?, body: String, session: SessionID?, sound: String, key: String = UUID().uuidString) {
+        DispatchQueue.main.async { Self.play(sound) }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
                 // Until Maxwell is allowed in System Settings › Notifications, post through osascript.
                 let esc = { (x: String) in x.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
                 let sub = subtitle.map { " subtitle \"\(esc($0))\"" } ?? ""
-                let script = "display notification \"\(esc(body))\" with title \"\(esc(title))\"\(sub) sound name \"Funk\""
+                let script = "display notification \"\(esc(body))\" with title \"\(esc(title))\"\(sub)"
                 DispatchQueue.global().async { ClaudeCLI.run("/usr/bin/osascript", ["-e", script], timeout: 5) }
                 mark("notified \(title) (osascript)")
                 return
@@ -244,11 +277,16 @@ final class Store {
             content.title = title
             if let subtitle { content.subtitle = subtitle }
             content.body = body
-            content.sound = .default
             if let session { content.userInfo = ["session": session] }
             let req = UNNotificationRequest(identifier: key, content: content, trigger: nil)
             UNUserNotificationCenter.current().add(req) { error in mark("notified \(title)\(error.map { ": \($0.localizedDescription)" } ?? "")") }
         }
+    }
+
+    /// One of `Config.sounds`; "none" is silence.
+    static func play(_ sound: String) {
+        guard sound != "none" else { return }
+        NSSound(named: NSSound.Name(sound))?.play()
     }
 
     // MARK: actions

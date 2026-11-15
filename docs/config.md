@@ -13,6 +13,9 @@ motion = on                   # off: no slides or fades (also off under Reduce M
 font-size = 13                # lists, panels and the viewer
 terminal-font-size = 12       # ⌘− and ⌘= change this one
 notify = true                 # macOS notification when a session needs you
+notify-sound = Funk           # none | Basso Blow Bottle Frog Funk Glass Hero Morse Ping Pop Purr Sosumi Submarine Tink
+notify-done = false           # true: also one when a session finishes its turn
+notify-done-sound = Submarine # same choices as notify-sound
 auto-open = true              # open .md files a session writes or names, and artifacts it publishes
 artifacts = viewer            # viewer: artifacts open beside the session, signed in to its account | browser
 browser = work2 zen container Claude Tinkers 2   # <account> <browser> [profile|container <name>]
