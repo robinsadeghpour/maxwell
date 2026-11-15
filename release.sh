@@ -47,9 +47,12 @@ notarize() {
 
 # Sign inside out: the hook helper, then the app. Hardened runtime and a secure timestamp are
 # what notarization requires; Maxwell needs no extra entitlements.
-for bin in "$APP/Contents/MacOS/maxwell-hook" "$APP"; do
-  codesign --force --timestamp --options runtime --sign "$ID" "$bin"
-done
+# Every executable in the bundle needs this, plugins included, so find them instead of listing them.
+find "$APP/Contents" -type f -perm +111 ! -path "$APP/Contents/MacOS/Maxwell" -print0 |
+  while IFS= read -r -d '' bin; do
+    file -b "$bin" | grep -q Mach-O && codesign --force --timestamp --options runtime --sign "$ID" "$bin"
+  done
+codesign --force --timestamp --options runtime --sign "$ID" "$APP"
 codesign --verify --strict --deep "$APP"
 
 # Notarize the app and staple the ticket to it, so it opens offline too.
