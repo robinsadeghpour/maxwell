@@ -166,6 +166,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
         updater.onReady = { [weak self] v in self?.root.status.update = v; self?.refreshSettings() }
         root.status.onUpdate = { [weak self] in self?.updater.install() }
+        updater.onInstallFailed = { [weak self] m in self?.toast(m) }
         newPanel.onClose = { [weak self] in self?.focusMain() }
         newPanel.onStart = { [weak self] a, f, n in self?.startSession(account: a, folder: f, name: n) }
         TerminalView.isAppShortcut = { [weak self] e in self?.actions.contains { $0.shortcut?.matches(e) == true } ?? false }

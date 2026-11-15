@@ -45,19 +45,42 @@ final class Updater {
 
     /// Replaces this app with the downloaded one after it quits, then opens it again.
     /// Sessions keep running: they are Claude Code background sessions.
+    /// A copy run straight from the DMG, or one macOS translocated, sits on a read-only volume:
+    /// its update goes to Applications instead, or the swap would fail and reopen the old version.
     func install() {
         guard let r = ready else { return }
-        let dest = Bundle.main.bundlePath
+        guard let dest = Self.installTarget() else {
+            onInstallFailed?("Maxwell can't write to Applications. Drag it there from the DMG and open it from Applications.")
+            return
+        }
         let script = """
         while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done
-        rm -rf "$1.old" && mv "$1" "$1.old" && /usr/bin/ditto "$2" "$1" && rm -rf "$1.old" || { rm -rf "$1"; mv "$1.old" "$1"; }
+        if [ -e "$1" ]; then
+          rm -rf "$1.old" && mv "$1" "$1.old" && /usr/bin/ditto "$2" "$1" && rm -rf "$1.old" || { rm -rf "$1"; mv "$1.old" "$1"; }
+        else
+          /usr/bin/ditto "$2" "$1"
+        fi
         /usr/bin/open "$1"
         """
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
-        p.arguments = ["-c", script, "sh", dest, r.app.path]
+        p.arguments = ["-c", script, "sh", dest.path, r.app.path]
         guard (try? p.run()) != nil else { return }
         NSApp.terminate(nil)
+    }
+
+    var onInstallFailed: ((String) -> Void)?
+
+    /// This app's own path when it can be replaced there, else Maxwell.app in the first
+    /// Applications folder this user can write to.
+    static func installTarget(bundle: URL = Bundle.main.bundleURL, home: URL = Paths.home) -> URL? {
+        let fm = FileManager.default
+        if !bundle.path.contains("/AppTranslocation/"), fm.isWritableFile(atPath: bundle.deletingLastPathComponent().path) { return bundle }
+        let user = home.appendingPathComponent("Applications")
+        if !fm.fileExists(atPath: user.path) { try? fm.createDirectory(at: user, withIntermediateDirectories: true) }
+        return [URL(fileURLWithPath: "/Applications"), user]
+            .first { fm.isWritableFile(atPath: $0.path) }?
+            .appendingPathComponent("Maxwell.app")
     }
 
     // MARK: fetching
