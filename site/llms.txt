@@ -37,6 +37,7 @@
 
 ## Changelog
 
+- [Groups hold up when sessions get busy](https://www.runmaxwell.com/changelog/2026-11-15-groups-under-load) (2026-11-15, v0.1.40)
 - [Viewer tabs that keep your place](https://www.runmaxwell.com/changelog/2026-11-15-tabs-that-keep-your-place) (2026-11-15, v0.1.39)
 - [Artifact links open beside the session](https://www.runmaxwell.com/changelog/2026-11-15-artifact-links-open-in-place) (2026-11-15, v0.1.38)
 - [Settings you can read](https://www.runmaxwell.com/changelog/2026-11-15-settings-you-can-read) (2026-11-15, v0.1.37)

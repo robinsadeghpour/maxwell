@@ -12,58 +12,7 @@ func reduce(into s: inout AppState, _ event: Event) {
     defer { syncNamed(&s, event) }
     switch event {
     case .hook(let h):
-        guard let acct = s.accountId(forConfigDir: h.configDir) else { return }
-        // Helper runs inside a config dir (e.g. a hook's own `claude -p`) are not work sessions.
-        if let cwd = h.cwd, s.accounts.contains(where: { cwd.hasPrefix(Paths.normalize($0.configDir.path) + "/") || cwd == Paths.normalize($0.configDir.path) }) {
-            return
-        }
-        var session = s.sessions[h.sessionId] ?? Session(
-            id: h.sessionId, name: String(h.sessionId.prefix(8)), accountId: acct, cwd: h.cwd ?? "", at: h.at,
-            origin: s.startedByMaxwell.contains(h.sessionId) ? .maxwell : .external, reach: .elsewhere(pid: nil))
-        if session.phase == .ended { guard case .sessionStart = h.kind else { return } }
-        session.lastEventAt = max(session.lastEventAt, h.at)
-        session.hookSeenAt = max(session.hookSeenAt ?? h.at, h.at)
-        if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
-        if let t = h.transcriptPath { session.transcriptPath = t }
-        if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
-        let reset = s.account(acct)?.limitResetsAt(now: h.at)
-        // Hooks are the fast edge between listings: each sets the phase it implies right away.
-        switch h.kind {
-        case .sessionStart:
-            if session.phase == .ended { session.phase = .yourTurn; session.phaseSource = "hook: session started" }
-        case .promptSubmitted(let prompt, let title):
-            session.prompted = true
-            session.phase = .working
-            session.phaseSource = "hook: prompt sent"
-            session.stopFailure = nil
-            session.waitingOn = nil
-            session.doneCheck = nil
-            if let title, !title.isEmpty { session.hookTitle = title }
-            if session.firstPrompt == nil, !prompt.isEmpty { session.firstPrompt = prompt }
-        case .stopped(let message):
-            session.prompted = true
-            session.lastMessage = message ?? session.lastMessage
-            session.waitingOn = nil
-            (session.phase, session.phaseSource) = Outcome.of(session, reset: reset, job: nil)
-        case .stopFailed(let error):
-            session.stopFailure = error
-            session.waitingOn = nil
-            (session.phase, session.phaseSource) = Outcome.of(session, reset: reset, job: nil)
-        case .notification(let type, let message):
-            // idle_prompt repeats "waiting for your input" after a Stop we already handled;
-            // agent_completed and push_notification report, they don't ask.
-            if ["permission_prompt", "elicitation_dialog", "agent_needs_input"].contains(type) || (type.isEmpty && !message.isEmpty) {
-                session.phase = .needsYou(message.isEmpty ? "Waiting for your answer" : message)
-                session.phaseSource = "hook: \(type.isEmpty ? "notification" : type)"
-                session.waitingOn = nil
-            }
-        case .sessionEnd:
-            session.phase = .ended
-            session.phaseSource = "hook: session ended"
-        }
-        // A listing that already saw this moment (its status changed with it) knows more than the hook.
-        if session.phase != .ended, Live.covers(session, h.at) { Live.settle(&session, reset: reset) }
-        s.sessions[h.sessionId] = session
+        reduce(hook: h, into: &s)
 
     case .usage(let u):
         guard let acct = s.accountId(forConfigDir: u.configDir), let i = s.accounts.firstIndex(where: { $0.id == acct }) else { return }
@@ -91,9 +40,15 @@ func reduce(into s: inout AppState, _ event: Event) {
             session.reach = e.reach
             session.accountId = snap.accountId
             session.listedAt = snap.at
+            // A turn that began without a prompt hook (a background task's report, a wake) starts when the process goes busy.
+            if e.status == .busy, session.listedStatus != .busy {
+                let began = e.statusAt ?? snap.at
+                if session.turnAt.map({ began > $0 }) ?? true { session.turnAt = began }
+            }
             session.listedStatus = e.status
             session.statusAt = e.statusAt
             session.job = e.job
+            session.unverified = e.unverified
             session.runningTasks = e.runningTasks
             if let pid = e.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
             s.closed[e.sessionId] = nil
@@ -181,6 +136,80 @@ func reduce(into s: inout AppState, _ event: Event) {
             s.notes[id]?[plugin] = nil
             if s.notes[id]?.isEmpty == true { s.notes[id] = nil }
         }
+    }
+}
+
+/// One hook: the session it names, then the phase it implies (see `applyHook`).
+private func reduce(hook h: Hook, into s: inout AppState) {
+    guard let acct = s.accountId(forConfigDir: h.configDir) else { return }
+    // Helper runs inside a config dir (e.g. a hook's own `claude -p`) are not work sessions.
+    if let cwd = h.cwd, s.accounts.contains(where: { cwd.hasPrefix(Paths.normalize($0.configDir.path) + "/") || cwd == Paths.normalize($0.configDir.path) }) {
+        return
+    }
+    var session = s.sessions[h.sessionId] ?? Session(
+        id: h.sessionId, name: String(h.sessionId.prefix(8)), accountId: acct, cwd: h.cwd ?? "", at: h.at,
+        origin: s.startedByMaxwell.contains(h.sessionId) ? .maxwell : .external, reach: .elsewhere(pid: nil))
+    if session.phase == .ended { guard case .sessionStart = h.kind else { return } }
+    session.lastEventAt = max(session.lastEventAt, h.at)
+    session.hookSeenAt = max(session.hookSeenAt ?? h.at, h.at)
+    if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
+    if let t = h.transcriptPath { session.transcriptPath = t }
+    if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
+    let reset = s.account(acct)?.limitResetsAt(now: h.at)
+    applyHook(h.kind, at: h.at, to: &session, reset: reset)
+    // A listing that already saw this moment (its status changed with it) knows more than the hook.
+    if session.phase != .ended, Live.covers(session, h.at) { Live.settle(&session, reset: reset) }
+    s.sessions[h.sessionId] = session
+}
+
+/// Hooks are the fast edge between listings: each sets the phase it implies right away.
+private func applyHook(_ kind: Hook.Kind, at: Date, to session: inout Session, reset: Date?) {
+    switch kind {
+    case .sessionStart:
+        if session.phase == .ended { session.phase = .yourTurn; session.phaseSource = "hook: session started" }
+    case .promptSubmitted(let prompt, let title):
+        session.prompted = true
+        session.phase = .working
+        session.phaseSource = "hook: prompt sent"
+        session.turnAt = at
+        session.stopFailure = nil
+        session.waitingOn = nil
+        session.doneCheck = nil
+        if let title, !title.isEmpty { session.hookTitle = title }
+        if session.firstPrompt == nil, !prompt.isEmpty { session.firstPrompt = prompt }
+    case .stopped(let message):
+        session.prompted = true
+        session.lastMessage = message ?? session.lastMessage
+        session.waitingOn = nil
+        // A turn ends with Stop or StopFailure, never both: a clean Stop ends an earlier limit or error
+        // (a turn started by a background task's report sends no prompt hook to clear it).
+        session.stopFailure = nil
+        (session.phase, session.phaseSource) = Outcome.of(session, reset: reset, job: nil)
+        // Stop fires when the main turn ends, also while subagents or background shells it started
+        // still run. If the last listing said the process was busy, stay Working until a listing
+        // confirms it went idle: otherwise Your turn shows (and "done" is announced) for a moment.
+        if session.phase == .yourTurn, let st = session.listedStatus, st == .busy || st == .shell || (session.job?.work ?? 0) > 0 {
+            session.phase = .working
+            session.phaseSource = "hook: turn ended, waiting for Claude Code to confirm"
+        }
+    case .stopFailed(let error):
+        session.stopFailure = error
+        session.waitingOn = nil
+        (session.phase, session.phaseSource) = Outcome.of(session, reset: reset, job: nil)
+    case .notification(let type, let message):
+        // idle_prompt repeats "waiting for your input" after a Stop we already handled;
+        // agent_completed and push_notification report, they don't ask.
+        // The hook comes seconds after Claude Code's own status, in vaguer words ("Claude needs your
+        // permission"); a needs-you already read from Claude Code keeps its text.
+        let fromClaudeCode: Bool = { if case .needsYou = session.phase { return session.phaseSource.hasPrefix("Claude Code") }; return false }()
+        if !fromClaudeCode, ["permission_prompt", "elicitation_dialog", "agent_needs_input"].contains(type) || (type.isEmpty && !message.isEmpty) {
+            session.phase = .needsYou(message.isEmpty ? "Waiting for your answer" : message)
+            session.phaseSource = "hook: \(type.isEmpty ? "notification" : type)"
+            session.waitingOn = nil
+        }
+    case .sessionEnd:
+        session.phase = .ended
+        session.phaseSource = "hook: session ended"
     }
 }
 

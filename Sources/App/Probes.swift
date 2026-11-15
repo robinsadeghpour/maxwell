@@ -66,14 +66,24 @@ final class AgentsProbe {
             let e = snap.entries[i]
             // The listing folds "shell" into "busy" and drops when the status changed; the
             // process's own file keeps both. Background sessions also have Claude Code's verdict on the turn.
-            if let pid = e.pid, let data = FileManager.default.contents(atPath: account.configDir.appendingPathComponent("sessions/\(pid).json").path),
-               let own = EventParser.parsePidFile(data, sessionId: e.sessionId) {
-                snap.entries[i].status = own.status
-                snap.entries[i].statusAt = own.at
+            // A running process always has both files; one Maxwell can't read means Claude Code changed
+            // them, and the groups fall back to weaker evidence: say so instead of guessing quietly.
+            if let pid = e.pid {
+                let file = account.configDir.appendingPathComponent("sessions/\(pid).json")
+                if let data = FileManager.default.contents(atPath: file.path), let own = EventParser.parsePidFile(data, sessionId: e.sessionId) {
+                    snap.entries[i].status = own.status
+                    snap.entries[i].statusAt = own.at
+                } else {
+                    snap.entries[i].unverified = "can't read \(file.path)"
+                }
             }
-            if case .background(let short) = e.reach,
-               let data = FileManager.default.contents(atPath: account.configDir.appendingPathComponent("jobs/\(short)/state.json").path) {
-                snap.entries[i].job = EventParser.parseJob(data)
+            if case .background(let short) = e.reach {
+                let file = account.configDir.appendingPathComponent("jobs/\(short)/state.json")
+                if let data = FileManager.default.contents(atPath: file.path), let job = EventParser.parseJob(data) {
+                    snap.entries[i].job = job
+                } else if e.pid != nil {
+                    snap.entries[i].unverified = snap.entries[i].unverified ?? "can't read \(file.path)"
+                }
             }
             snap.entries[i].title = Transcripts.tabTitle(e.sessionId)
             let path = Transcripts.defaultPath(sessionId: e.sessionId, cwd: e.cwd, account: account)
@@ -108,18 +118,24 @@ final class AgentsProbe {
         }
     }
 
+    /// Accounts whose files changed while a listing of them was running: list them once more after it,
+    /// or that change waits for the 30 s timer.
+    private var again = Set<AccountID>()
+
     func refresh(_ id: AccountID, then: (() -> Void)? = nil) {
         guard let account = accounts.first(where: { $0.id == id }) else { return }
         if then == nil {
-            guard !pending.contains(id) else { return }
+            guard !pending.contains(id) else { again.insert(id); return }
             pending.insert(id)
         }
         queue.async { [weak self] in
             let snap = Self.snapshot(account)
             DispatchQueue.main.async {
-                self?.pending.remove(id)
-                if let snap { self?.emit(.agents(snap)) }
+                guard let self else { return }
+                if then == nil { self.pending.remove(id) }
+                if let snap { self.emit(.agents(snap)) }
                 then?()
+                if self.again.remove(id) != nil { self.refresh(id) }
             }
         }
     }

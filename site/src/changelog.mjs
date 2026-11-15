@@ -5,6 +5,24 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-groups-under-load",
+    date: "2026-11-15",
+    versions: "0.1.40",
+    title: "Groups hold up when sessions get busy",
+    figure: "",
+    body: `
+<p>Maxwell's groups now hold up when sessions run subagents, background shells and permission prompts. We ran scripted sessions through each case and compared Maxwell with Claude Code's own records every quarter second. Every group change now matches, and you get one notification per real change.</p>
+<p>If Maxwell can't read Claude Code's own status for a session, the bottom bar now says <strong>! unverified</strong> instead of quietly guessing. <code>Maxwell watch</code> prints every group change as it happens, with where it came from.</p>`,
+    fixes: [
+      "Fixed a \"done\" notification while a subagent or background shell was still running",
+      "Fixed the vaguer permission notification replacing the exact command a session asked to run",
+      "Fixed a finished session with a dev server left running staying in Working",
+      "Fixed file watchers counting as background work",
+      "Fixed a usage limit from an earlier turn sticking after a clean turn",
+      "A session that asks the same question again no longer notifies twice",
+    ],
+  },
+  {
     slug: "2026-11-15-tabs-that-keep-your-place",
     date: "2026-11-15",
     versions: "0.1.39",
@@ -71,7 +89,7 @@ export default [
     title: "Working, Needs you and Your turn you can trust",
     figure: "",
     body: `
-<p>Maxwell now takes each session's group from Claude Code itself. It reads what the process is doing and, for background sessions, how Claude Code says the last turn ended. Before, a session that had asked you to approve something stayed in <strong>Working</strong> for as long as a background shell it started kept running. It now shows in <strong>Needs you</strong>, in Claude Code's words: "open the Sentry sign-in link above, approve it, then tell me".</p>
+<p>Maxwell now takes each session's group from Claude Code itself. It reads what the process is doing and, for background sessions, how Claude Code says the last turn ended. Before, a session that had asked you to approve something stayed in <strong>Working</strong> for as long as a background shell it started kept running. It now shows in <strong>Needs you</strong>, in Claude Code's words: "approve the staging deploy in the dashboard, then tell me".</p>
 <p>A session whose turn is over but whose background work is still running stays in Working. A line under its title says what it waits for. Hover that line on any session to see where its group came from. <code>Maxwell state</code> prints the same for every session.</p>`,
     fixes: [
       "Fixed idle sessions showing as Working when Claude Code expected more work later",

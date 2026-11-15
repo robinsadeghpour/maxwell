@@ -24,9 +24,9 @@
   "Sources/UI/Theme.swift": 1
  },
  "file-lines": {
-  "Sources/App/MainWindow.swift": 1633,
-  "Sources/App/Probes.swift": 524,
-  "Sources/App/Store.swift": 582,
+  "Sources/App/MainWindow.swift": 1644,
+  "Sources/App/Probes.swift": 540,
+  "Sources/App/Store.swift": 593,
   "Sources/App/main.swift": 626,
   "Sources/UI/ArtifactView.swift": 518,
   "Sources/UI/Layout.swift": 885,
@@ -35,12 +35,11 @@
   "Sources/UI/Terminal.swift": 622
  },
  "function-lines": {
-  "Sources/App/CLI.swift::runCLI": 95,
   "Sources/App/MainWindow.swift::makeActions": 128,
-  "Sources/App/MainWindow.swift::render": 83,
+  "Sources/App/MainWindow.swift::render": 84,
   "Sources/App/MainWindow.swift::wire": 98,
   "Sources/App/main.swift::runTestHooks": 378,
-  "Sources/Model/Reducer.swift::reduce": 175,
+  "Sources/Model/Reducer.swift::reduce": 130,
   "Sources/UI/ProjectLogo.swift::extract": 90
  },
  "hand-made-controls": {

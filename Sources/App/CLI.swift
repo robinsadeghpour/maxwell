@@ -37,57 +37,12 @@ func runCLI(_ args: [String]) -> Int32? {
                 }
                 print(line)
             }
+        case "watch":
+            StateAudit.watch(prefix: args.count > 2 ? args[2] : "", config: config)
         case "state":
-            // The audit: what the sidebar would show now, from the event log, live listings, repo
-            // checks and model reads (made here for candidates without one), with every check.
-            ClaudeCLI.scrubOwnEnvironment()
-            Titles.auto = config.autoTitles
-            print("claude: \(ClaudeCLI.claudeFound ? ClaudeCLI.claudePath : "not found (sessions can't be listed)")")
-            for a in config.accounts where ClaudeCLI.agents(a) == nil { print("! claude agents --json failed on \(a.id) (\(a.configDir.path))") }
-            let log = EventLog(url: Paths.eventLog)
-            var state = log.readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
-            for a in config.accounts { if let snap = AgentsProbe.snapshot(a) { state = reduce(state, .agents(snap)) } }
-            let checker = DoneChecker { _ in }
-            for s in state.sessions.values where s.phase == .yourTurn { state = reduce(state, .doneCheck(s.id, checker.evaluate(cwd: s.cwd))) }
-            let now = Date(), rules = config.rules
-            if !args.contains("--no-judge") {
-                for (s, h) in state.judgeCandidates(now: now, rules: rules) { Judge.judgeAndLog(s, hash: h, state: state, now: now) }
-                state = log.readNew().reduce(into: state) { reduce(into: &$0, $1) }
-            }
-            let projects = Projects(rules: config.projects)
-            let mark: [Check.Outcome: String] = [.pass: "✓", .fail: "✗", .unknown: "?"]
-            for (g, items) in state.grouped(now: now, rules: rules) where g != .recentlyClosed {
-                print("## \(g.title) \(items.count)")
-                for s in items {
-                    print("  \(s.id.prefix(8))  \(s.accountId)\t\(state.project(s, in: projects))\t\(s.title)\t\(Reply.span(now.timeIntervalSince(s.lastEventAt)))")
-                    // What the group rests on, and what it shows: the question, or the work it waits for.
-                    var why = "      ← \(s.phaseSource.isEmpty ? "hooks" : s.phaseSource)"
-                    if case .needsYou(let q) = s.phase { why += " · \(q.prefix(100))" }
-                    print(why)
-                    guard g != .working else { continue }
-                    let checks = state.checks(s, now: now, rules: rules)
-                    for c in checks where g == .safeToClose || c.outcome != .pass {
-                        print("      \(mark[c.outcome]!) \(c.title): \(c.detail)  [\(c.source)]")
-                    }
-                }
-            }
-            let stopped = state.sessions.values.filter { $0.phase == .yourTurn }
-            let verdicts = stopped.map { state.checks($0, now: now, rules: rules) }
-            let safe = verdicts.filter(Check.allPass).count
-            let unknownOnly = verdicts.filter { v in !Check.allPass(v) && !v.contains { $0.outcome == .fail } }.count
-            print("\nstopped \(stopped.count): safe \(safe), blocked by a failing check \(verdicts.filter { $0.contains { $0.outcome == .fail } }.count), blocked only by unknowns \(unknownOnly)")
-            for k in Check.Kind.allCases {
-                let f = verdicts.filter { $0.contains { $0.kind == k && $0.outcome == .fail } }.count
-                let u = verdicts.filter { $0.contains { $0.kind == k && $0.outcome == .unknown } }.count
-                if f + u > 0 { print("  \(k.title): \(f) fail, \(u) unknown") }
-            }
-            let reads = state.judgments.values
-            print("model reads cached \(reads.count), cost $\(String(format: "%.4f", reads.compactMap(\.costUSD).reduce(0, +)))")
-            for a in state.accounts {
-                print("\(a.id): 5h \(a.fiveHour.map { "\(Int($0.usedPercent))%" } ?? "-") wk \(a.week.map { "\(Int($0.usedPercent))%" } ?? "-")")
-            }
+            StateAudit.state(args: args, config: config)
         default:
-            FileHandle.standardError.write("usage: Maxwell [install-hooks | uninstall-hooks | accounts | state [--no-judge]]\n".data(using: .utf8)!)
+            FileHandle.standardError.write("usage: Maxwell [install-hooks | uninstall-hooks | accounts | state [--no-judge] | watch [name prefix]]\n".data(using: .utf8)!)
             return 2
         }
         return 0
