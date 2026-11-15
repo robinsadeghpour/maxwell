@@ -193,8 +193,20 @@ You need Xcode 27 with the Metal Toolchain (`xcodebuild -downloadComponent Metal
 ./build.sh          # builds Maxwell Dev (first run also builds Ghostty, ~3 min)
 ./build.sh test     # reducer and verdict tests, from recorded real hook payloads
 ./measure.sh        # performance budgets, fails loudly
-./release.sh 0.1.13 "What changed"  # tests, builds, signs, notarizes, publishes the DMG and zip
 ```
+
+### Releasing
+
+Releases are built by GitHub Actions on a clean Mac, one at a time. Add the version to the website changelog (`site/src/changelog.mjs`, then `node site/src/build.mjs`), push `v1`, and start the **Release** workflow from the Actions tab or with:
+
+```sh
+gh workflow run release.yml -R robinsadeghpour/maxwell -f version=0.1.13 -f notes="What changed"
+gh run watch -R robinsadeghpour/maxwell "$(gh run list -R robinsadeghpour/maxwell -w release.yml -L 1 --json databaseId -q '.[0].databaseId')"
+```
+
+It runs `release.sh` from `v1`: tests, builds, signs with the Developer ID certificate, has Apple notarize the app and the DMG, pushes `main` and publishes the DMG and zip. A version that's already released is refused, and a second release waits for the first. GhosttyKit is cached, so zig only runs when its pinned commit changes. `dry_run` only tests and builds.
+
+The certificate and the notary key are secrets of the repo's `release` environment, which only `v1` and `main` can use. `packaging/ci/set-release-secrets.sh` puts them there. `./release.sh 0.1.13 "What changed"` still releases from a Mac set up as the top of `release.sh` describes.
 
 **Maxwell Dev** is a separate app with its own ID, name and a "dev" badge on its Dock icon. It works on your real sessions and config, but quitting, crashing or relaunching it never touches the Maxwell you work in. The released Maxwell changes only when you click **Restart to update**.
 

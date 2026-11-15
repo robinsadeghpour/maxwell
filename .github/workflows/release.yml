@@ -1,0 +1,143 @@
+# Builds, signs, notarizes and publishes a Maxwell release from v1, the same way release.sh does
+# on a Mac (it runs release.sh). Start it from the Actions tab, or:
+#   gh workflow run release.yml -R robinsadeghpour/maxwell -f version=0.1.28 -f notes="What changed"
+# README › Develop › Releasing has the whole recipe.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, without the v (it needs a website changelog entry)
+        required: true
+      notes:
+        description: Release notes, in plain words
+        required: true
+      dry_run:
+        description: Only test and build; don't sign, notarize or publish
+        type: boolean
+        default: false
+
+# One release at a time. A second one waits for the first; release.sh then refuses a version
+# that is already tagged, so two attempts can't publish the same version.
+concurrency:
+  group: ${{ inputs.dry_run && 'release-dry-run' || 'release' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    # The signing certificate and notary key are secrets of this environment, which only runs
+    # started on v1 or main can use. Either way the release is built from v1.
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: v1
+          fetch-depth: 0
+
+      - name: Use Xcode 27
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_27*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      # GhosttyKit takes zig ~10 minutes to build, and only changes when build.sh's pin does.
+      - name: Read the GhosttyKit pin
+        id: ghostty
+        run: echo "commit=$(sed -n 's/^GHOSTTY_COMMIT=//p' build.sh)" >> "$GITHUB_OUTPUT"
+      - name: Restore GhosttyKit
+        id: ghostty-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            vendor/ghostty
+            !vendor/ghostty/.zig-cache
+          key: ghosttykit-${{ runner.os }}-${{ runner.arch }}-${{ steps.ghostty.outputs.commit }}-zig0.17.1
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        if: steps.ghostty-cache.outputs.cache-hit != 'true'
+        with:
+          version: 0.17.1
+      - name: Build GhosttyKit
+        if: steps.ghostty-cache.outputs.cache-hit != 'true'
+        run: |
+          xcodebuild -downloadComponent MetalToolchain
+          ./build.sh ghostty
+      - name: Save GhosttyKit
+        if: steps.ghostty-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            vendor/ghostty
+            !vendor/ghostty/.zig-cache
+          key: ${{ steps.ghostty-cache.outputs.cache-primary-key }}
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: Test and build (dry run)
+        if: inputs.dry_run
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          node site/src/build.mjs --check "$VERSION" || echo "(no changelog entry for $VERSION yet; a real release would stop here)"
+          ./build.sh test
+          ./build.sh release "$VERSION"
+          ditto -c -k --keepParent build/release/Maxwell.app "build/release/Maxwell-v$VERSION.zip"
+          uvx dmgbuild -s packaging/dmg/settings.py -D app=build/release/Maxwell.app Maxwell "build/release/Maxwell-v$VERSION.dmg"
+          ls -la build/release
+
+      - name: Put the signing certificate in a keychain
+        if: ${{ !inputs.dry_run }}
+        env:
+          CERT_P12: ${{ secrets.MAXWELL_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MAXWELL_CERT_PASSWORD }}
+        run: |
+          KC=$RUNNER_TEMP/release.keychain-db
+          KC_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KC_PASSWORD" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KC_PASSWORD" "$KC"
+          base64 -D <<<"$CERT_P12" > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
+          # The intermediate that issues Developer ID certificates, so codesign can build the chain.
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASSWORD" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$KC" | grep -q "Developer ID Application" || { echo "No Developer ID Application identity in MAXWELL_CERT_P12."; exit 1; }
+
+      - name: Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes }}
+          NOTARY_KEY: ${{ secrets.MAXWELL_NOTARY_KEY }}
+          MAXWELL_NOTARY_KEY_ID: ${{ secrets.MAXWELL_NOTARY_KEY_ID }}
+          MAXWELL_NOTARY_ISSUER: ${{ secrets.MAXWELL_NOTARY_ISSUER }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export MAXWELL_NOTARY_KEY=$RUNNER_TEMP/notary.p8
+          printf '%s\n' "$NOTARY_KEY" > "$MAXWELL_NOTARY_KEY"
+          ./release.sh "$VERSION" "$NOTES"
+
+      - name: Check the release the updater's way
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir "$RUNNER_TEMP/check" && cd "$RUNNER_TEMP/check"
+          gh release download "v$VERSION" -R "$GITHUB_REPOSITORY" -p '*.zip' -p 'Maxwell.dmg'
+          ditto -x -k Maxwell-v*.zip .
+          defaults read "$PWD/Maxwell.app/Contents/Info.plist" CFBundleShortVersionString | grep -qx "$VERSION"
+          xcrun stapler validate Maxwell.app
+          spctl --assess --type execute -v Maxwell.app
+          xcrun stapler validate Maxwell.dmg
+
+      - name: Remove the keychain
+        if: always() && !inputs.dry_run
+        run: security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
