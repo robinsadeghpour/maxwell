@@ -199,8 +199,8 @@ def main():
 
 {pins}
 rail = shown
-font-size = 14
-terminal-font-size = 14
+font-size = 13
+terminal-font-size = 11
 project-logo-style = engraved
 theme-dark = graphite
 appearance = dark
