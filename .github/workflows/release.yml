@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-26
+    runs-on: xcode-27  # macOS with Xcode 27 (GitHub preview image)
     timeout-minutes: 90
     # The signing certificate and notary key are secrets of this environment, which only runs
     # started on v1 or main can use. Either way the release is built from v1.
