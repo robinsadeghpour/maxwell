@@ -2,7 +2,7 @@ import Foundation
 
 /// Everything that changes AppState. Hook lines and usage samples come from the event
 /// log; agent snapshots and done checks come from the app's own probes. Model reads,
-/// closes, reopens, "Not safe" marks and project moves are Maxwell's own lines in the same log,
+/// closes, reopens, marks, pins and project moves are Maxwell's own lines in the same log,
 /// so they survive a restart and leave an audit trail.
 enum Event: Equatable {
     case hook(Hook)
@@ -13,7 +13,10 @@ enum Event: Equatable {
     case judged(hash: String, Judgment)
     case closed(ClosedSession)
     case reopened(SessionID, at: Date)
-    case markedNotSafe(SessionID, at: Date)
+    /// You put a session in a group by hand ("Not safe" marks it Your turn); nil hands it back to Maxwell.
+    case marked(SessionID, Mark?, at: Date)
+    /// You pinned (true) or unpinned a session.
+    case pinned(SessionID, Bool)
     /// You moved a session to another project; nil moves it back to its folder's project.
     case movedToProject(SessionID, String?)
     /// What the session's transcript points at (see `ProjectHints`); nil when nothing stands out.

@@ -96,10 +96,13 @@ func reduce(into s: inout AppState, _ event: Event) {
         }
         s.closed[id] = nil
 
-    case .markedNotSafe(let id, let at):
-        s.sessions[id]?.markedNotSafeAt = at
+    // Kept by id, not on the session: a mark, pin, move or dismissal can fold before the session's first hook.
+    case .marked(let id, let mark, let at):
+        s.marks[id] = mark.map { Marked(mark: $0, at: at) }
 
-    // Kept by id, not on the session: a move or dismissal can fold before the session's first hook.
+    case .pinned(let id, let on):
+        if on { s.pins.insert(id) } else { s.pins.remove(id) }
+
     case .movedToProject(let id, let project):
         s.moved[id] = project
 

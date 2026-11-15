@@ -16,7 +16,7 @@ struct Check: Equatable {
             case .worktree: return "worktree clean"
             case .pushed: return "everything pushed"
             case .pr: return "PR merged or none"
-            case .marked: return "not marked unsafe"
+            case .marked: return "your mark"
             case .plugin: return "plugin check"
             case .judge: return "model read: finished"
             }
@@ -121,8 +121,10 @@ extension AppState {
 
         repoChecks(s, into: &out)
 
-        if let m = s.markedNotSafeAt, m >= s.lastEventAt {
-            add(.marked, .fail, "you marked it not safe \(Reply.span(now.timeIntervalSince(m))) ago", "Not safe button")
+        if let m = mark(s) {
+            let ago = Reply.span(now.timeIntervalSince(m.at))
+            if m.mark == .safe { add(.marked, .pass, "you marked it safe to close \(ago) ago", "your mark") }
+            else { add(.marked, .fail, "you moved it to \(m.mark.group.title) \(ago) ago", "your mark") }
         }
 
         out += pluginChecks(s)
