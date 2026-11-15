@@ -17,18 +17,9 @@ enum HookInstaller {
 
     static func install(accounts: [Account], bundledHook: URL) throws -> Report {
         var r = Report()
-        let fm = FileManager.default
-        try fm.createDirectory(at: hookBinary.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let current = try? Data(contentsOf: hookBinary), bundled = try Data(contentsOf: bundledHook)
-        if current != bundled {
-            let tmp = hookBinary.appendingPathExtension("tmp")
-            try bundled.write(to: tmp)
-            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmp.path)
-            _ = try fm.replaceItemAt(hookBinary, withItemAt: tmp)
-            r.add("hook binary: \(hookBinary.path) (updated)")
-        } else {
-            r.add("hook binary: \(hookBinary.path) (current)")
-        }
+        try FileManager.default.createDirectory(at: hookBinary.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let updated = try copyBinary(bundledHook)
+        r.add("hook binary: \(hookBinary.path) (\(updated ? "updated" : "current"))")
         for file in settingsFiles(accounts) {
             try edit(file, report: &r) { addHooks(&$0) }
         }
@@ -36,6 +27,24 @@ enum HookInstaller {
             try editText(script, report: &r) { addTap($0) }
         }
         return r
+    }
+
+    /// After an app update: brings an installed hook up to the bundled one. Never installs it.
+    static func refreshBinary(bundledHook: URL) {
+        guard FileManager.default.fileExists(atPath: hookBinary.path) else { return }
+        _ = try? copyBinary(bundledHook)
+    }
+
+    /// Replaces the installed binary when it differs from the bundled one; true if it did.
+    private static func copyBinary(_ bundledHook: URL) throws -> Bool {
+        let fm = FileManager.default
+        let current = try? Data(contentsOf: hookBinary), bundled = try Data(contentsOf: bundledHook)
+        guard current != bundled else { return false }
+        let tmp = hookBinary.appendingPathExtension("tmp")
+        try bundled.write(to: tmp)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmp.path)
+        _ = try fm.replaceItemAt(hookBinary, withItemAt: tmp)
+        return true
     }
 
     static func uninstall(accounts: [Account]) throws -> Report {

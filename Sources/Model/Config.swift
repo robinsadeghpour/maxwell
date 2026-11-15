@@ -50,6 +50,8 @@ struct Config: Equatable {
     var safeAfter: TimeInterval = 2 * 3600
     /// The final model read of a candidate's last reply. Off: nothing is ever safe to close.
     var judge = true
+    /// Sessions are told to end each reply with a status line (Wrap.rule) that Maxwell reads.
+    var wrapLine = true
     /// Sessions Maxwell starts or brings in run with `--dangerously-skip-permissions`. Off: Claude's own default mode.
     var skipPermissions = true
     /// `project = <name> <path glob>` lines, checked before the git-derived project.
@@ -128,6 +130,7 @@ struct Config: Equatable {
             case "idle-after": if let d = duration(value) { c.idleAfter = d }
             case "safe-after": if let d = duration(value) { c.safeAfter = d }
             case "judge": c.judge = !["off", "false"].contains(value)
+            case "wrap-line": c.wrapLine = !["off", "false"].contains(value)
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
             case "project":
                 // project = <name> <path glob>; the name may contain spaces, the glob is the last word.
@@ -244,6 +247,9 @@ struct Config: Equatable {
     # Last step before Safe to close: one small model read (claude -p, haiku, on the account
     # with the most 5-hour room) of the last reply. off = nothing is ever safe to close.
     judge = on
+    # New sessions end every reply with a status line (Safe to close / Not done / Needs you) that
+    # Maxwell shows and checks. off = sessions are not asked for it.
+    wrap-line = on
     # Sessions Maxwell starts or brings in skip every permission prompt (--dangerously-skip-permissions).
     # off = Claude's own default permission mode.
     skip-permissions = on

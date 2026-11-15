@@ -199,6 +199,7 @@ enum Reply: Equatable {
     case statement          // reports; nothing asked, offered or left for him to do
 
     static func phase(after message: String?) -> Phase {
+        if let w = message.flatMap(Wrap.parse), w.state == .needsYou { return .needsYou(w.note.isEmpty ? "Needs you" : w.note) }
         switch message.map(classify) {
         case .question(let q)?: return .needsYou(q)
         case .limitHit?: return .limited(nil)
@@ -209,6 +210,7 @@ enum Reply: Equatable {
     /// Looks at the last few paragraphs, skipping trailers sessions often end with
     /// ("Linear: …", "Sources: …"), so a question above them still counts.
     static func classify(_ message: String) -> Reply {
+        let message = Wrap.stripped(message)
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("You've hit your") && trimmed.contains("limit") && trimmed.count < 200 { return .limitHit }
         let paragraphs = message.components(separatedBy: "\n\n")

@@ -99,10 +99,14 @@ final class SessionPane: MXView {
             banner.configure(group: group, text: "New session · type the first prompt below", tint: { $0.fg3 })
         case .yourTurn, .idle:
             let offer: String? = { if case .offer(let o)? = s.lastMessage.map(Reply.classify) { return o }; return nil }()
-            let text = offer.map { "Your turn · \($0)" } ?? "Your turn · not safe to close: " + blockers.joined(separator: " · ")
+            let wrap = s.lastMessage.flatMap(Wrap.parse)
+            let open = wrap.flatMap { $0.state == .open ? "Not done" + ($0.note.isEmpty ? "" : " · " + $0.note) : nil }
+            let text = offer.map { "Your turn · \($0)" } ?? open ?? "Your turn · not safe to close: " + blockers.joined(separator: " · ")
             banner.configure(group: group, text: text, tint: { $0.chk })
         case .safeToClose:
-            banner.configure(group: group, text: "Safe to close · every check passed; → on its row lists them", tint: { $0.safe })
+            let note = s.lastMessage.flatMap(Wrap.parse).flatMap { $0.state == .safe && !$0.note.isEmpty ? $0.note : nil }
+            let text = note.map { "Safe to close · \($0) · every check passed" } ?? "Safe to close · every check passed; → on its row lists them"
+            banner.configure(group: group, text: text, tint: { $0.safe })
             banner.add(MXButton("Not safe") { [weak self] in self?.delegate?.notSafe(s.id) })
             if case .background = s.reach {
                 banner.add(MXButton("Close session", hint: "⇧⌘⌫", primary: true) { [weak self] in self?.delegate?.close(s.id) })

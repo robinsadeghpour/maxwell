@@ -41,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         GhosttyRuntime.shared.start(configText: MainWindowController.ghosttyConfig(theme, fontSize: CGFloat(config.terminalFontSize)))
         mark("ghostty ready")
 
+        Wrap.publish(config.wrapLine)
+        if Updater.isRelease { HookInstaller.refreshBinary(bundledHook: bundledHookURL()) }
         store = Store(config: config)
         mark("event log folded (\(store.state.sessions.count) sessions)")
         main = MainWindowController(store: store)
@@ -118,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         var c = Config.load()
         if let t = arg("--theme") { c.themeOverride = t }
         guard c != store.config || Look.theme.name != c.theme(systemDark: SystemAppearance.isDark) else { return }
+        if c.wrapLine != store.config.wrapLine { Wrap.publish(c.wrapLine) }
         store.reloadConfig(c)
         main.applyLook(c)
         IconArt.choice = c.appIcon

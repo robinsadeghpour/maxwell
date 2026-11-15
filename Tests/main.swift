@@ -74,7 +74,7 @@ let later = 6.0 + 7200 + 60
 var safe = evidence(s, "s1", at: later)
 check(groupOf(safe, "s1", at: later) == .safeToClose, "every check passing -> safe to close")
 check(verdictOf(safe, "s1", at: later).allSatisfy { !$0.source.isEmpty && !$0.detail.isEmpty }, "every check names what it found and where")
-check(Set(verdictOf(safe, "s1", at: later).map(\.kind)) == Set(Check.Kind.allCases).subtracting([.marked, .plugin]), "the checklist has every check")
+check(Set(verdictOf(safe, "s1", at: later).map(\.kind)) == Set(Check.Kind.allCases).subtracting([.marked, .plugin, .wrap]), "the checklist has every check")
 check(groupOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180) == .yourTurn, "3 minutes after the reply is your turn, not safe")
 check(outcome(verdictOf(evidence(s, "s1", at: 6 + 180), "s1", at: 6 + 180), .quiet) == .fail, "quiet fails before safe-after")
 
@@ -385,6 +385,34 @@ roundTrip.sessions["s1"]!.listedStatus = .waiting("x")
 if let (st, sess, now, r) = FalseSafe.decode((try? JSONSerialization.jsonObject(with: JSONSerialization.data(withJSONObject: FalseSafe.encode(safe.sessions["s1"]!, in: safe, now: t0.addingTimeInterval(later), rules: rules)))) as? [String: Any] ?? [:]) {
     check(st.group(sess, now: now, rules: r) == .safeToClose && st.checks(sess, now: now, rules: r).map(\.outcome) == verdictOf(safe, "s1", at: later).map(\.outcome), "a false-safe fixture rebuilds the verdict it recorded")
 } else { check(false, "false-safe fixture encodes and decodes") }
+
+// The status line a session ends its reply with.
+check(Wrap.parse("Done.\n\n**Safe to close** · v0.1.17 shipped\n") == Wrap(state: .safe, note: "v0.1.17 shipped"), "bold safe line with a middle dot")
+check(Wrap.parse("Not done - PR #25 waiting on CI") == Wrap(state: .open, note: "PR #25 waiting on CI"), "plain line with a hyphen")
+check(Wrap.parse("🟡 __needs you__: pick a name") == Wrap(state: .needsYou, note: "pick a name"), "glyph prefix, underscores, any case, a colon")
+check(Wrap.parse("✅ `Safe to close` — merged") == Wrap(state: .safe, note: "merged"), "backticks and an em dash")
+check(Wrap.parse("**Safe to close**") == Wrap(state: .safe, note: ""), "no note")
+check(Wrap.parse("Not done | waiting on review")?.note == "waiting on review", "pipe separator")
+check(Wrap.parse("Not done · " + String(repeating: "x", count: 300))?.note.count == 120, "the note is capped")
+check(Wrap.parse("**Safe to close** · shipped\nOne more thing.") == nil, "only the last line counts")
+check(Wrap.parse("All merged and deployed.") == nil, "an unrelated last line is no status line")
+check(Wrap.parse("Needs your review first") == nil, "a longer word is not the state")
+check(Wrap.stripped("Merged.\n\n**Not done** · want me to tag it?") == "Merged.", "stripped drops the status line")
+check(Wrap.stripped("Merged. Want me to tag it?") == "Merged. Want me to tag it?", "stripped keeps a message without one")
+check(Reply.classify("Shipped v0.1.17.\n\n**Not done** · still waiting on CI, want me to watch it?") == .statement, "the status line is never a question or an offer")
+check(Reply.classify("Shipped.\n\nWant me to tag it?\n\n**Not done** · tag") == .question("Want me to tag it?"), "a question above the status line still counts")
+check(Reply.phase(after: "Built it.\n\n**Needs you** · pick a name for the setting") == .needsYou("pick a name for the setting"), "needs you from the status line")
+check(Reply.phase(after: "Built it.\n\n**Needs you**") == .needsYou("Needs you"), "needs you without a note")
+check(Reply.phase(after: "Built it.\n\n**Not done** · CI running") == .yourTurn, "not done is your turn")
+var wrapped = safe
+wrapped.sessions["s1"]!.lastMessage = "Shipped.\n\n**Safe to close** · v0.1.17 shipped"
+wrapped = reduce(wrapped, .judged(hash: Reply.hash(wrapped.sessions["s1"]!.lastMessage!), Judgment(verdict: .finished, at: t0, account: "work", costUSD: nil)))
+check(verdictOf(wrapped, "s1", at: later).first { $0.kind == .wrap } == Check(kind: .wrap, outcome: .pass, detail: "v0.1.17 shipped", source: "session's status line"), "safe status line passes")
+check(groupOf(wrapped, "s1", at: later) == .safeToClose, "a safe status line plus every check is safe to close")
+wrapped.sessions["s1"]!.lastMessage = "Shipped.\n\n**Not done** · PR #25 waiting on CI"
+wrapped = reduce(wrapped, .judged(hash: Reply.hash(wrapped.sessions["s1"]!.lastMessage!), Judgment(verdict: .finished, at: t0, account: "work", costUSD: nil)))
+check(verdictOf(wrapped, "s1", at: later).first { $0.kind == .wrap }.map { [$0.outcome.rawValue, $0.detail] } == ["fail", "Not done · PR #25 waiting on CI"], "not done fails the status line check")
+check(groupOf(wrapped, "s1", at: later) != .safeToClose, "a session that says not done is never safe")
 
 logoTests()
 artifactTests()

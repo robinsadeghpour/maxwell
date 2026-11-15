@@ -1,6 +1,7 @@
 // maxwell-hook: appends one line to ~/.local/state/maxwell/events.jsonl.
 //
-//   maxwell-hook               Claude Code hook: stdin is the hook payload.
+//   maxwell-hook               Claude Code hook: stdin is the hook payload. On
+//                              SessionStart it also prints <state dir>/session-context.md.
 //   maxwell-hook --statusline  status-line tap: stdin is the status-line JSON;
 //                              keeps rate_limits and context_window, at most once
 //                              per 30 s per account.
@@ -110,6 +111,20 @@ static int usage_due(const char *dir, const char *config_dir) {
     return 1;
 }
 
+// Claude Code adds SessionStart stdout to the session's context: Maxwell's rules for it.
+static void print_context(const char *dir) {
+    char path[1100], buf[16384];
+    snprintf(path, sizeof path, "%s/session-context.md", dir);
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return;
+    ssize_t r;
+    while ((r = read(fd, buf, sizeof buf)) > 0) {
+        ssize_t wr = write(1, buf, (size_t)r);
+        if (wr < 0) break;
+    }
+    close(fd);
+}
+
 int main(int argc, char **argv) {
     int statusline = argc > 1 && strcmp(argv[1], "--statusline") == 0;
     const char *home = getenv("HOME");
@@ -155,10 +170,16 @@ int main(int argc, char **argv) {
     if (fd < 0) {
         ensure_dir(dir);
         fd = open(log, O_WRONLY | O_APPEND | O_CREAT, 0644);
-        if (fd < 0) return 0;
     }
-    ssize_t wr = write(fd, line, (size_t)len);
-    (void)wr;
-    close(fd);
+    if (fd >= 0) {
+        ssize_t wr = write(fd, line, (size_t)len);
+        (void)wr;
+        close(fd);
+    }
+
+    const char *ev = 0;
+    size_t evl = 0;
+    if (!statusline && value_span(payload, "hook_event_name", &ev, &evl) && evl == 14 && memcmp(ev, "\"SessionStart\"", 14) == 0)
+        print_context(dir);
     return 0;
 }

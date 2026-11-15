@@ -5,13 +5,14 @@ import CryptoKit
 /// passes; a check that could not find out is unknown, and unknown is never safe.
 struct Check: Equatable {
     enum Kind: String, CaseIterable {
-        case listed, idle, hooks, reply, quiet, worktree, pushed, pr, marked, plugin, judge
+        case listed, idle, hooks, reply, wrap, quiet, worktree, pushed, pr, marked, plugin, judge
         var title: String {
             switch self {
             case .listed: return "still running"
             case .idle: return "not busy"
             case .hooks: return "hooks report it"
             case .reply: return "reply hands nothing back"
+            case .wrap: return "session says safe to close"
             case .quiet: return "quiet"
             case .worktree: return "worktree clean"
             case .pushed: return "everything pushed"
@@ -108,6 +109,10 @@ extension AppState {
             case .limitHit?: add(.reply, .fail, "stopped at a usage limit", replySource)
             case .statement?: add(.reply, .pass, "reports, asks and offers nothing", replySource)
             }
+        }
+        if let w = s.lastMessage.flatMap(Wrap.parse) {
+            if w.state == .safe { add(.wrap, .pass, w.note.isEmpty ? "safe to close" : w.note, "session's status line") }
+            else { add(.wrap, .fail, w.state.rawValue + (w.note.isEmpty ? "" : " · " + w.note), "session's status line") }
         }
 
         let quiet = now.timeIntervalSince(s.lastEventAt)

@@ -70,11 +70,12 @@ Closing a session that's still working, or that's waiting on you, costs you work
 
 1. **Unknown is never safe.** If Maxwell can't check something, the session isn't safe.
 2. **It needs proof of a finished task.** Nothing is running, including background tasks and subagents. The session has been quiet for 2 hours. Its last message asks nothing and offers nothing. Git is clean and pushed, and the PR is merged if there is one.
-3. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
-4. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" asks you to confirm and shows the list first.
-5. **Checked again at the moment of closing.** If anything changed, that session is skipped.
-6. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days. You can close any session yourself too, from its right-click menu or ⇧⌘⌫. If it isn't safe yet, Maxwell says what's still open and asks first.
-7. **"Not safe" teaches it.** Mark a wrong call and it becomes a test case, so the mistake can't repeat.
+3. **The session says where it stands.** Every session is told to end each reply with one status line: **Safe to close**, **Not done** or **Needs you**, and a few words. Maxwell shows it on the session, and "Not done" or "Needs you" keeps it from being safe. `wrap-line = off` stops asking for it.
+4. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
+5. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" asks you to confirm and shows the list first.
+6. **Checked again at the moment of closing.** If anything changed, that session is skipped.
+7. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days. You can close any session yourself too, from its right-click menu or ⇧⌘⌫. If it isn't safe yet, Maxwell says what's still open and asks first.
+8. **"Not safe" teaches it.** Mark a wrong call and it becomes a test case, so the mistake can't repeat.
 
 Run `Maxwell state` to audit every session and see which check holds each one back.
 
@@ -141,7 +142,7 @@ Everything stays on your machine. Maxwell sends nothing anywhere, apart from the
 | Hook entries for 6 events | each account's `settings.json`, backed up next to it first | `Maxwell uninstall-hooks` restores them exactly |
 | One line that samples usage | your status-line script, backed up first | same |
 | The hook program (C, ~2 ms, always exits 0) | `~/.local/share/maxwell/` | delete the folder |
-| Event log | `~/.local/state/maxwell/events.jsonl` | delete the folder |
+| Event log, and the status-line rule the hook gives new sessions | `~/.local/state/maxwell/` | delete the folder |
 | Config | `~/.config/maxwell/config` | delete the file |
 | claude.ai logins, one per account | Maxwell's own WebKit storage | Settings › Accounts › Sign out |
 | Your plugins | `~/.config/maxwell/plugins/` | delete the folder |
@@ -162,6 +163,7 @@ project-logo-style = engraved # engraved | pixel | monogram
 safe-after = 2h               # quiet time before a session can be safe to close
 idle-after = 24h              # quiet time before a stopped session folds into Idle
 judge = on                    # off skips the model read, so nothing is ever safe
+wrap-line = on                # sessions end each reply with a status line Maxwell reads
 notify = true
 auto-open = true
 artifacts = viewer            # viewer (beside the session, signed in) | browser
