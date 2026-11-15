@@ -33,7 +33,8 @@
 - [Keyboard shortcuts](https://www.runmaxwell.com/docs/keyboard-shortcuts): Every action has a key, and every key can be changed in Settings › Keys or with a keybind line.
 - [Configuration](https://www.runmaxwell.com/docs/configuration): One plain text file, one key = value per line. Maxwell reloads it the moment you save, and the Settings window writes the same file.
 - [Command line](https://www.runmaxwell.com/docs/command-line): The Maxwell binary answers a few commands in a terminal, for auditing and undoing.
-- [What Maxwell touches](https://www.runmaxwell.com/docs/privacy): Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads, which go through your own Claude account, and what plugins you turn on.
+- [What Maxwell touches](https://www.runmaxwell.com/docs/privacy): Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads, which go through your own Claude account, what plugins you turn on, and anonymous usage numbers if you agree to share them.
+- [Usage numbers](https://www.runmaxwell.com/docs/usage-stats): If you agree, Maxwell sends a few anonymous counts: which version you run and which features you use. It's off until you say yes, and this page lists every event.
 
 ## Changelog
 

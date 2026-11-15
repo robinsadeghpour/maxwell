@@ -15,7 +15,7 @@ export const sections = [
   { title: "Plugins", blurb: "Linear and Slack ship with Maxwell. Anyone can write another.",
     pages: ["linear", "slack", "write-a-plugin"] },
   { title: "Reference", blurb: "Every key, every config line, and what Maxwell touches on your Mac.",
-    pages: ["keyboard-shortcuts", "configuration", "command-line", "privacy"] },
+    pages: ["keyboard-shortcuts", "configuration", "command-line", "privacy", "usage-stats"] },
 ];
 
 export const pages = {
@@ -414,7 +414,7 @@ linear.sync = suggest</code></pre>
 
   privacy: {
     title: "What Maxwell touches",
-    lede: "Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads, which go through your own Claude account, and what plugins you turn on.",
+    lede: "Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads, which go through your own Claude account, what plugins you turn on, and anonymous usage numbers if you agree to share them.",
     figure: fig.pipeline("Hooks write one log. One pure reducer turns it into the state of every session."),
     body: `
 <h2>Files and settings</h2>
@@ -436,6 +436,32 @@ linear.sync = suggest</code></pre>
 <li><strong>Haiku reads</strong>, through your own Claude account: the final Safe to close check, and names for sessions without a readable title.</li>
 <li><strong>Linear</strong>, once you add a key: reads tickets and makes the moves you accept.</li>
 <li><strong>Slack</strong>, once you add a token: reads your DMs, mentions and threads.</li>
+<li><strong>Usage numbers</strong>, only if you say yes: a few anonymous counts, all listed in <a href="/docs/usage-stats">Usage numbers</a>.</li>
 </ul>`,
+  },
+
+  "usage-stats": {
+    title: "Usage numbers",
+    lede: "If you agree, Maxwell sends a few anonymous counts: which version you run and which features you use. It's off until you say yes, and this page lists every event.",
+    body: `
+<h2>Turning it on or off</h2>
+<p>A while after launch, Maxwell asks once: <strong>Share anonymous usage numbers?</strong> Both answers are saved, so it doesn't ask again. To change your answer later, use <strong>Settings › General › Privacy › Share usage numbers</strong>, or set it in the config:</p>
+<pre><code>usage-stats = on              <span class="c"># on | off; unset: Maxwell asks once</span></code></pre>
+<p>Dev builds you compile yourself never send anything, whatever the setting says.</p>
+<h2>What identifies you</h2>
+<p>Only a random id, made when you turn sharing on and stored in <code>~/.local/state/maxwell/install-id</code>. Turning sharing off deletes it, and turning it back on makes a new one. PostHog keeps no profile for that id and doesn't look up a location from your IP address.</p>
+<h2>Every event</h2>
+<p>Every event also carries <code>version</code>, the Maxwell version (for example <code>0.1.30</code>).</p>
+<table><thead><tr><th>Event</th><th>When</th><th>Properties</th></tr></thead><tbody>
+<tr><td><code>app_active</code></td><td>At most once a day while Maxwell runs</td><td><code>macos</code>: the major version, like <code>15</code><br><code>accounts</code>: how many Claude accounts, as 1, 2, 3-5 or 6+<br><code>plugins</code>: which built-in plugins are on (<code>linear</code>, <code>slack</code>)<br><code>own_plugins</code>: how many plugins you added yourself, as 0, 1, 2, 3-5 or 6+</td></tr>
+<tr><td><code>session_started</code></td><td>You start a session in Maxwell</td><td>none</td></tr>
+<tr><td><code>session_attached</code></td><td>Maxwell opens a session's terminal</td><td>none</td></tr>
+<tr><td><code>session_brought_in</code></td><td>A terminal session moves into Maxwell</td><td>none</td></tr>
+<tr><td><code>safe_to_close_used</code></td><td>You close sessions from the Safe to close sheet</td><td><code>closed</code>: how many closed, as 1, 2, 3-5 or 6+</td></tr>
+</tbody></table>
+<h2>What's never sent</h2>
+<p>Anything your sessions say, session or project names, file paths, account names or emails, plugin settings, tokens, or the names of plugins you added yourself. Counts are rounded into the ranges above.</p>
+<h2>Where it goes</h2>
+<p>To a PostHog project in the EU used only for Maxwell. The numbers show how many installs run each version and which features get used, so work goes where it helps. The code that sends them is <a href="${GH}/blob/main/Sources/Model/Usage.swift">Usage.swift</a> and <a href="${GH}/blob/main/Sources/App/Telemetry.swift">Telemetry.swift</a>.</p>`,
   },
 };
