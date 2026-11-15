@@ -533,6 +533,7 @@ check(term.isNewestInFolder(term.sessions["t1"]!) && !term.isNewestInFolder(term
 liveStateTests()
 logoTests()
 artifactTests()
+cloudTests()
 pluginTests()
 pluginHostTests()
 linearTests()

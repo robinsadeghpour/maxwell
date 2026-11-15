@@ -121,6 +121,7 @@ enum Origin: Equatable { case maxwell, external }
 enum Reach: Equatable {
     case background(shortId: String)   // `claude attach <shortId>`
     case elsewhere(pid: Int?)          // interactive in another terminal: shown read-only
+    case cloud(url: String)            // on Anthropic's cloud machines: its claude.ai/code page
 }
 
 /// What the session's folder says about unfinished work. Facts only, nil where git could
@@ -267,6 +268,9 @@ struct AppState: Equatable {
     var pluginNames: [PluginID: String] = [:]
     /// Plugins that are on but not running, with why: their checks are unknown.
     var pluginDown: [PluginID: String] = [:]
+    /// Cloud sessions: the folder each started from in Maxwell, and the local session it was sent from.
+    var cloudFolders: [SessionID: String] = [:]
+    var cloudFrom: [SessionID: SessionID] = [:]
 
     func account(_ id: AccountID) -> Account? { accounts.first { $0.id == id } }
 

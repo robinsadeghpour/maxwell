@@ -23,6 +23,10 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
     var onState: ((State) -> Void)?
     /// "Open in browser": the account's browser choice.
     var onOpenExternal: ((URL, Account) -> Void)?
+    /// What the page is, in the cards' words: "artifact", or "cloud session" in the session pane.
+    var noun = "artifact"
+    /// The cards offer "Open in browser"; off where the surrounding view already does.
+    var offersBrowser = true
 
     /// Keyed by account and artifact.
     private var webs: [String: WKWebView] = [:]
@@ -188,20 +192,20 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
         web?.isHidden = !(state == .ready || state == .loading || state == .signingIn)
         switch state {
         case .signedOut:
-            card.show(["Sign in to see this artifact.",
+            card.show(["Sign in to see this \(noun).",
                        "It belongs to \(who).",
                        "You sign in once, on claude.ai's own page."],
-                      buttons: [("Sign in to claude.ai", true, { [weak self] in self?.signIn() }), ("Open in browser", false, external)])
+                      buttons: [("Sign in to claude.ai", true, { [weak self] in self?.signIn() })] + (offersBrowser ? [("Open in browser", false, external)] : []))
         case .offline:
-            card.show(["You're offline.", "The artifact loads when the connection is back."],
+            card.show(["You're offline.", "The \(noun) loads when the connection is back."],
                       buttons: [("Try again", true, { [weak self] in self?.load() }), ("Open in browser", false, external)])
         case .noAccess:
-            card.show(["This account can't open the artifact.",
+            card.show(["This account can't open the \(noun).",
                        "Signed in to claude.ai as someone other than \(who),",
-                       "or the artifact was deleted or never shared with it."],
+                       "or the \(noun) was deleted or never shared with it."],
                       buttons: [("Sign in again", true, { [weak self] in self?.switchAccount() }), ("Open in browser", false, external)])
         case .failed(let why):
-            card.show(["The artifact didn't load.", why],
+            card.show(["The \(noun) didn't load.", why],
                       buttons: [("Try again", true, { [weak self] in self?.load() }), ("Open in browser", false, external)])
         default:
             card.hide()

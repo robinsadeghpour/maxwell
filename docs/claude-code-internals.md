@@ -49,3 +49,17 @@ Processes a background session starts are their own "responsible process" for ma
 - Esc ends a turn with no Stop hook; only `status` changes.
 - A hook's stdout on `SessionStart` and on `UserPromptSubmit` (exit 0) is added to the session's context (2.1, 2026-11-15). The hook prints the status-line rule on SessionStart, or on the first prompt of a session that started without it, and records that in `<state dir>/briefed/<session id>`.
 - Stop fires while a background subagent or shell still runs; `status` stays `busy` (subagent) or becomes `shell`.
+
+## Cloud sessions
+
+Seen in 2.1.325. Read in `Sources/ClaudeCode/CloudSessions.swift`, parsed in `Sources/Model/Cloud.swift`.
+
+| What | What Maxwell assumes |
+|---|---|
+| `claude --cloud "<task>"` | Interactive only (with `-p` it refuses), so Maxwell runs it under `/usr/bin/script` for a terminal. Prints `Created cloud session: <title>`, `View: <url>`, `Resume with: claude --teleport <id>`, then exits. In a folder the account hasn't trusted, it stops at the trust dialog: Maxwell asks first. |
+| `claude -p "<text>" --cloud <id>` | Queues a message for the session, prints `Sent to cloud session.`, exits 0. |
+| `claude --cloud <id>` | Attaching a terminal to a cloud session: "not enabled for your account" here, so Maxwell shows the claude.ai/code page instead. |
+| `claude --teleport <id>` | Fetches the session and continues it locally; checks out its branch, so Maxwell runs it in a new worktree under `.claude/worktrees/cloud-<id suffix>`. |
+| Login | Keychain generic password `Claude Code-credentials` for `~/.claude`, `Claude Code-credentials-<first 8 hex of SHA-256 of the config folder>` for others; JSON `claudeAiOauth.accessToken` and `expiresAt` (ms). Read with `/usr/bin/security find-generic-password -s <name> -w`. Maxwell never refreshes it. |
+| `GET https://api.anthropic.com/v1/sessions?beta=true&limit=100` | Headers `Authorization: Bearer`, `anthropic-version: 2023-06-01`, `anthropic-beta: ccr-byoc-2025-07-29`. `data[]`: `environment_kind` (`anthropic_cloud` for cloud sessions, `bridge` for Remote Control ones), `session_status` (`pending`, `running`, `idle`, `needs_answer`, `requires_action`, `paused`, `failed`, `archived`), `post_turn_summary` (`status_category`: `working`, `completed`, `review_ready`, `needs_action`, `blocked`, `failed`; `status_detail`; `needs_action`), `external_metadata.current_branches`, `session_context.sources[].url`, `title`, `created_at`/`updated_at` with microseconds. `session_url` is empty in the list; the page is `https://claude.ai/code/<id>`. |
+| `POST /v1/sessions/<id>/archive?beta=true` | Body `{}`. Archives it; `session_status` becomes `archived`. |

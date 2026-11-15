@@ -9,7 +9,7 @@ export const sections = [
   { title: "Getting started", blurb: "Install Maxwell, connect it to Claude Code and open your first session.",
     pages: ["install", "first-session"] },
   { title: "Sessions", blurb: "How Maxwell sorts sessions, names them, and decides what's safe to close.",
-    pages: ["groups", "safe-to-close", "session-names", "projects", "search"] },
+    pages: ["groups", "safe-to-close", "cloud", "session-names", "projects", "search"] },
   { title: "Workspace", blurb: "Panels, the viewer, artifacts, accounts and themes.",
     pages: ["panels", "viewer", "accounts", "appearance"] },
   { title: "Plugins", blurb: "Linear and Slack ship with Maxwell. Anyone can write another.",
@@ -113,6 +113,40 @@ export const pages = {
 <h2>Tune it</h2>
 <pre><code>judge = on        <span class="c"># off skips the model read, so nothing is ever safe</span></code></pre>
 <p>Run <code>Maxwell state</code> in a terminal to audit every session and see which check holds each one back.</p>`,
+  },
+
+  cloud: {
+    title: "Cloud sessions",
+    lede: "Claude Code can run a session on Anthropic's cloud machines instead of your Mac. Maxwell starts them, lists them with your other sessions, and moves work there and back.",
+    body: `
+<p>A cloud session runs on a fresh Linux machine that clones your repository from GitHub at your branch's last push. It keeps going when your Mac sleeps, and it uses the same plan usage as a session on your Mac. Nothing of it runs on your Mac, so it takes no memory here.</p>
+<h2>What to send there</h2>
+<p>Work that can finish without you, and that tests or CI can check: a fix with a clear plan, a failing test, a dependency bump, a PR waiting on CI. Keep work on your Mac when it needs your eyes or your machine: UI you judge by looking at it, the iOS Simulator, local services and secrets, or a Mac app such as Maxwell itself. Cloud machines run Linux.</p>
+<h2>Start one</h2>
+<ol class="steps">
+<li>Press ${k("⌥ ⌘ N")}, or ${k("⌘ N")} and then <strong>Cloud</strong> (${k("⌥ ⌘ ↑")}).</li>
+<li>Pick the project and the account, and write the task. A cloud session needs one to start.</li>
+<li>Press ${k("⏎")}. Maxwell runs <code>claude --cloud "&lt;task&gt;"</code> in the project's folder and opens the session.</li>
+</ol>
+<p class="note">Push your branch first. Commits that aren't pushed and uncommitted changes don't go along; with Cloud picked, the panel says so under the project before you start. A folder Claude Code hasn't been allowed to work in yet asks first, as it does for a session on your Mac.</p>
+<h2>Send a session there</h2>
+<p>When a session on your Mac has a plan and the rest is work it can do alone, choose <strong>Session › Send to Cloud…</strong> (${k("⌥ ⌘ ↑")}). Maxwell asks the session to commit, push its branch and write a short brief: the goal, what's done, what's left and how to check it. A cloud session starts from that brief and the pushed branch, and the session on your Mac stops. <strong>Recently closed</strong> brings it back.</p>
+<p>If the branch isn't pushed, the session asks you something instead of writing the brief, or no brief comes within 10 minutes, nothing moves and the session stays on your Mac.</p>
+<h2>In the list</h2>
+<p>Cloud sessions sit in the same groups as the others, with <strong>cloud</strong> in their second line and the project their repository belongs to. Maxwell reads their state from Claude Code every 20 seconds. A question shows in <strong>Needs you</strong> and sends a notification. A finished turn shows in <strong>Your turn</strong> with Claude's own one-line summary.</p>
+<p>Open one and its claude.ai page shows in the middle pane, signed in to that account, so you can read and reply there. Sign in once per account; Maxwell asks the first time. From the line under the title:</p>
+<ul>
+<li><strong>Open in browser</strong> (${k("⇧ ⌘ O")}): the same page in the account's browser.</li>
+<li><strong>Bring to Mac</strong> (${k("⌥ ⌘ ↓")}): a new terminal runs <code>claude --teleport</code> in a fresh worktree of the project, so your checkout stays as it is. The conversation continues on your Mac.</li>
+<li><strong>Archive…</strong> (${k("⇧ ⌘ ⌫")}): asks, then archives the session. Claude stops in the cloud; the conversation stays readable on claude.ai.</li>
+</ul>
+<p>A cloud session is never <strong>Safe to close</strong>: Maxwell can't look inside the cloud machine's checkout, and unknown is never safe. Archive it when you're done with it.</p>
+<h2>What it needs</h2>
+<ul>
+<li>A claude.ai login in Claude Code on that account (Pro, Max, Team or Enterprise), and GitHub connected for the repository. Run <code>/web-setup</code> once in Claude Code if <code>claude --cloud</code> asks for it.</li>
+<li>Secrets your tests need, set up in the cloud environment on claude.ai/code. Your Mac's <code>.env</code> files don't go along.</li>
+<li>Your personal <code>~/.claude/CLAUDE.md</code>, skills and plugins stay on your Mac. A cloud session reads what the repository commits: its <code>CLAUDE.md</code>, <code>.claude/settings.json</code> and skills.</li>
+</ul>`,
   },
 
   "session-names": {
@@ -352,6 +386,9 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⌘ T")}</td><td>New session in the open session's folder or project, on the account with the most room</td></tr>
 <tr><td>${k("⌥ ⌘ T")}</td><td>A new terminal at the top of the sidebar, in the current session's folder</td></tr>
 <tr><td>${k("⌘ N")}</td><td>New session: pick the project (search all your repos) and account. From a terminal: <code>open -a Maxwell .</code></td></tr>
+<tr><td>${k("⌥ ⌘ N")}</td><td>New <a href="/docs/cloud">cloud session</a></td></tr>
+<tr><td>${k("⌥ ⌘ ↑")}</td><td>Send the session to the cloud (asks first)</td></tr>
+<tr><td>${k("⌥ ⌘ ↓")}</td><td>Bring a cloud session to this Mac</td></tr>
 <tr><td>${k("⇧ ⌘ ⌫")}</td><td>Close the session: at once when it's safe, otherwise after saying what's still open</td></tr>
 <tr><td>${k("⇧ ⌘ X")}</td><td>Close all safe (asks first)</td></tr>
 <tr><td>${k("⌘ Z")}</td><td>Undo the last close</td></tr>
@@ -442,7 +479,7 @@ linear.sync = suggest</code></pre>
 
   privacy: {
     title: "What Maxwell touches",
-    lede: "Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads, which go through your own Claude account, and what plugins you turn on.",
+    lede: "Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads and the cloud session listing, which go through your own Claude account, and what plugins you turn on.",
     figure: fig.pipeline("Hooks write one log. One pure reducer turns it into the state of every session."),
     body: `
 <h2>Files and settings</h2>
@@ -462,6 +499,7 @@ linear.sync = suggest</code></pre>
 <h2>What leaves your Mac</h2>
 <ul>
 <li><strong>Haiku reads</strong>, through your own Claude account: the final Safe to close check for replies without a status line, and names for sessions without a readable title.</li>
+<li><strong>Cloud sessions</strong>: every 20 seconds Maxwell asks Claude Code's Sessions API for each account's cloud sessions, signed in with that account's own Claude Code login, which it reads from the Keychain item Claude Code keeps it in. The login is never stored, logged or sent anywhere else.</li>
 <li><strong>Linear</strong>, once you add a key: reads tickets and makes the moves you accept.</li>
 <li><strong>Slack</strong>, once you add a token: reads your DMs, mentions and threads.</li>
 </ul>`,

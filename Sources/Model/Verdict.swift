@@ -3,6 +3,14 @@ import CryptoKit
 
 /// One piece of evidence for "safe to close". A session is safe only when every check
 /// passes; a check that could not find out is unknown, and unknown is never safe.
+extension Check {
+    /// Maxwell can't look inside a cloud machine's checkout, so it never calls a cloud session safe:
+    /// Close archives it when you're done.
+    static func cloud(account: String) -> Check {
+        Check(kind: .listed, outcome: .unknown, detail: "runs in the cloud; Close archives it when you're done", source: "Sessions API (\(account))")
+    }
+}
+
 struct Check: Equatable {
     enum Kind: String, CaseIterable {
         case listed, idle, hooks, reply, wrap, worktree, pushed, pr, marked, plugin, judge
@@ -74,6 +82,7 @@ extension AppState {
         func add(_ k: Check.Kind, _ o: Check.Outcome, _ detail: String, _ source: String) { out.append(Check(kind: k, outcome: o, detail: detail, source: source)) }
 
         let listing = "claude agents --json (\(acct))"
+        if case .cloud = s.reach { return [Check.cloud(account: acct)] }
         if s.phase == .ended {
             add(.listed, .fail, "no longer listed", listing)
         } else if let at = s.parkedAt {

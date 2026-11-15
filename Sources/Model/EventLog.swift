@@ -88,6 +88,13 @@ enum MaxwellRecord {
 
     static func reopened(_ id: SessionID) -> [String: Any] { ["type": "reopened", "session": id] }
 
+    /// A cloud session Maxwell started; `from`: the local session it was sent from.
+    static func cloudStarted(_ id: SessionID, account: AccountID, title: String, cwd: String, from: SessionID?) -> [String: Any] {
+        var f: [String: Any] = ["type": "cloud-started", "session": id, "account": account, "title": title, "cwd": cwd]
+        if let from { f["from"] = from }
+        return f
+    }
+
     static func notSafe(_ s: Session, checks: [Check]) -> [String: Any] {
         ["type": "not-safe", "session": s.id, "hash": s.lastMessage.map(Reply.hash) ?? "", "checks": checks.map(encode)]
     }
@@ -150,6 +157,9 @@ enum MaxwellRecord {
             s.phase = .ended
             return .closed(ClosedSession(at: at, session: s, checks: decode(m["checks"])))
         case "reopened": return .reopened(sid, at: at)
+        case "cloud-started":
+            return .cloudStarted(sid, m["account"] as? String ?? "", title: m["title"] as? String ?? sid, cwd: m["cwd"] as? String ?? "",
+                                 from: m["from"] as? String, at: at)
         case "not-safe": return .marked(sid, .yourTurn, at: at)
         case "marked": return .marked(sid, (m["as"] as? String).flatMap(Mark.init), at: at)
         case "pinned": return .pinned(sid, m["on"] as? Bool ?? false)

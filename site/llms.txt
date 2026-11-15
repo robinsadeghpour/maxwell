@@ -11,6 +11,7 @@
 
 - [Session groups](https://www.runmaxwell.com/docs/groups): Every session is in exactly one group, picked by what it needs from you. You only have to look at the first two.
 - [Safe to close](https://www.runmaxwell.com/docs/safe-to-close): Closing a session that's still working, or waiting on you, costs you work. So Maxwell only calls a session safe when it can prove it.
+- [Cloud sessions](https://www.runmaxwell.com/docs/cloud): Claude Code can run a session on Anthropic's cloud machines instead of your Mac. Maxwell starts them, lists them with your other sessions, and moves work there and back.
 - [Session names](https://www.runmaxwell.com/docs/session-names): A session keeps Claude's title when that title says something. Otherwise Maxwell names the task once, so every row reads at a glance.
 - [Projects and the rail](https://www.runmaxwell.com/docs/projects): Each session belongs to a project, its git repo by default. A rail on the left, like the macOS Dock, switches between them.
 - [Search and actions](https://www.runmaxwell.com/docs/search): One box finds any session, project or action. Press ⌘P, or Shift twice.
@@ -33,7 +34,7 @@
 - [Keyboard shortcuts](https://www.runmaxwell.com/docs/keyboard-shortcuts): Every action has a key, and every key can be changed in Settings › Keys or with a keybind line.
 - [Configuration](https://www.runmaxwell.com/docs/configuration): One plain text file, one key = value per line. Maxwell reloads it the moment you save, and the Settings window writes the same file.
 - [Command line](https://www.runmaxwell.com/docs/command-line): The Maxwell binary answers a few commands in a terminal, for auditing and undoing.
-- [What Maxwell touches](https://www.runmaxwell.com/docs/privacy): Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads, which go through your own Claude account, and what plugins you turn on.
+- [What Maxwell touches](https://www.runmaxwell.com/docs/privacy): Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads and the cloud session listing, which go through your own Claude account, and what plugins you turn on.
 
 ## Changelog
 

@@ -8,6 +8,9 @@ final class Store {
     private(set) var config: Config
     private let log: EventLog
     private var agents: AgentsProbe?
+    /// Cloud sessions and sending local ones there (StoreCloud.swift).
+    var cloud: CloudProbe?
+    var handoffs: [SessionID: CloudHandoff] = [:]
     private lazy var doneChecker = DoneChecker { [weak self] in self?.apply([$0]) }
     private var transcripts: TranscriptWatcher?
     private lazy var hints = ProjectHintScanner { [weak self] in self?.apply($0) }
@@ -48,6 +51,7 @@ final class Store {
         notifyAfter = Date().addingTimeInterval(8)
         log.tail { [weak self] in self?.apply($0) }
         agents = AgentsProbe(accounts: config.accounts) { [weak self] in self?.apply([$0]) }
+        cloud = makeCloudProbe(config.accounts)
         let tw = TranscriptWatcher(accounts: config.accounts)
         tw.cwdFor = { [weak self] id in self?.state.sessions[id]?.cwd }
         tw.onItem = { [weak self] id, item, reload in self?.onViewerItem?(id, item, reload) }
@@ -78,13 +82,14 @@ final class Store {
         for (id, s) in state.sessions {
             let old = before.sessions[id]?.phase
             // A repo check older than the last activity is unknown; take a new one.
-            if s.phase == .yourTurn, old != .yourTurn || (s.doneCheck.map { $0.at < s.lastEventAt } ?? true) { doneChecker.check(s) }
+            if s.phase == .yourTurn, !s.isCloud, old != .yourTurn || (s.doneCheck.map { $0.at < s.lastEventAt } ?? true) { doneChecker.check(s) }
             if case .needsYou = s.phase, !(old.map { if case .needsYou = $0 { return true }; return false } ?? false) {
                 announceLater(id, needsYou: true)
             }
             if s.phase == .yourTurn, old == .working { announceLater(id, needsYou: false) }
         }
         bringInQueued()
+        advanceHandoffs()
         queuePluginSync()
         onChange?(state)
     }
@@ -226,6 +231,7 @@ final class Store {
         if accountsChanged {
             state = log.readNew().reduce(into: AppState(accounts: c.accounts)) { reduce(into: &$0, $1) }
             agents = AgentsProbe(accounts: c.accounts) { [weak self] in self?.apply([$0]) }
+            cloud = makeCloudProbe(c.accounts)
         }
         onChange?(state)
     }
@@ -507,7 +513,7 @@ final class Store {
     }
 
     private func stop(_ s: Session, account a: Account, then: @escaping (CloseOutcome) -> Void) {
-        guard case .background(let short) = s.reach else { return then(.skipped("runs in another terminal")) }
+        guard case .background(let short) = s.reach else { return then(.skipped(s.isCloud ? "runs in the cloud; Close archives it" : "runs in another terminal")) }
         let checks = self.checks(s)
         DispatchQueue.global().async { [weak self] in
             let r = ClaudeCLI.stop(account: a, shortId: short)
@@ -522,7 +528,7 @@ final class Store {
     }
 
     /// Logs one of Maxwell's own records and folds it in now (the log tail folds it again, harmlessly).
-    private func record(_ fields: [String: Any]) {
+    func record(_ fields: [String: Any]) {
         let at = Date()
         MaxwellRecord.append(fields, at: at)
         let line = (try? JSONSerialization.data(withJSONObject: ["ts": (at.timeIntervalSince1970 * 1000).rounded(), "maxwell": fields]))
