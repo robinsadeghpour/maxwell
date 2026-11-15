@@ -18,11 +18,13 @@ on:
         type: boolean
         default: false
 
-# One release at a time. A second one waits for the first; release.sh then refuses a version
-# that is already tagged, so two attempts can't publish the same version.
+# One release at a time. Later ones queue (queue: max keeps every pending run instead of only the
+# newest); release.sh then refuses a version that is already tagged, so two attempts can't publish
+# the same version.
 concurrency:
   group: ${{ inputs.dry_run && 'release-dry-run' || 'release' }}
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: write

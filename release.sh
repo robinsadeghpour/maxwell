@@ -96,8 +96,15 @@ spctl --assess --type open --context context:primary-signature -v "$DMG"
 spctl --assess --type execute -v "$APP"
 cp "$DMG" "$OUT/Maxwell.dmg"
 
-git push -q --atomic origin v1 v1:main
-gh release create "v$V" "$DMG" "$OUT/Maxwell.dmg" "$ZIP" --target main --title "v$V" --notes "$NOTES"
+# Publish the commit that was built. main moves to it (fast-forward only, so an older build can't
+# undo a newer release). v1 is pushed only when it doesn't have this commit yet: other work may
+# have landed on v1 during the build, and that's fine.
+COMMIT=$(git rev-parse HEAD)
+git fetch -q origin v1
+REFS=("$COMMIT:refs/heads/main")
+git merge-base --is-ancestor "$COMMIT" origin/v1 || REFS+=("$COMMIT:refs/heads/v1")
+git push -q --atomic origin "${REFS[@]}"
+gh release create "v$V" "$DMG" "$OUT/Maxwell.dmg" "$ZIP" --target "$COMMIT" --title "v$V" --notes "$NOTES"
 
 # Homebrew: point the cask at this release now. In GitHub Actions the token can't push to the tap;
 # the tap's own workflow picks the release up within 30 minutes instead.

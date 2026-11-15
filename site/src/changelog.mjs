@@ -15,12 +15,13 @@ export default [
 <p>Open as many as you like: with <strong>new</strong> on the Terminals header, from ${k("⌘ K")}, or by right-clicking a session and choosing <strong>Open Terminal Here</strong>. ${k("J")} ${k("K")} and ${k("⌘ [")} ${k("⌘ ]")} step through them with your sessions. × on the row, ${k("⌘ W")} or <code>exit</code> ends one.</p>`,
     fixes: [
       "Fixed close all and stop all covering a row after launch",
+      "Maxwell releases are now built, signed and notarized by GitHub Actions on a clean Mac, one release at a time",
     ],
   },
   {
     slug: "2026-11-15-update-from-the-dmg",
     date: "2026-11-15",
-    versions: "0.1.30 – 0.1.31",
+    versions: "0.1.30",
     title: "Updates work when Maxwell runs from the DMG",
     figure: "",
     body: `
@@ -29,7 +30,6 @@ export default [
     fixes: [
       "Fixed Restart to update reopening the old version when Maxwell ran from the DMG",
       "Restart to update now says so when no Applications folder can be written, instead of quitting",
-      "Maxwell releases are now built, signed and notarized by GitHub Actions on a clean Mac, one release at a time",
     ],
   },
   {
