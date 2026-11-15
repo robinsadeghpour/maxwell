@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Agents that wait still count</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-agents-waiting</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-agents-waiting</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;A subagent can start a long command, end its turn and wait for it. Claude Code reports that as done for now, so Maxwell stopped counting the agent and the row lost its &lt;em&gt;agents&lt;/em&gt; note while the agent was still at work. Maxwell now keeps counting it until the agent really finishes.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;The header's agents button now stays at the right edge, so a long session title no longer hides it&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Pin sessions, and overrule a verdict</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-pin-and-mark-sessions</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-pin-and-mark-sessions</guid>

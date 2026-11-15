@@ -157,6 +157,11 @@ let kindsRun = kinds.running(since: processStart)
 check(kindsRun.map(\.kind) == [.agent, .shell] && kindsRun.map(\.label) == ["Sleep 400 seconds, reply done 1", nil] && kindsRun.map(\.id) == ["a14a", "b5zcokrb2"],
       "running tasks keep their kind and the agent's description, oldest first")
 check(kindsRun.summary == "1 agent · 1 shell", "one agent and one shell")
+// Claude Code 2.1.325: an agent that ends its turn with its own background work reports "completed", then notifies again.
+kinds.read(Data(#"{"type":"user","message":{"content":"<task-notification>\n<task-id>a14a</task-id>\n<status>completed</status>\n<summary>Agent \"Sleep\" is waiting on its own background work</summary>\n<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>\n</task-notification>"}}"#.utf8))
+check(kinds.running(since: processStart).map(\.id) == ["a14a", "b5zcokrb2"], "an agent waiting on its own background work still runs")
+kinds.read(Data(#"{"type":"user","message":{"content":"<task-notification>\n<task-id>a14a</task-id>\n<status>completed</status>\n<summary>Agent \"Sleep\" finished</summary>\n</task-notification>"}}"#.utf8))
+check(kinds.running(since: processStart).map(\.id) == ["b5zcokrb2"], "its later finished notice ends it")
 check((try? JSONDecoder().decode(TaskLedger.self, from: Data(#"{"started":{"a1":721000000},"finished":[]}"#.utf8))) == nil,
       "a scan saved before tasks had kinds fails to decode, so task-scans.json resets and rescans")
 check(safe.judgeCandidates(now: t0.addingTimeInterval(later), rules: GroupRules(idleAfter: 86400, judge: false)).isEmpty, "judge = off asks the model nothing")

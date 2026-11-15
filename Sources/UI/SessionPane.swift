@@ -200,13 +200,15 @@ final class SessionPane: MXView {
         let w = bounds.width, h = Metrics.header
         glyph.frame = NSRect(x: 8, y: 0, width: 16, height: h)
         prompt.frame = NSRect(x: 10, y: 0, width: 14, height: h)
-        let tw = min(title.textWidth + 2, w * 0.45)
-        title.frame = NSRect(x: 28, y: 0, width: tw, height: h)
-        let pw = project.textWidth + 2
-        project.frame = NSRect(x: title.frame.maxX + 8, y: 0, width: pw, height: h)
-        pills.frame = NSRect(x: project.frame.maxX + 10, y: 0, width: min(pills.textWidth + 2, max(0, w - project.frame.maxX - 22)), height: h)
+        // The agents button sits at the right edge so a long title can't push it out of view.
         let bs = agents.intrinsicContentSize
-        agents.frame = NSRect(x: pills.frame.maxX + 8, y: ((h - bs.height) / 2).rounded(), width: bs.width, height: bs.height)
+        agents.frame = NSRect(x: w - bs.width - 10, y: ((h - bs.height) / 2).rounded(), width: bs.width, height: bs.height)
+        let end = agents.isHidden ? w : agents.frame.minX - 8
+        let tw = min(title.textWidth + 2, end * 0.45)
+        title.frame = NSRect(x: 28, y: 0, width: tw, height: h)
+        let pw = min(project.textWidth + 2, max(0, end - title.frame.maxX - 8))
+        project.frame = NSRect(x: title.frame.maxX + 8, y: 0, width: pw, height: h)
+        pills.frame = NSRect(x: project.frame.maxX + 10, y: 0, width: min(pills.textWidth + 2, max(0, end - project.frame.maxX - 22)), height: h)
         headerLine.frame = NSRect(x: 0, y: h - 1, width: w, height: 1)
         var y = h
         if !banner.isHidden && session != nil && !shellShown {
