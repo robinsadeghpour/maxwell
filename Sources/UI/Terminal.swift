@@ -204,6 +204,8 @@ final class TerminalView: NSView, NSTextInputClient {
     private(set) var surface: ghostty_surface_t?
     private var keyText: [String]? = nil
     private var tracking: NSTrackingArea?
+    /// Pasteboard change count at the last click, to tell whether the drag since then copied.
+    private var clipboardAtClick = NSPasteboard.general.changeCount
     var cwd: String?
     var onOpenURL: ((String, String?) -> Void)?
     var onExit: (() -> Void)?
@@ -364,6 +366,11 @@ final class TerminalView: NSView, NSTextInputClient {
     override func performKeyEquivalent(with e: NSEvent) -> Bool {
         guard window?.firstResponder === self, let surface else { return false }
         if Self.isAppShortcut?(e) == true { return false }
+        // Claude Code draws its own mouse selection and copies it on release. ⌘C would reach it
+        // as a key and clear that highlight, so once the drag has copied, ⌘C stops here.
+        if e.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+           e.charactersIgnoringModifiers == "c", !ghostty_surface_has_selection(surface),
+           NSPasteboard.general.changeCount != clipboardAtClick { return true }
         // Let Ghostty handle its own bindings (cmd+c, cmd+v, cmd+k ...); the app menu gets the rest.
         var k = keyEvent(GHOSTTY_ACTION_PRESS, e)
         var flags = ghostty_binding_flags_e(0)
@@ -421,6 +428,7 @@ final class TerminalView: NSView, NSTextInputClient {
     override func mouseDragged(with e: NSEvent) { pos(e) }
     override func mouseDown(with e: NSEvent) {
         window?.makeFirstResponder(self)
+        clipboardAtClick = NSPasteboard.general.changeCount
         pos(e)
         if let surface { _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, Self.mouseMods(e.modifierFlags)) }
     }
