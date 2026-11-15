@@ -101,8 +101,8 @@ cp "$DMG" "$OUT/Maxwell.dmg"
 # have landed on v1 during the build, and that's fine.
 COMMIT=$(git rev-parse HEAD)
 git fetch -q origin v1
-REFS=("$COMMIT:refs/heads/main")
-git merge-base --is-ancestor "$COMMIT" origin/v1 || REFS+=("$COMMIT:refs/heads/v1")
+REFS=("${COMMIT}:refs/heads/main")
+git merge-base --is-ancestor "$COMMIT" origin/v1 || REFS+=("${COMMIT}:refs/heads/v1")
 git push -q --atomic origin "${REFS[@]}"
 gh release create "v$V" "$DMG" "$OUT/Maxwell.dmg" "$ZIP" --target "$COMMIT" --title "v$V" --notes "$NOTES"
 
