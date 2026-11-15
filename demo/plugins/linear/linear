@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Demo Linear plugin: invented tickets for the invented demo sessions. Speaks Maxwell's plugin
+protocol (docs/plugins.md) and never talks to Linear."""
+import json, sys
+
+TICKETS = {  # session title: (key, status, tone)
+    "Migrate sign-in to passkeys": ("LUM-142", "In Progress", "info"),
+    "Rate limits for the v2 API": ("ORB-88", "In Progress", "info"),
+    "Offline sync conflicts": ("FLD-31", "In Progress", "info"),
+    "Fix the flaky checkout test": ("LUM-137", "In Review", "warn"),
+    "Dark mode for settings": ("LUM-149", "In Progress", "info"),
+    "Upgrade to Postgres 17": ("ORB-90", "In Progress", "info"),
+    "Widget for today's notes": ("FLD-35", "Todo", "neutral"),
+    "Load test the CSV importer": ("ORB-93", "In Progress", "info"),
+    "Bump dependencies": ("LUM-120", "Done", "good"),
+    "Docs for webhooks": ("ORB-71", "Done", "good"),
+    "Crash on an empty notebook": ("FLD-27", "Done", "good"),
+}
+seen = {}
+
+
+def send(msg):
+    sys.stdout.write(json.dumps(msg) + "\n"); sys.stdout.flush()
+
+
+def annotate(sess):
+    t = TICKETS.get(sess.get("title"))
+    if not t:
+        return
+    key, status, tone = t
+    note = {"session": sess["id"], "badges": [{"text": f"{key} · {status}", "tone": tone, "tooltip": sess["title"]}],
+            "fields": [{"label": "Ticket", "value": f"{key} {sess['title']}"}]}
+    if status == "Done":
+        note["checks"] = [{"id": "ticket-done", "title": "Linear ticket done", "outcome": "pass", "detail": f"{key} is Done", "source": "Linear"}]
+    send({"jsonrpc": "2.0", "method": "session/annotate", "params": note})
+    seen[sess["id"]] = (key, status, sess["title"])
+
+
+def panel():
+    groups = {"In Progress": [], "In Review": [], "Done": []}
+    for sid, (key, status, title) in sorted(seen.items(), key=lambda kv: kv[1][0]):
+        if status in groups:
+            groups[status].append({"id": key, "key": key, "title": title, "session": sid,
+                                   "status": "done" if status == "Done" else "inSession"})
+    sections = [{"title": t, "rows": rows} for t, rows in groups.items() if rows]
+    send({"jsonrpc": "2.0", "method": "panel/set", "params": {"panel": "tickets", "view": {"type": "list", "sections": sections}}})
+
+
+for line in sys.stdin:
+    try:
+        msg = json.loads(line)
+    except ValueError:
+        continue
+    method = msg.get("method")
+    if method == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
+        send({"jsonrpc": "2.0", "method": "status", "params": {"state": "ok"}})
+    elif method == "sessions/changed":
+        for sess in msg["params"].get("sessions", []):
+            annotate(sess)
+        panel()
+    elif method == "shutdown":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": None}); break
+    elif "id" in msg:
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})

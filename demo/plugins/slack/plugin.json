@@ -1,0 +1,9 @@
+{
+  "id": "slack",
+  "name": "Slack",
+  "version": "0.0.0-demo",
+  "description": "Demo: invented people waiting on a reply. Never talks to Slack.",
+  "protocol": 1,
+  "run": ["./slack"],
+  "panels": [{ "id": "waiting", "title": "Slack", "key": "s" }]
+}

@@ -68,38 +68,56 @@ def box(lines, width, color=DIM):
     return out
 
 
+GREY_BG, GREY = "\x1b[48;5;236m", "\x1b[38;5;244m"
+MODEL = {"work": "Opus", "personal": "Sonnet", "team": "Opus"}
+
+
+def header(w, where):
+    """Claude Code's welcome box: its name and version set into the top border."""
+    title = " Claude Code v2.1 "
+    top = f"{ORANGE}╭───{title}{'─' * max(0, w - 5 - len(title))}╮{RESET}"
+    rows = [("", ""), (f"   {BOLD}Welcome back!{RESET}", "   Welcome back!"), ("", ""),
+            (f"   {ORANGE}✻{RESET}  {MODEL.get(s['acct'], 'Opus')} · {s['acct']}", f"   ✻  {MODEL.get(s['acct'], 'Opus')} · {s['acct']}"),
+            (f"   {GREY}{where}{RESET}", f"   {where}"), ("", "")]
+    out = [top]
+    for text, plain in rows:
+        out.append(f"{ORANGE}│{RESET}{text}{' ' * max(0, w - 2 - len(plain))}{ORANGE}│{RESET}")
+    out.append(f"{ORANGE}╰{'─' * (w - 2)}╯{RESET}")
+    return out
+
+
 def screen(state, tick, approved):
     cols, rows = shutil.get_terminal_size((100, 32))
-    w = min(cols - 2, 96)
+    w = min(cols - 2, 110)
     home = os.path.expanduser("~")
     where = s["cwd"].replace(home, "~")
-    out = box([(f"{ORANGE}✻{RESET} {BOLD}Claude Code{RESET}", "✻ Claude Code"),
-               ("", ""), (f"{DIM}  cwd: {where}{RESET}", f"  cwd: {where}")], min(w, 64), DIM)
-    out += ["", f"{DIM}>{RESET} {s['prompt']}", ""]
+    out = header(min(w, 72), where) + [""]
+    prompt = f"> {s['prompt']}"
+    out += [f"{GREY_BG}{prompt}{' ' * max(0, w - len(prompt))}{RESET}", ""]
     tools = TOOLS.get(s["key"], []) + (AFTER.get(s["key"], [])[:approved] if approved else [])
     for name, arg, result in tools:
-        out += [f"{GREEN}⏺{RESET} {BOLD}{name}{RESET}({arg})", f"  {DIM}⎿  {result}{RESET}", ""]
+        tail = f" {GREY}(ctrl+o to expand){RESET}" if name != "Bash" else ""
+        out += [f"{GREEN}⏺{RESET} {BOLD}{name}{RESET}({arg})", f"  {GREY}⎿  {result}{RESET}{tail}", ""]
     if s.get("reply") and s["state"] != "busy" and not (s["state"] == "permission" and approved):
         for i, line in enumerate(wrap(s["reply"].replace("**", "\x00"), w - 2)):
             parts = line.split("\x00")
             line = "".join(p if j % 2 == 0 else f"{BOLD}{p}{RESET}" for j, p in enumerate(parts))
             out.append(f"{'⏺ ' if i == 0 else '  '}{line}")
         out.append("")
+    rule = f"{GREY}{'─' * w}{RESET}"
     if state == "waiting":
         cmd = s.get("wait", "").split(": ", 1)[-1]
-        bw = min(w, 78)
-        out += box([(f"{BOLD}Bash command{RESET}", "Bash command"), ("", ""),
-                    (f"  {cmd}", f"  {cmd}"), (f"  {DIM}Apply the credentials table migration{RESET}", "  Apply the credentials table migration"), ("", ""),
-                    ("Do you want to proceed?", "Do you want to proceed?"),
-                    (f"{BLUE}❯ 1. Yes{RESET}", "❯ 1. Yes"),
-                    (f"  2. Yes, and don't ask again for {cmd.split(' ')[0]} commands", f"  2. Yes, and don't ask again for {cmd.split(' ')[0]} commands"),
-                    ("  3. No, and tell Claude what to do differently (esc)", "  3. No, and tell Claude what to do differently (esc)")], bw, BLUE)
-    elif state == "busy":
-        verb = VERBS.get(s["key"], "Working")
-        out += [f"{ORANGE}{SPIN[tick % len(SPIN)]} {verb}…{RESET} {DIM}({12 + tick // 8}s · esc to interrupt){RESET}", ""]
-        out += box([(f"{DIM}>{RESET} ", "> ")], w, DIM)
+        words = cmd.split(" ")
+        out += [rule, f" {BOLD}Bash command{RESET}", "", f"   {cmd}", f"   {GREY}Apply the credentials table migration{RESET}", "",
+                " Do you want to proceed?", f" {BLUE}❯ 1. Yes{RESET}",
+                f"   2. Yes, and don't ask again for {' '.join(words[:3])} commands in {where}",
+                f"   3. No, and tell Claude what to do differently {GREY}(esc){RESET}"]
     else:
-        out += box([(f"{DIM}>{RESET} ", "> ")], w, DIM)
+        if state == "busy":
+            verb = VERBS.get(s["key"], "Working")
+            secs = 12 + tick // 8
+            out += [f"{ORANGE}{SPIN[tick % len(SPIN)]} {verb}…{RESET} {GREY}(esc to interrupt · {secs}s · ↓ {1.1 + secs / 40:.1f}k tokens){RESET}", ""]
+        out += [rule, f"{GREY}>{RESET} ", rule, f"  {GREY}? for shortcuts{RESET}"]
     out = out[-(rows - 1):]
     return "\x1b[H\x1b[2J" + "\r\n".join(out)
 

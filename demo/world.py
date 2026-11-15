@@ -78,6 +78,27 @@ SESSIONS = [
          reply="The webhooks page is live with examples for every event and the signature check in Go and Node. PR #157 is merged.\n\n**Safe to close** · docs live"),
 ]
 
+PLAN = """# Passkeys rollout
+
+Sign in to Lumen with a passkey. Passwords stay as a fallback for one month.
+
+## Steps
+
+1. **Credentials table.** One row per passkey: user, public key, sign count, device name.
+2. **Registration.** Settings › Security › Add a passkey. WebAuthn, resident keys preferred.
+3. **Sign in.** The sign-in page offers the passkey first and keeps "Use a password" one tap away.
+4. **Fallback.** Password sign-in keeps working until 15 December, then asks to add a passkey.
+
+## Behind a flag
+
+`auth.passkeys` starts at 10% of accounts on Monday, 50% on Wednesday, everyone on Friday.
+
+## Open questions
+
+- Do we let people remove their last passkey while passwords are off?
+- Which recovery path for a lost device: email link or support?
+"""
+
 ACCT_DIR = lambda a: f"{ROOT}/.accounts/{a}"
 sid = lambda k: str(uuid.uuid5(uuid.NAMESPACE_URL, "maxwell-demo/" + k))
 short = lambda k: sid(k)[:8]
@@ -192,6 +213,12 @@ def main():
     json.dump({s["key"]: dict(s, id=sid(s["key"]), short=short(s["key"]), cwd=cwd_of(s)) for s in SESSIONS},
               open(f"{ROOT}/.sessions.json", "w"), indent=1)
     shutil.copytree(f"{HERE}/bin", f"{ROOT}/.bin")
+    # Demo Linear and Slack plugins: invented tickets and people, through the real plugin protocol.
+    shutil.copytree(f"{HERE}/plugins", f"{ROOT}/.plugins")
+    # The plan the passkeys session wrote, for the viewer beside it.
+    plan_dir = f"{cwd_of(SESSIONS_BY_KEY['passkeys'])}/docs"
+    os.makedirs(plan_dir, exist_ok=True)
+    open(f"{plan_dir}/passkeys-rollout.md", "w").write(PLAN)
     pins = "\n".join(f"project-pin = {p.capitalize()}" for p in PROJECTS)
     accts = "\n".join(f"account = {a} {ACCT_DIR(a)}" for a in ACCOUNTS)
     open(f"{ROOT}/.config", "w").write(f"""# Maxwell demo world (invented)
@@ -212,7 +239,8 @@ idle-after = 24h
 """)
     open(f"{ROOT}/.env", "w").write(" ".join([
         f"MAXWELL_CONFIG={ROOT}/.config", f"MAXWELL_STATE_DIR={ROOT}/.state",
-        f"MAXWELL_CLAUDE={ROOT}/.bin/claude", f"MAXWELL_GH={ROOT}/.bin/gh", f"MAXWELL_DEMO_ROOT={ROOT}"]) + "\n")
+        f"MAXWELL_CLAUDE={ROOT}/.bin/claude", f"MAXWELL_GH={ROOT}/.bin/gh", f"MAXWELL_DEMO_ROOT={ROOT}",
+        f"MAXWELL_PLUGINS_DIR={ROOT}/.plugins"]) + "\n")
     print(ROOT)
 
 
