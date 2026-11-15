@@ -73,6 +73,8 @@ export const pages = {
 <p><strong>All projects</strong> (${k("⌘ 0")}) shows every session in these groups, so its count matches the bottom bar. A project shows only its own.</p>
 <h2>Clear out old sessions</h2>
 <p>Sessions keep running until something stops them, so a new Maxwell often finds some from days ago. They wait in Idle. Its <strong>stop all</strong> button stops the background ones with <code>claude stop</code>. Each keeps its conversation, and <strong>Undo</strong> or <strong>Recently closed</strong> brings it back. A session marked <em>in a terminal</em> belongs to that terminal, so end it there.</p>
+<h2>Agents a session runs</h2>
+<p>A session can hand work to subagents and background shells. Its row says so, like <em>work · 3 agents</em>, and the header shows a <strong>3 agents</strong> button. Hover it to see what each agent is doing. Click it, or press ${k("⇧ ⌘ G")}, to open Claude's own agent list in the terminal. There ${k("↑")} ${k("↓")} pick an agent and ${k("⏎")} opens its chat, where you can read along and message it. ${k("Esc")} goes back to the main conversation.</p>
 <h2>Move through sessions</h2>
 <p>${k("J")} and ${k("K")} move up and down the list, and ${k("⏎")} opens a session. ${k("⌘ J")} jumps to the next session that needs you, across every project.</p>
 <p>${k("⇧ ⌘ I")} shows or hides Idle. How long a stopped session waits before it folds into Idle is set by <code>idle-after</code>, 24 hours by default.</p>
@@ -339,6 +341,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⇧ ⌘ X")}</td><td>Close all safe (asks first)</td></tr>
 <tr><td>${k("⌘ Z")}</td><td>Undo the last close</td></tr>
 <tr><td>${k("⇧ ⌘ I")}</td><td>Show or hide Idle</td></tr>
+<tr><td>${k("⇧ ⌘ G")}</td><td>Open the session's agent list</td></tr>
 <tr><td>${k("⇧ ⌘ M")}</td><td>Move a limited session to the account with the most room</td></tr>
 </tbody></table>
 <h2>Projects</h2>

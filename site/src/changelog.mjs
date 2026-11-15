@@ -5,6 +5,19 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-see-your-agents",
+    date: "2026-11-15",
+    versions: "0.1.34",
+    title: "See the agents a session runs",
+    figure: "",
+    body: `
+<p>When a session hands work to subagents, Maxwell now shows it. The row says <em>3 agents</em> (or <em>1 agent · 2 shells</em>), so a session that sits in <strong>Working</strong> tells you why.</p>
+<p>The header gets a <strong>3 agents</strong> button. Hover it for what each agent is doing. Click it, or press ${k("⇧ ⌘ G")}, and Claude's own agent list opens in the terminal: pick one with ${k("↑")} ${k("↓")} and ${k("⏎")} to read its chat or message it.</p>`,
+    fixes: [
+      "Safe to close now names what it's waiting for, like \"2 subagents and 1 background shell running\"",
+    ],
+  },
+  {
     slug: "2026-11-15-terminals-in-sidebar",
     date: "2026-11-15",
     versions: "0.1.33",
