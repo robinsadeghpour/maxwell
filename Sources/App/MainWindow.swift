@@ -694,7 +694,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let press = { [weak self] in
             guard let self, let t = self.terminals[id] else { return }
             self.window?.makeFirstResponder(t)
-            t.sendKey(keyCode: 125) // kVK_DownArrow
+            t.pressDown()
         }
         if terminals[id] == nil || detached.contains(id) {
             reattach(id)
@@ -1436,7 +1436,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "move", title: "Move to the Account With Most Room", menu: "Session", shortcut: Shortcut("cmd+shift+m"), isEnabled: limited) { [weak self] in
                 if let id = self?.current { self?.move(id) }
             },
-            Action(id: "show-agents", title: "Show Agents", menu: "Session", shortcut: Shortcut("cmd+shift+a"), isEnabled: { [weak self] in
+            Action(id: "show-agents", title: "Show Agents", menu: "Session", shortcut: Shortcut("cmd+shift+g"), isEnabled: { [weak self] in
                 guard let self, let id = self.current, let s = self.store.state.sessions[id], case .background = s.reach else { return false }
                 return !(s.runningTasks?.agents.isEmpty ?? true)
             }) { [weak self] in
