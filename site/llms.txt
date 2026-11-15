@@ -37,6 +37,7 @@
 
 ## Changelog
 
+- [Side panels open one at a time](https://www.runmaxwell.com/changelog/2026-11-15-side-panels-are-tabs) (2026-11-15, v0.1.44)
 - [Claude in a Maxwell terminal is one row](https://www.runmaxwell.com/changelog/2026-11-15-claude-in-a-maxwell-terminal) (2026-11-15, v0.1.43)
 - [Panel tabs stay on the edge](https://www.runmaxwell.com/changelog/2026-11-15-panel-tabs-stay) (2026-11-15, v0.1.42)
 - [New sessions start in the right project](https://www.runmaxwell.com/changelog/2026-11-15-new-sessions-start-in-the-right-project) (2026-11-15, v0.1.41)

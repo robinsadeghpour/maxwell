@@ -40,6 +40,7 @@ struct PanelLayout: Codable, Equatable {
     mutating func move(_ p: PanelID, to d: Dock) {
         place[p] = d
         hidden.remove(p)
+        if d != .bottom, p.flexible { hidden.formUnion(panels(d).filter { $0 != p && $0.flexible }) }
         order.removeAll { $0 == p }
         order.append(p)
     }
@@ -203,8 +204,11 @@ final class RootView: MXView {
     }
 
     /// Panels in an area that are on screen: not collapsed, and the viewer only with a file.
+    /// A side area shows one list or document at a time, like tabs; widgets stack beside it.
     func shown(_ d: Dock) -> [PanelID] {
-        panels.panels(d).filter { !panels.hidden.contains($0) && ($0 != .viewer || viewerOpen) && ($0 != .plugins || hasPluginPanels) }
+        var out = panels.panels(d).filter { !panels.hidden.contains($0) && ($0 != .viewer || viewerOpen) && ($0 != .plugins || hasPluginPanels) }
+        if d != .bottom, let tab = out.first(where: \.flexible) { out.removeAll { $0.flexible && $0 != tab } }
+        return out
     }
 
     func isShown(_ p: PanelID) -> Bool { shown(panels.place[p] ?? .left).contains(p) }
@@ -215,8 +219,14 @@ final class RootView: MXView {
         sync(animated: animated)
     }
 
+    /// Showing a list or document in a side area hides the others there: they are its tabs.
     func setHidden(_ p: PanelID, _ hide: Bool) {
-        if hide { panels.hidden.insert(p) } else { panels.hidden.remove(p) }
+        var l = panels
+        if hide { l.hidden.insert(p) } else {
+            l.hidden.remove(p)
+            if let d = l.place[p], d != .bottom, p.flexible { l.hidden.formUnion(l.panels(d).filter { $0 != p && $0.flexible }) }
+        }
+        panels = l
     }
 
     /// Hides every panel of an area, or shows them all again.
