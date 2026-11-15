@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-bring-in-for-real",
     date: "2026-11-15",
-    versions: "0.1.24",
+    versions: "0.1.24 – 0.1.25",
     title: "Terminal sessions move into Maxwell",
     figure: fig.bringIn("A terminal session moves into Maxwell and keeps its conversation."),
     body: `
@@ -19,6 +19,7 @@ export default [
       "Fixed the \"Not trusted on default yet\" dead end on ⌘ T",
       "Messages name the account only when you have more than one",
       "When several Claude sessions run in the same folder and Maxwell can't tell which one to move, it says so and leaves them running",
+      "Maxwell is now signed and notarized by Apple, so the download opens without the \"could not verify\" warning. Plugin keys ask for Keychain access once more after this update",
     ],
   },
   {
