@@ -22,7 +22,7 @@ Everything you commit, push or put in a branch name, PR or issue is public, incl
 ## Checking your change
 
 - `./build.sh test`: the standard check, then reducer, plugin and logo tests from recorded events. CI runs the same and a full build on every pull request.
-- `./build.sh` builds **Maxwell Dev** (own app ID, never touches the released app). Check the change in it, scripted: [docs/harness.md](docs/harness.md) has the flags and their traps.
+- `./build.sh` builds **Maxwell Dev** (own app ID, never touches the released app). Check the change in it, scripted and quiet (its window stays off Robin's screens; never `open` it): [docs/harness.md](docs/harness.md) has the flags and their traps.
 - A bug fix comes with the fixture, test or harness step that would have caught it.
 
 ## Claude Code

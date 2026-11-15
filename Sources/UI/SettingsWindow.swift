@@ -1133,7 +1133,7 @@ final class SettingsWindowController: NSWindowController {
     private(set) var tooltips: Tooltips!
 
     init() {
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 600), styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
+        let w = MXWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 600), styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
         w.title = "Maxwell Settings"
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
@@ -1154,10 +1154,7 @@ final class SettingsWindowController: NSWindowController {
         if let section { view.section = section }
         view.update(m)
         if window?.isVisible != true { window?.center() }
-        if quietTest { window?.orderBack(nil) } else {
-            showWindow(nil)
-            window?.makeKeyAndOrderFront(nil)
-        }
+        (window as? MXWindow)?.present()
         window?.makeFirstResponder(view)
     }
 }

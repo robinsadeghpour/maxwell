@@ -291,7 +291,9 @@ final class Store {
 
     /// A macOS notification; clicking it opens the session. Maxwell plays the sound itself, so it is the
     /// same whether macOS has allowed Maxwell or not.
+    /// A quiet run only logs it: the user's own Maxwell already tells them about the same session.
     func post(title: String, subtitle: String?, body: String, session: SessionID?, sound: String, key: String = UUID().uuidString) {
+        if quietTest { return mark("notified \(title) (quiet run, not shown)") }
         DispatchQueue.main.async { Self.play(sound) }
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {

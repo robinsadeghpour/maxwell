@@ -341,12 +341,12 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
 /// A window.open from claude.ai's sign-in (Google): its own small window sharing the account's configuration.
 final class PopupWindow: NSObject, NSWindowDelegate, WKUIDelegate {
     let web: WKWebView
-    private let win: NSWindow
+    private let win: MXWindow
     var onClose: (() -> Void)?
 
     init(configuration c: WKWebViewConfiguration, parent: NSWindow?) {
         web = WKWebView(frame: NSRect(x: 0, y: 0, width: 480, height: 640), configuration: c)
-        win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        win = MXWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         super.init()
         win.isReleasedWhenClosed = false
         win.title = "Sign in"
@@ -354,7 +354,7 @@ final class PopupWindow: NSObject, NSWindowDelegate, WKUIDelegate {
         win.delegate = self
         web.uiDelegate = self
         if let p = parent { win.setFrameOrigin(NSPoint(x: p.frame.midX - 240, y: p.frame.midY - 320)) } else { win.center() }
-        win.makeKeyAndOrderFront(nil)
+        win.present()
         titleWatch = web.observe(\.url) { [weak self] w, _ in self?.win.title = w.url?.host ?? "Sign in" }
     }
     private var titleWatch: NSKeyValueObservation?
@@ -447,7 +447,7 @@ final class SignInStrip: MXView {
 /// Closes by itself once the account is signed in.
 final class SignInWindow: NSObject, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate {
     private static var open: [String: SignInWindow] = [:]
-    private let win: NSWindow
+    private let win: MXWindow
     private let web: WKWebView
     private let strip = SignInStrip(frame: .zero)
     private let account: Account
@@ -455,14 +455,14 @@ final class SignInWindow: NSObject, NSWindowDelegate, WKUIDelegate, WKNavigation
     private var watch: NSObjectProtocol?
 
     static func show(_ a: Account, near parent: NSWindow?) {
-        if let w = open[a.name] { w.win.makeKeyAndOrderFront(nil); return }
+        if let w = open[a.name] { w.win.present(); return }
         open[a.name] = SignInWindow(a, parent: parent)
     }
 
     private init(_ a: Account, parent: NSWindow?) {
         account = a
         web = WKWebView(frame: .zero, configuration: ClaudeWeb.shared.configuration(a))
-        win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        win = MXWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         super.init()
         win.isReleasedWhenClosed = false
         win.title = "Sign in to claude.ai · \(a.name)"
@@ -482,7 +482,7 @@ final class SignInWindow: NSObject, NSWindowDelegate, WKUIDelegate, WKNavigation
         web.uiDelegate = self
         web.navigationDelegate = self
         if let p = parent { win.setFrameOrigin(NSPoint(x: p.frame.midX - 260, y: p.frame.midY - 350)) } else { win.center() }
-        win.makeKeyAndOrderFront(nil)
+        win.present()
         web.load(URLRequest(url: ClaudeWeb.login))
         watch = NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: a.name, queue: .main) { [weak self] _ in
             if ClaudeWeb.shared.status[a.name] == .signedIn { self?.win.close() }

@@ -2,7 +2,7 @@
 
 Build **Maxwell Dev** with `./build.sh`. It has its own app ID and a "dev" badge, works on your real sessions and config, and never touches the Maxwell you work in.
 
-Scripted runs pass flags to `build/Maxwell.app/Contents/MacOS/Maxwell`. Anything with `--quit-after N` is quiet: no Dock icon, the window stays behind yours and never takes focus. Keys and clicks are injected inside the app (`--keys "2:shift shift;3:esc"`, `--click "4:700,600"`), and `--snap` writes a screenshot. The flags are parsed in `Sources/App/main.swift` (`runTestHooks`) until step 3 of the [clean-up plan](cleanup-plan.md) moves them to `Sources/Harness/`. Don't add new ones there; the standard check refuses them.
+Scripted runs pass flags to `build/Maxwell.app/Contents/MacOS/Maxwell`. Anything with `--quit-after N`, and Maxwell Dev started from a Claude session, is quiet: no Dock icon, no notifications, no focus, and its windows sit past the right edge of every screen, where they still draw and `--snap` still captures them. Start it by running the binary: `open` drops the session's environment, so the app can't tell and comes to the front. The repository's `.claude/settings.json` refuses `open … Maxwell` for that reason. Keys and clicks are injected inside the app (`--keys "2:shift shift;3:esc"`, `--click "4:700,600"`), and `--snap` writes a screenshot. The flags are parsed in `Sources/App/main.swift` (`runTestHooks`) until step 3 of the [clean-up plan](cleanup-plan.md) moves them to `Sources/Harness/`. Don't add new ones there; the standard check refuses them.
 
 For videos and screenshots that leave the Mac, use the invented world in `demo/` (`./build.sh && ./demo/record.sh && ./demo/cut.sh`). Never record real sessions: they show customer names.
 

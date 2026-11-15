@@ -1,12 +1,26 @@
 import AppKit
 
-/// The main window. Tells the controller when keyboard focus moves between panes.
+/// Maxwell's windows. Tells the controller when keyboard focus moves between panes.
 final class MXWindow: NSWindow {
     var onFocusChange: (() -> Void)?
     override func makeFirstResponder(_ r: NSResponder?) -> Bool {
         let ok = super.makeFirstResponder(r)
         onFocusChange?()
         return ok
+    }
+    /// AppKit pulls a titled window back onto a screen; a quiet run's window stays parked.
+    override func constrainFrameRect(_ r: NSRect, to s: NSScreen?) -> NSRect {
+        quietTest ? r : super.constrainFrameRect(r, to: s)
+    }
+
+    /// Shows the window. In a quiet run it goes past the right edge of every screen instead:
+    /// ordered in, so it draws and `--snap` can capture it, but never on the user's screens
+    /// and never key.
+    func present() {
+        guard quietTest else { return makeKeyAndOrderFront(nil) }
+        let right = NSScreen.screens.map(\.frame.maxX).max() ?? 0
+        setFrameOrigin(NSPoint(x: right + 2000, y: 0))
+        orderBack(nil)
     }
 }
 
