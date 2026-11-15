@@ -147,8 +147,9 @@ final class Store {
         bringing.insert(s.id)
         let name = String((s.name.isEmpty ? s.title : s.name).prefix(40))
         let skip = config.skipPermissions
+        let newest = state.isNewestInFolder(s)
         DispatchQueue.global().async { [weak self] in
-            let why = Self.move(s, account: account, name: name, skipPermissions: skip)
+            let why = Self.move(s, account: account, name: name, skipPermissions: skip, newestInFolder: newest)
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.bringing.remove(s.id)
@@ -160,14 +161,25 @@ final class Store {
         }
     }
 
-    private static func move(_ s: Session, account: Account, name: String, skipPermissions: Bool) -> String? {
+    private static func move(_ s: Session, account: Account, name: String, skipPermissions: Bool, newestInFolder: Bool) -> String? {
+        // Background sessions only start in folders Claude Code trusts. The terminal session was
+        // already let in here (for the home folder, Claude Code asks every time and never saves
+        // it), so record that before ending the terminal's process, never after.
+        guard ClaudeCLI.trust(s.cwd, account: account) else {
+            return "Maxwell couldn't record that Claude may work in \((s.cwd as NSString).abbreviatingWithTildeInPath). It still runs in your terminal."
+        }
         var skip = skipPermissions
-        if let p = ClaudeCLI.terminalProcess(sessionId: s.id, account: account) {
-            skip = skipPermissions || p.skipsPermissions
-            kill(p.pid, SIGTERM)
+        switch ClaudeCLI.terminalProcess(s, account: account, newestInFolder: newestInFolder) {
+        case .found(let pid, let skips):
+            skip = skipPermissions || skips
+            kill(pid, SIGTERM)
             let until = Date().addingTimeInterval(15)
-            while kill(p.pid, 0) == 0, Date() < until { usleep(200_000) }
-            if kill(p.pid, 0) == 0 { return "its terminal process didn't exit" }
+            while kill(pid, 0) == 0, Date() < until { usleep(200_000) }
+            if kill(pid, 0) == 0 { return "its terminal process didn't exit. It still runs in your terminal." }
+        case .unsure(let n):
+            return "\(n) Claude sessions run in \((s.cwd as NSString).abbreviatingWithTildeInPath) in your terminals and Maxwell can't tell which is this one. Quit it there (Ctrl-C twice), then bring it in."
+        case .none:
+            break
         }
         for attempt in 0..<3 {
             usleep(useconds_t(1_500_000 * (attempt + 1)))

@@ -99,7 +99,7 @@ final class PluginHost {
         manifests = d.found
         for id in gone { turnOff(id, removed: true) }
         for m in manifests {
-            let want = config.pluginEnabled(m.id)
+            let want = config.pluginEnabled(m)
             let s = config.pluginSettings(m)
             if !want { turnOff(m.id, removed: false); continue }
             if changed.contains(m.id) { stopProcess(m.id) }

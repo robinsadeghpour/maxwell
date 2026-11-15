@@ -5,6 +5,23 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-bring-in-for-real",
+    date: "2026-11-15",
+    versions: "0.1.24",
+    title: "Terminal sessions move into Maxwell",
+    figure: fig.bringIn("A terminal session moves into Maxwell and keeps its conversation."),
+    body: `
+<p><strong>Bring into Maxwell</strong> now ends the session in your terminal before it continues in Maxwell. Recent Claude Code versions stopped recording which process runs a terminal session, so Maxwell couldn't find it, and the session carried on in Warp or Terminal while a second copy started in Maxwell. Maxwell's hook now notes the process itself.</p>
+<p>When Claude Code hasn't been told it may work in a folder, ${k("⌘ T")} and New Session now ask <strong>Let Claude work in this folder?</strong>, the same question Claude asks in a terminal. Click <strong>Trust Folder</strong> and the session starts.</p>
+<p>Slack and Linear now start off. Turn them on in <strong>Settings › Plugins</strong> when you want them.</p>`,
+    fixes: [
+      "Fixed Bring into Maxwell failing for sessions started in the home folder",
+      "Fixed the \"Not trusted on default yet\" dead end on ⌘ T",
+      "Messages name the account only when you have more than one",
+      "When several Claude sessions run in the same folder and Maxwell can't tell which one to move, it says so and leaves them running",
+    ],
+  },
+  {
     slug: "2026-11-15-cleaner-panels",
     date: "2026-11-15",
     versions: "0.1.20 – 0.1.23",

@@ -11,6 +11,7 @@
 // write() on an O_APPEND descriptor, so concurrent sessions never interleave lines.
 
 #include <fcntl.h>
+#include <libproc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -111,6 +112,21 @@ static int usage_due(const char *dir, const char *config_dir) {
     return 1;
 }
 
+// The Claude Code process this hook runs for: the first ancestor that isn't the shell Claude
+// Code runs the hook command in. Maxwell stops it when a terminal session moves into Maxwell.
+static int session_pid(void) {
+    pid_t pid = getppid();
+    for (int i = 0; i < 4 && pid > 1; i++) {
+        char name[2 * MAXCOMLEN + 1] = {0};
+        proc_name(pid, name, sizeof name);
+        if (strcmp(name, "sh") && strcmp(name, "bash") && strcmp(name, "zsh") && strcmp(name, "dash")) return pid;
+        struct proc_bsdinfo info;
+        if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, sizeof info) != sizeof info) return 0;
+        pid = (pid_t)info.pbi_ppid;
+    }
+    return 0;
+}
+
 // Claude Code adds SessionStart stdout to the session's context: Maxwell's rules for it.
 static void print_context(const char *dir) {
     char path[1100], buf[16384];
@@ -162,7 +178,7 @@ int main(int argc, char **argv) {
                        "{\"ts\":%lld,\"configDir\":\"%s\",\"usage\":{\"session_id\":%.*s,\"rate_limits\":%.*s,\"context_window\":%.*s}}\n",
                        ms, cdir, (int)sidl, sid, (int)rll, rl, (int)cwl, cw);
     } else {
-        len = snprintf(line, sizeof line, "{\"ts\":%lld,\"configDir\":\"%s\",\"hook\":%s}\n", ms, cdir, payload);
+        len = snprintf(line, sizeof line, "{\"ts\":%lld,\"configDir\":\"%s\",\"pid\":%d,\"hook\":%s}\n", ms, cdir, session_pid(), payload);
     }
     if (len <= 0 || (size_t)len >= sizeof line) return 0;
 

@@ -576,7 +576,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let candidates = state.sessions.values.filter { if case .elsewhere = $0.reach { return true }; return false }
         toast("Looking for sessions in other terminals…")
         DispatchQueue.global().async { [weak self] in
-            let live = candidates.filter { s in state.account(s.accountId).flatMap { ClaudeCLI.terminalProcess(sessionId: s.id, account: $0) } != nil }
+            let live = candidates.filter { s in
+                guard let a = state.account(s.accountId) else { return false }
+                return ClaudeCLI.terminalProcess(s, account: a, newestInFolder: state.isNewestInFolder(s)) != .none
+            }
             DispatchQueue.main.async { self?.confirmBringIn(live) }
         }
     }
@@ -738,16 +741,19 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         guard FileManager.default.fileExists(atPath: folder) else {
             return newPanel.show(error: "\((folder as NSString).abbreviatingWithTildeInPath) is gone. Pick another folder.")
         }
-        newPanel.show(error: "Starting \(name) on \(account.name)…")
+        newPanel.show(error: "Starting \(name)\(on(account))…")
         store.newSession(account: account, cwd: folder, name: name, model: model) { [weak self] r in
             guard let self else { return }
             switch r {
             case .success(let id):
                 self.newPanel.dismiss()
-                self.toast("Started \(name) on \(account.name).")
+                self.toast("Started \(name)\(self.on(account)).")
                 self.open(id)
             case .failure(.untrusted):
-                self.newPanel.show(error: "Not trusted on \(account.name) yet. Run claude there once and accept.")
+                self.newPanel.show(error: "Claude needs your OK to work in this folder.")
+                self.askToTrust(folder, account: account,
+                                retry: { self.startSession(account: account, folder: folder, name: name, model: model) },
+                                cancelled: { self.newPanel.show(error: "Not started: Claude may not work in this folder yet.") })
             case .failure(let e):
                 self.newPanel.show(error: "\(e)")
             }
@@ -892,14 +898,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// Plugins changed: new actions and menu when the set changed, a toast when one stops for good.
     private func pluginsChanged() {
         let host = store.plugins
-        let sig = host.manifests.filter { store.config.pluginEnabled($0.id) }.map { "\($0.id)@\($0.version)" }.joined(separator: ",")
+        let sig = host.manifests.filter { store.config.pluginEnabled($0) }.map { "\($0.id)@\($0.version)" }.joined(separator: ",")
         if sig != pluginSignature { pluginSignature = sig; rebuildActions() }
         for (id, st) in host.status {
             if case .failed(let why) = st.run, pluginRun[id] != st.run { toast("\(host.manifest(id)?.name ?? id) stopped: \(why). Settings › Plugins can restart it.") }
             pluginRun[id] = st.run
         }
         root.pluginPanel.update(host: host, state: store.state)
-        root.setPluginPanels(!host.panels.isEmpty || host.manifests.contains { !$0.panels.isEmpty && store.config.pluginEnabled($0.id) })
+        root.setPluginPanels(!host.panels.isEmpty || host.manifests.contains { !$0.panels.isEmpty && store.config.pluginEnabled($0) })
         refreshSettings()
         render(store.state)
     }
@@ -1072,19 +1078,50 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let state = store.state
         guard let folder = cwd ?? folderHere(state), let a = state.roomiest(now: Date()) ?? state.accounts.first else { return false }
         let base = name ?? (folder as NSString).lastPathComponent.lowercased().replacingOccurrences(of: " ", with: "-")
-        let name = "\(base)-\(String(format: "%02x", Int.random(in: 0..<256)))"
-        toast("Starting \(name) on \(a.name)…")
-        store.newSession(account: a, cwd: folder, name: name, model: model, prompt: prompt) { [weak self] r in
+        let full = "\(base)-\(String(format: "%02x", Int.random(in: 0..<256)))"
+        toast("Starting \(full)\(on(a))…")
+        store.newSession(account: a, cwd: folder, name: full, model: model, prompt: prompt) { [weak self] r in
             guard let self else { return }
             switch r {
-            case .success(let id): self.toast("Started \(name) on \(a.name)."); self.open(id); done(.success(id))
+            case .success(let id): self.toast("Started \(full)\(self.on(a))."); self.open(id); done(.success(id))
             case .failure(.untrusted):
-                let why = "Not trusted on \(a.name) yet. Run claude there once and accept."
-                self.toast(why); done(.failure(.init(message: why)))
+                self.askToTrust(folder, account: a,
+                                retry: { self.startHere(prompt: prompt, name: name, cwd: folder, model: model, done: done) },
+                                cancelled: { done(.failure(.init(message: "Not started: Claude may not work in \((folder as NSString).abbreviatingWithTildeInPath) yet."))) })
             case .failure(let e): self.toast("\(e)"); done(.failure(.init(message: "\(e)")))
             }
         }
         return true
+    }
+
+    /// " on <account>" when there is more than one account to tell apart, else nothing.
+    private func on(_ a: Account) -> String { store.state.accounts.count > 1 ? " on \(a.name)" : "" }
+
+    /// Claude Code starts background sessions only in folders it has been told it may work in.
+    /// Asks the question its own terminal prompt asks, saves the answer where Claude Code keeps
+    /// it, then tries again.
+    private func askToTrust(_ folder: String, account: Account, retry: @escaping () -> Void, cancelled: @escaping () -> Void) {
+        let path = (folder as NSString).abbreviatingWithTildeInPath
+        let a = NSAlert()
+        a.messageText = "Let Claude work in \(path)?"
+        var info = "Claude Code asks this once per folder, the same question it asks in a terminal. "
+            + "Once you say yes, Claude can read, edit and run files in this folder\(on(account))."
+        if Paths.normalize(folder) == Paths.normalize(Paths.home.path) {
+            info += "\n\nThis is your home folder. Claude Code won't ask here again, in your terminal either. A project folder is usually the better place to start."
+        }
+        a.informativeText = info
+        a.addButton(withTitle: "Trust Folder")
+        a.addButton(withTitle: "Cancel")
+        guard let w = window else { return cancelled() }
+        a.beginSheetModal(for: w) { [weak self] r in
+            guard r == .alertFirstButtonReturn else { return cancelled() }
+            DispatchQueue.global().async {
+                let ok = ClaudeCLI.trust(folder, account: account)
+                DispatchQueue.main.async {
+                    if ok { retry() } else { self?.toast("Maxwell couldn't save that. Run claude in \(path) once and accept."); cancelled() }
+                }
+            }
+        }
     }
 
     private func dismissOverlays() {
@@ -1298,7 +1335,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         ]
         // Plugin actions: menu, ⌘K and a default shortcut unless a built-in one already has it.
         let taken = Set(list.compactMap { $0.shortcut?.display })
-        for m in store.plugins.manifests where store.config.pluginEnabled(m.id) {
+        for m in store.plugins.manifests where store.config.pluginEnabled(m) {
             for a in m.actions {
                 let key = a.shortcut.flatMap(Shortcut.init).flatMap { taken.contains($0.display) ? nil : $0 }
                 list.append(Action(id: "\(m.id).\(a.id)", title: a.title, menu: "Plugins", shortcut: key,

@@ -6,6 +6,15 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Terminal sessions move into Maxwell</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-bring-in-for-real</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-bring-in-for-real</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;&lt;strong&gt;Bring into Maxwell&lt;/strong&gt; now ends the session in your terminal before it continues in Maxwell. Recent Claude Code versions stopped recording which process runs a terminal session, so Maxwell couldn't find it, and the session carried on in Warp or Terminal while a second copy started in Maxwell. Maxwell's hook now notes the process itself.&lt;/p&gt;
+&lt;p&gt;When Claude Code hasn't been told it may work in a folder, &lt;span class=&quot;kc&quot;&gt;&lt;kbd&gt;⌘&lt;/kbd&gt;&lt;kbd&gt;T&lt;/kbd&gt;&lt;/span&gt; and New Session now ask &lt;strong&gt;Let Claude work in this folder?&lt;/strong&gt;, the same question Claude asks in a terminal. Click &lt;strong&gt;Trust Folder&lt;/strong&gt; and the session starts.&lt;/p&gt;
+&lt;p&gt;Slack and Linear now start off. Turn them on in &lt;strong&gt;Settings › Plugins&lt;/strong&gt; when you want them.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed Bring into Maxwell failing for sessions started in the home folder&lt;/li&gt;&lt;li&gt;Fixed the &quot;Not trusted on default yet&quot; dead end on ⌘ T&lt;/li&gt;&lt;li&gt;Messages name the account only when you have more than one&lt;/li&gt;&lt;li&gt;When several Claude sessions run in the same folder and Maxwell can't tell which one to move, it says so and leaves them running&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Quieter plugin lists and a tidier Settings</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-cleaner-panels</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-cleaner-panels</guid>

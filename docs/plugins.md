@@ -23,6 +23,8 @@ Maxwell looks in two places, user plugins first:
 2. `Maxwell.app/Contents/Resources/plugins/<id>/` (the plugins that ship with Maxwell)
 
 A user plugin with the same id replaces the bundled one. Installing is copying the folder in.
+The plugins that ship with Maxwell (Slack, Linear) stay off until you turn them on in Settings ›
+Plugins; a plugin you install yourself is on.
 Maxwell picks it up without a restart.
 
 ### The manifest
@@ -252,7 +254,7 @@ Settings live in the Maxwell config file, namespaced by plugin id, Ghostty style
 ```
 linear.team = TIN
 linear.sync = suggest
-linear.enabled = false     # turn a plugin off (default: on)
+linear.enabled = true      # on or off (default: on for plugins you install, off for built-in ones)
 ```
 
 Settings › Plugins draws the manifest's fields and writes these lines.

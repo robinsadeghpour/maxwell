@@ -735,7 +735,7 @@ final class SettingsView: MXView {
         for p in model.plugins {
             let m = p.manifest
             form.header("\(m.name)  ·  \(m.version)\(m.bundled ? "  ·  built in" : "")")
-            let on = c.pluginEnabled(m.id)
+            let on = c.pluginEnabled(m)
             form.toggle("Enabled", on, note: m.description) { [weak self] in self?.set("\(m.id).enabled", $0 ? "true" : "false") }
             guard on else { continue }
             var buttons: [(NSView, CGFloat)] = [(Label(p.status.line, font: Fonts.mono(Metrics.fontSize - 1), color: { $0.fg }), w - 190)]

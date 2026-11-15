@@ -95,20 +95,122 @@ enum ClaudeCLI {
         return .success(parts[1].trimmingCharacters(in: .whitespaces))
     }
 
-    /// The interactive process running `sessionId` in a terminal on this account, from Claude
-    /// Code's own pid files (`<config>/sessions/<pid>.json`), with whether it skips permissions.
-    static func terminalProcess(sessionId: String, account: Account) -> (pid: pid_t, skipsPermissions: Bool)? {
+    /// Where a session that runs in another terminal is running.
+    enum TerminalProcess: Equatable {
+        case none                                           // no process: resuming is safe
+        case found(pid: pid_t, skipsPermissions: Bool)
+        case unsure(count: Int)                             // several in its folder, none known to be it
+    }
+
+    /// The interactive process running `s` in a terminal on `account`: the process Maxwell's hook
+    /// recorded, Claude Code's own pid file (versions that write one for interactive sessions), or
+    /// the one interactive `claude` in the session's folder (hooks from before the pid). That last
+    /// guess is only made for the folder's newest session (`newestInFolder`): an older one that
+    /// ended without saying so would otherwise be matched to someone else's live terminal.
+    static func terminalProcess(_ s: Session, account: Account, newestInFolder: Bool) -> TerminalProcess {
+        if case .elsewhere(let pid?) = s.reach, let args = interactiveArgs(pid_t(pid)) {
+            return .found(pid: pid_t(pid), skipsPermissions: skipsPermissions(args))
+        }
         let dir = account.configDir.appendingPathComponent("sessions")
         let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         for f in files where f.hasSuffix(".json") {
             guard let data = FileManager.default.contents(atPath: dir.appendingPathComponent(f).path),
                   let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  j["sessionId"] as? String == sessionId, j["kind"] as? String == "interactive",
-                  let pid = (j["pid"] as? NSNumber)?.int32Value, kill(pid, 0) == 0 else { continue }
-            let args = run("/bin/ps", ["-o", "args=", "-p", "\(pid)"]).out
-            return (pid, args.contains("--dangerously-skip-permissions") || args.contains("bypassPermissions"))
+                  j["sessionId"] as? String == s.id, j["kind"] as? String == "interactive",
+                  let pid = (j["pid"] as? NSNumber)?.int32Value, let args = interactiveArgs(pid) else { continue }
+            return .found(pid: pid, skipsPermissions: skipsPermissions(args))
         }
-        return nil
+        let here = interactiveClaudes().filter { $0.cwd == s.cwd }
+        if let p = here.first(where: { $0.args.contains(s.id) }) ?? (here.count == 1 && newestInFolder ? here.first : nil) {
+            return .found(pid: p.pid, skipsPermissions: skipsPermissions(p.args))
+        }
+        return here.isEmpty || !newestInFolder ? .none : .unsure(count: here.count)
+    }
+
+    private static func skipsPermissions(_ args: String) -> Bool {
+        args.contains("--dangerously-skip-permissions") || args.contains("bypassPermissions")
+    }
+
+    /// A `claude` someone runs in a terminal, not Claude Code's background machinery
+    /// (`bg-spare`, `bg-pty-host`, `daemon`) or a one-off command (`attach`, `-p`, ...).
+    static func isInteractiveClaude(_ args: String) -> Bool {
+        let words = args.split(separator: " ").map(String.init)
+        // `claude ...`, `/path/to/claude ...`, or `node /path/to/claude ...` (npm installs).
+        guard words.prefix(2).contains(where: { ($0 as NSString).lastPathComponent == "claude" }) else { return false }
+        let notInteractive: Set<String> = ["daemon", "attach", "agents", "logs", "stop", "mcp", "doctor", "update", "-p", "--print"]
+        return !words.contains { notInteractive.contains($0) || $0.hasPrefix("--bg") || $0.hasPrefix("bg-") }
+    }
+
+    /// The process's arguments when it is alive and an interactive `claude`.
+    private static func interactiveArgs(_ pid: pid_t) -> String? {
+        guard pid > 1, kill(pid, 0) == 0 else { return nil }
+        let args = run("/bin/ps", ["-o", "args=", "-p", "\(pid)"]).out.trimmingCharacters(in: .whitespacesAndNewlines)
+        return isInteractiveClaude(args) ? args : nil
+    }
+
+    /// Every interactive `claude` on this Mac with its working folder.
+    private static func interactiveClaudes() -> [(pid: pid_t, cwd: String, args: String)] {
+        let procs: [(pid: pid_t, args: String)] = run("/bin/ps", ["-axo", "pid=,args="]).out.split(separator: "\n").compactMap { line in
+            let t = line.trimmingCharacters(in: .whitespaces)
+            guard let sp = t.firstIndex(of: " "), let pid = pid_t(t[..<sp]) else { return nil }
+            let args = t[sp...].trimmingCharacters(in: .whitespaces)
+            return isInteractiveClaude(args) ? (pid, args) : nil
+        }
+        guard !procs.isEmpty else { return [] }
+        // `lsof -Fn` prints "p<pid>" and then "n<path>" for each process's working folder.
+        var cwd: [pid_t: String] = [:], current: pid_t?
+        for line in run("/usr/sbin/lsof", ["-a", "-d", "cwd", "-Fn", "-p", procs.map { "\($0.pid)" }.joined(separator: ",")]).out.split(separator: "\n") {
+            if line.hasPrefix("p") { current = pid_t(line.dropFirst()) }
+            else if line.hasPrefix("n"), let p = current { cwd[p] = String(line.dropFirst()) }
+        }
+        return procs.compactMap { p in cwd[p.pid].map { (p.pid, $0, p.args) } }
+    }
+
+    // MARK: folder trust
+
+    /// Claude Code's record of the folders it may work in: `projects[path].hasTrustDialogAccepted`
+    /// in the account's `.claude.json` (`~/.claude.json` for the default account).
+    static func trustFile(_ account: Account) -> URL {
+        account.configDirEnv == nil ? Paths.home.appendingPathComponent(".claude.json") : account.configDir.appendingPathComponent(".claude.json")
+    }
+
+    /// True when `folder` or a folder above it is trusted on `account`.
+    static func isTrusted(_ folder: String, account: Account) -> Bool {
+        guard let data = FileManager.default.contents(atPath: trustFile(account).path),
+              let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let projects = j["projects"] as? [String: Any] else { return false }
+        var dir = folder
+        while true {
+            if (projects[dir] as? [String: Any])?["hasTrustDialogAccepted"] as? Bool == true { return true }
+            let up = (dir as NSString).deletingLastPathComponent
+            if up == dir || up.isEmpty { return false }
+            dir = up
+        }
+    }
+
+    /// Says yes to Claude Code's "Do you trust the files in this folder?" for `folder`, writing
+    /// the same record its own prompt writes. Claude Code writes this file too, so it checks
+    /// that the answer stuck and tries again if not.
+    @discardableResult
+    static func trust(_ folder: String, account: Account) -> Bool {
+        let url = trustFile(account)
+        for _ in 0..<3 {
+            if isTrusted(folder, account: account) { return true }
+            var j: [String: Any] = [:]
+            if let data = FileManager.default.contents(atPath: url.path) {
+                guard let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+                j = parsed
+            }
+            var projects = j["projects"] as? [String: Any] ?? [:]
+            var entry = projects[folder] as? [String: Any] ?? [:]
+            entry["hasTrustDialogAccepted"] = true
+            projects[folder] = entry
+            j["projects"] = projects
+            guard let out = try? JSONSerialization.data(withJSONObject: j, options: [.prettyPrinted]) else { return false }
+            try? out.write(to: url, options: .atomic)
+            usleep(100_000)
+        }
+        return isTrusted(folder, account: account)
     }
 
     /// `claude --bg --resume <id>`: the same conversation, under the same id, as a background

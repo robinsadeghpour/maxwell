@@ -60,7 +60,9 @@ struct Config: Equatable {
     var plugins: [PluginID: [String: String]] = [:]
 
     /// Plugins are on unless `<id>.enabled = false`.
-    func pluginEnabled(_ id: PluginID) -> Bool { plugins[id]?["enabled"].map { !["false", "off"].contains($0) } ?? true }
+    /// `<id>.enabled` when set. Otherwise a plugin you installed yourself is on, and one that
+    /// comes with Maxwell (Slack, Linear) is off until you turn it on in Settings › Plugins.
+    func pluginEnabled(_ m: PluginManifest) -> Bool { plugins[m.id]?["enabled"].map { !["false", "off"].contains($0) } ?? !m.bundled }
 
     /// A plugin's settings with the manifest's defaults filled in. Secrets are never here.
     func pluginSettings(_ m: PluginManifest) -> [String: String] {

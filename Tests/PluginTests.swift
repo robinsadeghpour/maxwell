@@ -78,7 +78,14 @@ func pluginTests() {
 
     // Settings.
     let cfg = Config.parse("linear.team = ACME\nlinear.enabled = false\nslack.sync = off\naccount = work ~/.claude\n")
-    check(cfg.plugins["linear"]?["team"] == "ACME" && !cfg.pluginEnabled("linear") && cfg.pluginEnabled("slack"), "plugin settings are namespaced lines; on unless enabled = false")
+    func manifest(_ id: String, bundled: Bool) -> PluginManifest? {
+        guard case .success(var m) = PluginManifest.parse(Data(#"{"id":"\#(id)","name":"X","version":"1","protocol":1,"run":["x"]}"#.utf8), dir: dir) else { return nil }
+        m.bundled = bundled
+        return m
+    }
+    let mine = manifest("slack", bundled: false)!, builtIn = manifest("slack", bundled: true)!, offLinear = manifest("linear", bundled: false)!
+    check(cfg.plugins["linear"]?["team"] == "ACME" && !cfg.pluginEnabled(offLinear) && cfg.pluginEnabled(mine), "plugin settings are namespaced lines; a plugin you installed is on unless enabled = false")
+    check(!cfg.pluginEnabled(builtIn) && Config.parse("slack.enabled = true\n").pluginEnabled(builtIn), "a plugin that comes with Maxwell is off until turned on")
     if case .success(var m) = PluginManifest.parse(Data(#"{"id":"linear","name":"L","version":"1","protocol":1,"run":["x"],"settings":[{"key":"team","title":"Team","type":"string","default":"ENG"},{"key":"sync","title":"Sync","type":"choice","default":"suggest"},{"key":"api-key","title":"Key","type":"secret"}]}"#.utf8), dir: dir) {
         m.dir = dir
         check(cfg.pluginSettings(m) == ["team": "ACME", "sync": "suggest"], "settings fill defaults and never include secrets")

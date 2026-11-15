@@ -413,6 +413,17 @@ wrapped = reduce(wrapped, .judged(hash: Reply.hash(wrapped.sessions["s1"]!.lastM
 check(verdictOf(wrapped, "s1", at: later).first { $0.kind == .wrap }.map { [$0.outcome.rawValue, $0.detail] } == ["fail", "Not done · PR #25 waiting on CI"], "not done fails the status line check")
 check(groupOf(wrapped, "s1", at: later) != .safeToClose, "a session that says not done is never safe")
 
+// Terminal sessions: the hook's pid says which process to stop when one moves into Maxwell.
+let pidLine = #"{"ts":1800000000000,"configDir":"\#(home.path)/.claude","pid":4242,"hook":{"session_id":"t1","hook_event_name":"Stop","cwd":"/tmp/x"}}"#
+var term = AppState(accounts: accounts)
+term = reduce(term, EventParser.parse(line: Substring(pidLine))!)
+check(term.sessions["t1"]?.reach == .elsewhere(pid: 4242), "a hook's pid marks the terminal process")
+let oldLine = #"{"ts":1800000001000,"configDir":"\#(home.path)/.claude","hook":{"session_id":"t1","hook_event_name":"Stop","cwd":"/tmp/x"}}"#
+term = reduce(term, EventParser.parse(line: Substring(oldLine))!)
+check(term.sessions["t1"]?.reach == .elsewhere(pid: 4242), "a hook line without a pid keeps the one known")
+term = reduce(term, hook(.stopped(lastMessage: "ok"), "t0", at: -100))
+check(term.isNewestInFolder(term.sessions["t1"]!) && !term.isNewestInFolder(term.sessions["t0"]!), "only the newest session in a folder is a lone terminal's")
+
 logoTests()
 artifactTests()
 pluginTests()

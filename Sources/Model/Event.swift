@@ -36,6 +36,8 @@ struct Hook: Equatable {
     var cwd: String?
     var transcriptPath: String?
     var kind: Kind
+    /// The Claude Code process the hook ran for (hooks from Maxwell 0.1.24 on).
+    var pid: Int? = nil
 
     enum Kind: Equatable {
         case sessionStart(source: String)
@@ -94,7 +96,10 @@ enum EventParser {
         let at = Date(timeIntervalSince1970: ts / 1000)
         if let m = obj["maxwell"] as? [String: Any] { return MaxwellRecord.parse(m, at: at) }
         guard let configDir = obj["configDir"] as? String else { return nil }
-        if let h = obj["hook"] as? [String: Any] { return parseHook(h, at: at, configDir: configDir).map(Event.hook) }
+        if let h = obj["hook"] as? [String: Any] {
+            let pid = (obj["pid"] as? NSNumber)?.intValue
+            return parseHook(h, at: at, configDir: configDir).map { var h = $0; h.pid = pid.flatMap { $0 > 0 ? $0 : nil }; return .hook(h) }
+        }
         if let u = obj["usage"] as? [String: Any] { return .usage(parseUsage(u, at: at, configDir: configDir)) }
         return nil
     }

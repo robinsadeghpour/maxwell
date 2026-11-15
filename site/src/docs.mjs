@@ -43,9 +43,11 @@ export const pages = {
 <h2>Start a session</h2>
 <p>${k("⌘ T")} starts a session in the folder of the project on screen, on the account with the most room. ${k("⌘ N")} asks for the folder and the account first.</p>
 <p>Maxwell runs <code>claude --bg</code>, attaches the session in the middle pane, and selects it. Closing Maxwell detaches the terminal. The session goes on.</p>
+<p>Claude Code only works in folders you've said it may. The first time you start a session in a new folder, Maxwell asks <strong>Let Claude work in this folder?</strong>, the same question Claude asks in a terminal. Click <strong>Trust Folder</strong> and the session starts.</p>
 <h2>Bring in a terminal session</h2>
 <p>Sessions running in another terminal show up too, read-only. To move one into Maxwell, select it and click <strong>Bring into Maxwell</strong>. To move every one with a live process, choose <strong>Session › Bring Terminal Sessions into Maxwell…</strong>.</p>
-<p>Maxwell ends the terminal's <code>claude</code>, waits for it to exit, and resumes the same conversation with <code>claude --bg --resume</code>, under the same id, account, folder and permission mode. A session in the middle of a turn moves when the turn ends.</p>
+<p>Maxwell ends the terminal's <code>claude</code>, waits for it to exit, and resumes the same conversation with <code>claude --bg --resume</code>, under the same id, account, folder and permission mode. The terminal tab is left at a shell prompt. A session in the middle of a turn moves when the turn ends.</p>
+<p>If several Claude sessions run in the same folder and Maxwell can't tell which is the one you picked, it leaves them running and says so. Quit that one in its terminal (${k("⌃ C")} twice), then bring it in.</p>
 <h2>Permission prompts</h2>
 <p>Sessions Maxwell starts or brings in run with <code>--dangerously-skip-permissions</code> by default, so they don't stop before every command. To keep Claude's own permission mode, turn off <strong>Settings › General › Sessions › Skip permission prompts</strong>, or add this line to the config:</p>
 <pre><code>skip-permissions = off</code></pre>`,
@@ -232,6 +234,7 @@ motion = on                 <span class="c"># off: no slides or fades</span></co
     body: `
 <h2>Connect</h2>
 <ol class="steps">
+<li>In Maxwell, turn on <strong>Settings › Plugins › Linear</strong>. The plugins that come with Maxwell start off.</li>
 <li>In Linear, open <strong>Settings › Security &amp; access</strong> and create a personal API key.</li>
 <li>In Maxwell, paste it in <strong>Settings › Plugins › Linear › API key</strong>. It's stored in the Keychain, and only this plugin can read it.</li>
 </ol>
@@ -261,6 +264,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
     body: `
 <h2>Connect</h2>
 <ol class="steps">
+<li>In Maxwell, turn on <strong>Settings › Plugins › Slack</strong>. The plugins that come with Maxwell start off.</li>
 <li>Press ${k("⌘ K")} and choose <strong>Connect Slack…</strong>. Slack's "create app" page opens with the manifest filled in: a user token with read-only scopes, no bot, no events.</li>
 <li>Click <strong>Create</strong>, then <strong>Install to Workspace</strong>. If your workspace needs an admin to approve apps, they approve it there.</li>
 <li>Copy the <strong>User OAuth Token</strong> (<code>xoxp-…</code>) from OAuth &amp; Permissions into <strong>Settings › Plugins › Slack</strong>. Maxwell keeps it in the Keychain.</li>

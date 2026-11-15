@@ -272,4 +272,13 @@ struct AppState: Equatable {
         accounts.filter { $0.id != excluding && $0.limitResetsAt(now: now) == nil }
             .min { ($0.usedPercent ?? 50) < ($1.usedPercent ?? 50) }
     }
+
+    /// True when no other session in another terminal, on the same account and folder, was active
+    /// more recently: the only one a lone `claude` running in that folder can be.
+    func isNewestInFolder(_ s: Session) -> Bool {
+        !sessions.values.contains { o in
+            guard o.id != s.id, o.accountId == s.accountId, o.cwd == s.cwd, o.phase != .ended, case .elsewhere = o.reach else { return false }
+            return o.lastEventAt > s.lastEventAt
+        }
+    }
 }

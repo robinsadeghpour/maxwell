@@ -25,6 +25,7 @@ func reduce(into s: inout AppState, _ event: Event) {
         session.hookSeenAt = max(session.hookSeenAt ?? h.at, h.at)
         if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
         if let t = h.transcriptPath { session.transcriptPath = t }
+        if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
         switch h.kind {
         case .sessionStart:
             if session.phase == .ended { session.phase = .yourTurn }
