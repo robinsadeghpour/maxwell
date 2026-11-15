@@ -31,4 +31,4 @@ Maxwell depends on Claude Code's undocumented files and output. [docs/claude-cod
 
 ## Shipping
 
-Robin doesn't review PRs, test or release by hand. Get confident, wait for CI, merge your own PR into `v1`, and release: [docs/releasing.md](docs/releasing.md). Record decisions in `docs/decisions.tsv`.
+Robin doesn't review PRs, test or release by hand. Get confident, push your branch, open a PR, wait for CI, merge it into `v1` yourself, and release. `v1` refuses anything whose CI hasn't passed, direct pushes included, for everyone: [docs/releasing.md](docs/releasing.md). Record decisions in `docs/decisions.tsv`.

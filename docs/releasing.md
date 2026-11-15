@@ -2,7 +2,7 @@
 
 Robin doesn't review PRs, test or release by hand. Get confident yourself (`./build.sh test`, a check in Maxwell Dev), wait for CI on your pull request, merge it into `v1`, then release. Don't leave a PR waiting.
 
-`v1` is where work lands. `main` is the last released commit; the release workflow moves it, and pushing it deploys runmaxwell.com (Vercel).
+`v1` is where work lands, only through pull requests whose CI (`test-and-build`) passed; direct pushes and force pushes are refused, for admins too. `main` is the last released commit; the release workflow moves it, and pushing it deploys runmaxwell.com (Vercel).
 
 ## Steps
 
@@ -17,4 +17,4 @@ Robin doesn't review PRs, test or release by hand. Get confident yourself (`./bu
 
 GhosttyKit is cached in Actions by its pin; zig only runs (~7 min) when `GHOSTTY_COMMIT` in `build.sh` changes. The Developer ID certificate and notary key are secrets of the `release` environment, usable only from `v1` and `main`. If the certificate is replaced, Robin runs `packaging/ci/set-release-secrets.sh cert` once. Never go back to unsigned DMGs (Gatekeeper blocks them for every new user) or ad-hoc signing (every update would ask for the Keychain again). Only the Account Holder can create a new Developer ID certificate.
 
-**If CI is down:** `./release.sh <v> "<notes>"` from an up-to-date `v1` in `~/projects/maxwell-oss`, which has `vendor` and `.release.env` (`MAXWELL_ASC_PROFILE`). The login keychain holds the certificate.
+**If CI is down:** `./release.sh <v> "<notes>"` from an up-to-date `v1` in `~/projects/maxwell-oss` (release from a commit that is already on `v1`; `release.sh` can't push `v1` past its protection), which has `vendor` and `.release.env` (`MAXWELL_ASC_PROFILE`). The login keychain holds the certificate.
