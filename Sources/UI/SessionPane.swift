@@ -105,7 +105,7 @@ final class SessionPane: MXView {
             banner.configure(group: group, text: "Safe to close · every check passed; → on its row lists them", tint: { $0.safe })
             banner.add(MXButton("Not safe") { [weak self] in self?.delegate?.notSafe(s.id) })
             if case .background = s.reach {
-                banner.add(MXButton("Close session", hint: "⌘⌫", primary: true) { [weak self] in self?.delegate?.close(s.id) })
+                banner.add(MXButton("Close session", hint: "⇧⌘⌫", primary: true) { [weak self] in self?.delegate?.close(s.id) })
             }
         case .recentlyClosed:
             banner.configure(group: group, text: "Closed by Maxwell · stopped with claude stop, conversation kept", tint: { $0.fg3 })

@@ -73,7 +73,7 @@ Closing a session that's still working, or that's waiting on you, costs you work
 3. **A final read by a small model.** Only for sessions that passed everything else, Haiku reads the last message once and has to answer `finished`. Each read costs about $0.0002.
 4. **You see the evidence.** Each safe session lists every check and where its result came from. "Close all safe" asks you to confirm and shows the list first.
 5. **Checked again at the moment of closing.** If anything changed, that session is skipped.
-6. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days. You can close any session yourself too, from its right-click menu or ⌘⌫. If it isn't safe yet, Maxwell says what's still open and asks first.
+6. **Closing never deletes.** Maxwell only runs `claude stop`, which keeps the conversation. Undo for 10 seconds, and reopen anything from Recently closed for 7 days. You can close any session yourself too, from its right-click menu or ⇧⌘⌫. If it isn't safe yet, Maxwell says what's still open and asks first.
 7. **"Not safe" teaches it.** Mark a wrong call and it becomes a test case, so the mistake can't repeat.
 
 Run `Maxwell state` to audit every session and see which check holds each one back.
@@ -90,8 +90,10 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘T | New session in the current folder, on the account with the most room |
 | ⌘N | New session, choosing folder and account |
 | Esc or click outside | Close search, the palette or a panel |
-| ⌘⌫ | Close the session: at once when it's safe, otherwise after saying what's still open |
+| ⇧⌘⌫ | Close the session: at once when it's safe, otherwise after saying what's still open |
 | ⇧⌘X | Close all safe (asks first) |
+| ⌘⌫, ⌥⌫ | In the terminal: delete to the start of the line, delete a word |
+| ⌘V | Paste text, copied files (as paths) or a screenshot (as an image) |
 | ⌘Z | Undo the last close |
 | ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |
 | ⌥⌘P | Pin the current file or artifact |

@@ -3,6 +3,7 @@
 // and the OPEN_URL / PWD actions so terminal paths open in the session's viewer.
 import AppKit
 import GhosttyKit
+import UniformTypeIdentifiers
 
 final class GhosttyRuntime {
     static let shared = GhosttyRuntime()
@@ -21,7 +22,7 @@ final class GhosttyRuntime {
                 DispatchQueue.main.async { if let a = GhosttyRuntime.shared.app { ghostty_app_tick(a) } }
             },
             action_cb: { _, target, action in GhosttyRuntime.shared.handle(target: target, action: action) },
-            read_clipboard_cb: { ud, _, state, mimes, n, _ in readClipboard(ud, state, mimes, n) },
+            read_clipboard_cb: { ud, _, state, mimes, n, list in readClipboard(ud, state, mimes, n, list) },
             confirm_read_clipboard_cb: { _, _, _, _ in },
             write_clipboard_cb: { _, _, contents, n, _ in
                 for i in 0..<n {
@@ -97,27 +98,106 @@ final class GhosttyRuntime {
     }
 }
 
-private func readClipboard(_ ud: UnsafeMutableRawPointer?, _ state: UnsafeMutableRawPointer, _ mimes: UnsafePointer<UnsafePointer<CChar>>, _ n: Int) -> ghostty_clipboard_read_result_e {
+/// Answers Ghostty's clipboard reads the way Ghostty.app does: every requested MIME type the
+/// pasteboard can serve (images too, which Claude Code asks for on ⌘V), copied files as escaped
+/// paths, and the list of available types when `list` asks for it.
+private func readClipboard(_ ud: UnsafeMutableRawPointer?, _ state: UnsafeMutableRawPointer,
+                           _ mimes: UnsafePointer<UnsafePointer<CChar>>, _ n: Int, _ list: Bool) -> ghostty_clipboard_read_result_e {
     guard let ud else { return GHOSTTY_CLIPBOARD_READ_UNSUPPORTED }
     let view = Unmanaged<TerminalView>.fromOpaque(ud).takeUnretainedValue()
-    guard let s = view.surface, let text = NSPasteboard.general.string(forType: .string) else {
-        return GHOSTTY_CLIPBOARD_READ_UNAVAILABLE
+    guard let s = view.surface else { return GHOSTTY_CLIPBOARD_READ_UNSUPPORTED }
+    let pb = NSPasteboard.general
+    var contents: [(mime: String, data: Data)] = []
+    for i in 0..<n {
+        let mime = String(cString: mimes[i])
+        guard !contents.contains(where: { $0.mime == mime }), let data = pb.terminalData(forMime: mime) else { continue }
+        contents.append((mime, data))
     }
-    var mime = "text/plain"
-    for i in 0..<n { let m = String(cString: mimes[i]); if m.hasPrefix("text/plain") { mime = m; break } }
-    mime.withCString { mp in
-        text.withCString { tp in
-            var c = ghostty_clipboard_content_s(mime: mp, data: tp, len: strlen(tp))
-            withUnsafePointer(to: &c) { cp in
-                var done = ghostty_clipboard_complete_s()
-                done.contents = cp
-                done.contents_len = 1
-                done.confirmed = true
-                ghostty_surface_complete_clipboard_request(s, &done, state)
-            }
+    let available = list ? pb.terminalMimes() : []
+    if contents.isEmpty && !list { return GHOSTTY_CLIPBOARD_READ_UNAVAILABLE }
+
+    // Everything handed to Ghostty lives in C memory for the duration of the call.
+    var owned: [UnsafeMutableRawPointer] = []
+    defer { owned.forEach { free($0) } }
+    func cString(_ str: String) -> UnsafePointer<CChar> { let p = strdup(str)!; owned.append(p); return UnsafePointer(p) }
+    let cContents = contents.map { c -> ghostty_clipboard_content_s in
+        let buf = malloc(max(c.data.count, 1))!
+        owned.append(buf)
+        c.data.withUnsafeBytes { if let b = $0.baseAddress { buf.copyMemory(from: b, byteCount: $0.count) } }
+        return ghostty_clipboard_content_s(mime: cString(c.mime), data: buf.assumingMemoryBound(to: CChar.self), len: c.data.count)
+    }
+    let cAvailable = available.map { Optional(cString($0)) }
+    cContents.withUnsafeBufferPointer { cp in
+        cAvailable.withUnsafeBufferPointer { ap in
+            var done = ghostty_clipboard_complete_s()
+            done.contents = cp.baseAddress
+            done.contents_len = cp.count
+            done.available = ap.isEmpty ? nil : UnsafePointer(OpaquePointer(ap.baseAddress))
+            done.available_len = ap.count
+            done.confirmed = true
+            ghostty_surface_complete_clipboard_request(s, &done, state)
         }
     }
     return GHOSTTY_CLIPBOARD_READ_STARTED
+}
+
+extension NSPasteboard {
+    /// Pasted or dropped content as terminal text: copied files become escaped absolute paths
+    /// (Claude Code attaches image paths as images), anything else its plain string.
+    var terminalText: String? {
+        let parts = (pasteboardItems ?? []).compactMap { item -> String? in
+            if let plist = item.propertyList(forType: .fileURL),
+               let url = NSURL(pasteboardPropertyList: plist, ofType: .fileURL) as URL?, url.isFileURL {
+                return Self.shellEscape(url.path)
+            }
+            return item.string(forType: .string)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    private var fileURLs: [URL] {
+        (pasteboardItems ?? []).compactMap { item in
+            guard let plist = item.propertyList(forType: .fileURL),
+                  let url = NSURL(pasteboardPropertyList: plist, ofType: .fileURL) as URL?, url.isFileURL else { return nil }
+            return url
+        }
+    }
+
+    /// An image (a screenshot, a copied picture) with no text or files to paste instead.
+    var holdsOnlyImage: Bool {
+        terminalText == nil && (types ?? []).contains { UTType($0.rawValue)?.conforms(to: .image) == true }
+    }
+
+    func terminalData(forMime mime: String) -> Data? {
+        if mime == "text/plain" || mime.hasPrefix("text/plain;") { return terminalText.map { Data($0.utf8) } }
+        if mime == "text/uri-list" {
+            let urls = fileURLs
+            return urls.isEmpty ? nil : Data(urls.map { $0.absoluteString + "\r\n" }.joined().utf8)
+        }
+        let type = UTType(mimeType: mime).map { PasteboardType($0.identifier) } ?? PasteboardType(mime)
+        return data(forType: type)
+    }
+
+    /// Declared types only, never the data: the listing must stay cheap.
+    func terminalMimes() -> [String] {
+        let declared = types ?? []
+        func mime(_ t: PasteboardType) -> String? {
+            guard let m = UTType(t.rawValue)?.preferredMIMEType else { return nil }
+            return m == "text/plain;charset=utf-8" ? "text/plain" : m
+        }
+        var result: [String] = []
+        let hasFiles = declared.contains(.fileURL)
+        if hasFiles || declared.contains(where: { mime($0) == "text/plain" }) { result.append("text/plain") }
+        if hasFiles { result.append("text/uri-list") }
+        for t in declared { if let m = mime(t), !result.contains(m) { result.append(m) } }
+        return result
+    }
+
+    static func shellEscape(_ s: String) -> String {
+        var out = ""
+        for ch in s { if "\\ ()[]{}<>\"'`!#$&;|*?\t".contains(ch) { out.append("\\") }; out.append(ch) }
+        return out
+    }
 }
 
 final class TerminalView: NSView, NSTextInputClient {
@@ -154,6 +234,7 @@ final class TerminalView: NSView, NSTextInputClient {
         }
         owned.forEach { free($0) }
         if surface == nil { NSLog("ghostty_surface_new failed") }
+        registerForDraggedTypes([.fileURL, .string])
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -234,14 +315,31 @@ final class TerminalView: NSView, NSTextInputClient {
         guard let surface else { return }
         var k = k
         if let text, !text.isEmpty, let first = text.unicodeScalars.first,
-           first.value >= 0x20, !(0xF700...0xF8FF).contains(first.value) {
+           first.value >= 0x20, first.value != 0x7F, !(0xF700...0xF8FF).contains(first.value) {
             text.withCString { p in k.text = p; _ = ghostty_surface_key(surface, k) }
         } else {
             _ = ghostty_surface_key(surface, k)
         }
     }
 
+    /// Claude Code reads images off the clipboard itself, but only on Ctrl+V: a terminal's ⌘V has
+    /// no text to paste for an image, so it sends nothing. With only an image on the clipboard,
+    /// ⌘V presses Ctrl+V instead.
+    private static func imagePasteAsCtrlV(_ e: NSEvent) -> [NSEvent]? {
+        guard e.modifierFlags.intersection([.command, .shift, .control, .option]) == .command,
+              e.charactersIgnoringModifiers?.lowercased() == "v", NSPasteboard.general.holdsOnlyImage else { return nil }
+        return [NSEvent.EventType.keyDown, .keyUp].compactMap {
+            NSEvent.keyEvent(with: $0, location: .zero, modifierFlags: .control, timestamp: e.timestamp,
+                             windowNumber: e.windowNumber, context: nil, characters: "\u{16}",
+                             charactersIgnoringModifiers: "v", isARepeat: false, keyCode: 9)
+        }
+    }
+
     override func keyDown(with e: NSEvent) {
+        if let ctrlV = Self.imagePasteAsCtrlV(e) {
+            for c in ctrlV { c.type == .keyDown ? keyDown(with: c) : keyUp(with: c) }
+            return
+        }
         let action = e.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
         // Let AppKit's text system turn the key into text (dead keys, option chars).
         keyText = []
@@ -294,6 +392,18 @@ final class TerminalView: NSView, NSTextInputClient {
         window?.convertToScreen(convert(bounds, to: nil)) ?? .zero
     }
     func characterIndex(for point: NSPoint) -> Int { 0 }
+
+    // MARK: drag and drop
+    /// Dropped files paste as escaped paths, like Ghostty.app; Claude Code attaches images by path.
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        sender.draggingPasteboard.terminalText == nil ? [] : .copy
+    }
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        guard let surface, let text = sender.draggingPasteboard.terminalText, !text.isEmpty else { return false }
+        text.withCString { ghostty_surface_paste_text(surface, $0, UInt(strlen($0))) }
+        window?.makeFirstResponder(self)
+        return true
+    }
 
     // MARK: mouse
     override func updateTrackingAreas() {

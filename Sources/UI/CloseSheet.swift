@@ -1,6 +1,6 @@
 import AppKit
 
-/// "Close all safe" (and ⌘⌫ on one session): every session with its checklist, and nothing
+/// "Close all safe" (and ⇧⌘⌫ on one session): every session with its checklist, and nothing
 /// closes until you confirm. ⏎ closes, esc cancels.
 final class CloseSheet: MXView {
     struct Item { var id: SessionID; var title: String; var detail: String; var checks: [Check]; var hash: String? }

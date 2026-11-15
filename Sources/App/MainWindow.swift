@@ -616,7 +616,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// ⌘⌫, the row menu and the banner button. Safe sessions close at once; any other asks
+    /// ⇧⌘⌫ (⌘⌫ itself belongs to the terminal: delete to line start), the row menu and the banner button. Safe sessions close at once; any other asks
     /// first and says what is still open. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
         guard let s = store.state.sessions[id], s.phase != .ended else { return }
@@ -1209,7 +1209,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "undo-close", title: "Undo Close", menu: "Session", shortcut: Shortcut("cmd+z"), isEnabled: { [weak self] in self?.root.status.toastAction != nil }) { [weak self] in
                 self?.root.status.runToastAction()
             },
-            Action(id: "close-session", title: "Close Session", menu: "Session", shortcut: Shortcut("cmd+backspace"), isEnabled: hasCurrent) { [weak self] in
+            Action(id: "close-session", title: "Close Session", menu: "Session", shortcut: Shortcut("cmd+shift+backspace"), isEnabled: hasCurrent) { [weak self] in
                 if let id = self?.current { self?.close(id) }
             },
             Action(id: "close-all-safe", title: "Close All Safe Sessions", menu: "Session", shortcut: Shortcut("cmd+shift+x")) { [weak self] in self?.closeAllSafe() },
