@@ -48,7 +48,7 @@ export const pages = {
 <p>Maxwell runs <code>claude --bg</code>, attaches the session in the middle pane, and selects it. Closing Maxwell detaches the terminal. The session goes on.</p>
 <p>Claude Code only works in folders you've said it may. The first time you start a session in a new folder, Maxwell asks <strong>Let Claude work in this folder?</strong>, the same question Claude asks in a terminal. Click <strong>Trust Folder</strong> and the session starts.</p>
 <h2>Bring in a terminal session</h2>
-<p>Sessions running in another terminal show up too, read-only. To move one into Maxwell, select it and click <strong>Bring into Maxwell</strong>. To move every one with a live process, choose <strong>Session › Bring Terminal Sessions into Maxwell…</strong>.</p>
+<p>Run <code>claude</code> in a terminal you opened in Maxwell and its row becomes the session, with the terminal live in the pane. Sessions running in another terminal app show up too, read-only. To move one into Maxwell, select it and click <strong>Bring into Maxwell</strong>. To move every one with a live process, choose <strong>Session › Bring Terminal Sessions into Maxwell…</strong>.</p>
 <p>Maxwell ends the terminal's <code>claude</code>, waits for it to exit, and resumes the same conversation with <code>claude --bg --resume</code>, under the same id, account, folder and permission mode. The terminal tab is left at a shell prompt. A session in the middle of a turn moves when the turn ends.</p>
 <p>If several Claude sessions run in the same folder and Maxwell can't tell which is the one you picked, it leaves them running and says so. Quit that one in its terminal (${k("⌃ C")} twice), then bring it in.</p>
 <h2>Permission prompts</h2>

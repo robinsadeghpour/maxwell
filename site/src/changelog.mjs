@@ -5,6 +5,19 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-claude-in-a-maxwell-terminal",
+    date: "2026-11-15",
+    versions: "0.1.43",
+    title: "Claude in a Maxwell terminal is one row",
+    figure: "",
+    body: `
+<p>Run <code>claude</code> in a terminal you opened in Maxwell (${k("⌥ ⌘ T")}) and that terminal's row becomes the session's: its title, its group, Needs you and Your turn. Before, the terminal and the session showed up as two rows, and the session's pane was read-only even though it ran right there.</p>
+<p>The pane shows the terminal, live, under the session's project, folder and branch. When Claude exits, the terminal's row comes back where it was. Sessions started in other terminal apps still show as <em>in a terminal</em> and can be brought in as before.</p>`,
+    fixes: [
+      "A session's row menu offers Close Terminal when it runs in a Maxwell terminal, instead of Bring into Maxwell",
+    ],
+  },
+  {
     slug: "2026-11-15-panel-tabs-stay",
     date: "2026-11-15",
     versions: "0.1.42",
