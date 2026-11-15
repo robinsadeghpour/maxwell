@@ -34,7 +34,18 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-agents-waiting">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-idle-sessions-free-their-memory">
+  <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.48</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-15-idle-sessions-free-their-memory">Idle sessions free their memory</a></h2>
+    
+    <div class="prose"><p>Claude Code stops a background session that has been idle for about an hour, to free memory, but only when no terminal is attached to it. Maxwell used to keep every session you opened attached until it quit, so none of them were ever stopped. Now Maxwell lets go of a session's terminal after 10 minutes off screen, and attaches again when you open it.</p>
+<p>A session Claude Code stopped while it waited on you stays in Your turn or Needs you. Opening it shows its last reply and a Resume button, so moving through the list doesn't start every session it passes. <span class="kc"><kbd>⌘</kbd><kbd>R</kbd></span> resumes it too. Its conversation is kept, as always.</p></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Grey text is easier to read in every theme and now meets WCAG AA contrast</span></li><li><span>A session waiting on you no longer disappears from the list when Claude Code stops it</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-15-agents-waiting">
   <aside><div><time datetime="2026-11-15">Nov 15, 2026</time><span class="ver">v0.1.47</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-15-agents-waiting">Agents that wait still count</a></h2>
