@@ -290,7 +290,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let m = NSMenu()
         m.addItem(MenuAction("Open") { [weak self] in self?.open(s.id) })
         m.addItem(MenuAction("Rename…") { [weak self] in self?.rename(s.id) })
-        m.addItem(MenuAction("Suggest a Title") { [weak self] in self?.suggestTitle(s.id) })
+        if store.config.autoTitles { m.addItem(MenuAction("Suggest a Title") { [weak self] in self?.suggestTitle(s.id) }) }
         m.addItem(.separator())
         let move = NSMenuItem(title: "Move to Project", action: nil, keyEquivalent: "")
         let sub = NSMenu()

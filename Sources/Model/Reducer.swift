@@ -278,6 +278,9 @@ enum Reply: Equatable {
 }
 
 enum Titles {
+    /// `auto-titles`: off when people name their sessions themselves.
+    static var auto = true
+
     /// First words of a prompt, for sessions with no name yet.
     static func fromPrompt(_ prompt: String) -> String {
         let words = prompt.split(whereSeparator: { $0.isWhitespace }).prefix(6).joined(separator: " ")

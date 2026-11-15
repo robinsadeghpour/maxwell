@@ -232,8 +232,9 @@ enum ClaudeCLI {
 
     /// `claude --bg --resume <id>`: the same conversation, under the same id, as a background
     /// session. Claude starts a copy instead while it still sees the old process; that is reported.
-    static func resumeBackground(account: Account, cwd: String, sessionId: String, name: String, skipPermissions: Bool) -> Swift.Result<(short: String, copy: Bool), StartError> {
-        var args = ["--bg", "--resume", sessionId, "--name", name]
+    static func resumeBackground(account: Account, cwd: String, sessionId: String, name: String?, skipPermissions: Bool) -> Swift.Result<(short: String, copy: Bool), StartError> {
+        var args = ["--bg", "--resume", sessionId]
+        if let name { args += ["--name", name] }
         if skipPermissions { args.append("--dangerously-skip-permissions") }
         let r = run(claudePath, args, cwd: cwd, env: env(for: account), timeout: 30)
         let text = r.out + r.err

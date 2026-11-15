@@ -57,6 +57,9 @@ struct Config: Equatable {
     var wrapLine = true
     /// Sessions Maxwell starts or brings in run with `--dangerously-skip-permissions`. Off: Claude's own default mode.
     var skipPermissions = true
+    /// Maxwell titles sessions from the conversation and names the ones it brings in.
+    /// Off: a session shows the name it has in Claude Code (`/rename`), and Maxwell never changes it.
+    var autoTitles = true
     /// `project = <name> <path glob>` lines, checked before the git-derived project.
     var projects: [ProjectRule] = []
     var accounts: [Account] = []
@@ -141,6 +144,7 @@ struct Config: Equatable {
             case "judge": c.judge = !["off", "false"].contains(value)
             case "wrap-line": c.wrapLine = !["off", "false"].contains(value)
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
+            case "auto-titles": c.autoTitles = !["off", "false"].contains(value)
             case "project":
                 // project = <name> <path glob>; the name may contain spaces, the glob is the last word.
                 guard let sp = value.lastIndex(of: " ") else { continue }
@@ -263,6 +267,9 @@ struct Config: Equatable {
     # Sessions Maxwell starts or brings in skip every permission prompt (--dangerously-skip-permissions).
     # off = Claude's own default permission mode.
     skip-permissions = on
+    # Maxwell titles sessions from what they work on, and names the ones it brings in.
+    # off = sessions keep the name you give them (/rename in Claude Code, or Rename… in Maxwell).
+    auto-titles = on
     # project = <name> <path glob>. Without one, a session's project is its git repo
     # (worktrees count as their parent repo).
     # project = Orbit ~/projects/orbit*

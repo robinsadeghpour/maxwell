@@ -15,6 +15,13 @@
 &lt;p&gt;A new Maxwell often finds sessions from days ago that are still running. They fold into Idle, and its new &lt;strong&gt;stop all&lt;/strong&gt; stops the background ones. Conversations are kept, and &lt;strong&gt;Undo&lt;/strong&gt; brings them back. Rows of sessions running in another terminal now say so.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;A question nobody answered for 3 days now folds into Idle instead of staying in Needs you&lt;/li&gt;&lt;li&gt;The Dock badge now counts the Needs you group&lt;/li&gt;&lt;/ul&gt;</description>
 </item>
 <item>
+<title>Keep the names you give your sessions</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-15-your-own-names</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-15-your-own-names</guid>
+<pubDate>Sun, 15 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;If you name your sessions yourself, turn off &lt;strong&gt;Settings › General › Sessions › Name sessions for me&lt;/strong&gt;. Each session then shows what Claude Code shows: the name you gave it with &lt;code&gt;/rename&lt;/code&gt;, or its own title. Haiku no longer titles it, and &lt;strong&gt;Bring into Maxwell&lt;/strong&gt; keeps its name. &lt;strong&gt;Rename&lt;/strong&gt; in Maxwell still works. The setting is on by default, so nothing changes unless you turn it off.&lt;/p&gt;&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;New config key: auto-titles&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>A plain terminal, one key away</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-15-terminal-window</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-15-terminal-window</guid>

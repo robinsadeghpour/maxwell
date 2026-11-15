@@ -37,7 +37,8 @@
 
 ## Changelog
 
-- [Set up in one place, and All projects adds up](https://www.runmaxwell.com/changelog/2026-11-15-setup-and-all-projects) (2026-11-15, v0.1.28)
+- [Set up in one place, and All projects adds up](https://www.runmaxwell.com/changelog/2026-11-15-setup-and-all-projects) (2026-11-15, v0.1.29)
+- [Keep the names you give your sessions](https://www.runmaxwell.com/changelog/2026-11-15-your-own-names) (2026-11-15, v0.1.28)
 - [A plain terminal, one key away](https://www.runmaxwell.com/changelog/2026-11-15-terminal-window) (2026-11-15, v0.1.27)
 - [Pick a sound for each notification](https://www.runmaxwell.com/changelog/2026-11-15-notification-sounds) (2026-11-15, v0.1.26)
 - [Terminal sessions move into Maxwell](https://www.runmaxwell.com/changelog/2026-11-15-bring-in-for-real) (2026-11-15, v0.1.24 – 0.1.25)

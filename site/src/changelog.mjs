@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-15-setup-and-all-projects",
     date: "2026-11-15",
-    versions: "0.1.28",
+    versions: "0.1.29",
     title: "Set up in one place, and All projects adds up",
     figure: fig.setup("Each step checks itself, and the list goes away when everything is done."),
     body: `
@@ -17,6 +17,18 @@ export default [
     fixes: [
       "A question nobody answered for 3 days now folds into Idle instead of staying in Needs you",
       "The Dock badge now counts the Needs you group",
+    ],
+  },
+  {
+    slug: "2026-11-15-your-own-names",
+    date: "2026-11-15",
+    versions: "0.1.28",
+    title: "Keep the names you give your sessions",
+    figure: "",
+    body: `
+<p>If you name your sessions yourself, turn off <strong>Settings › General › Sessions › Name sessions for me</strong>. Each session then shows what Claude Code shows: the name you gave it with <code>/rename</code>, or its own title. Haiku no longer titles it, and <strong>Bring into Maxwell</strong> keeps its name. <strong>Rename</strong> in Maxwell still works. The setting is on by default, so nothing changes unless you turn it off.</p>`,
+    fixes: [
+      "New config key: auto-titles",
     ],
   },
   {

@@ -166,10 +166,11 @@ struct Session: Equatable {
 
 extension Session {
     /// What the session is about. Yours wins; a model's shows only while the session's own
-    /// title is weak, so a later `/rename` in Claude takes over again.
+    /// title is weak, so a later `/rename` in Claude takes over again. With `Titles.auto` off,
+    /// what Claude Code itself shows (its title, `/rename` included) or the name you gave it here.
     var title: String {
-        if let n = named, n.byYou || ownTitleWeak { return n.text }
-        return ownTitle
+        if let n = named, n.byYou || (Titles.auto && ownTitleWeak) { return n.text }
+        return Titles.auto ? ownTitle : hookTitle ?? name
     }
     /// Claude's title, the tab title, the first prompt's words, or the generated name.
     var ownTitle: String { hookTitle ?? tabTitle ?? promptTitle ?? name }

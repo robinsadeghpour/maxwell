@@ -40,6 +40,7 @@ final class Store {
             secrets: quietTest ? MemorySecrets() : KeychainSecrets(),
             version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")
         state = log.readNew().reduce(into: AppState(accounts: config.accounts)) { reduce(into: &$0, $1) }
+        Titles.auto = config.autoTitles
     }
 
     /// Starts the live sources. Called once the window is on screen.
@@ -152,7 +153,8 @@ final class Store {
     private func start(_ s: Session) {
         guard let account = state.account(s.accountId) else { onBrought?(s, "no account \(s.accountId)"); return }
         bringing.insert(s.id)
-        let name = String((s.name.isEmpty ? s.title : s.name).prefix(40))
+        // With auto titles off the session keeps the name it has: no --name on resume.
+        let name = config.autoTitles ? String((s.name.isEmpty ? s.title : s.name).prefix(40)) : nil
         let skip = config.skipPermissions
         let newest = state.isNewestInFolder(s)
         DispatchQueue.global().async { [weak self] in
@@ -168,7 +170,7 @@ final class Store {
         }
     }
 
-    private static func move(_ s: Session, account: Account, name: String, skipPermissions: Bool, newestInFolder: Bool) -> String? {
+    private static func move(_ s: Session, account: Account, name: String?, skipPermissions: Bool, newestInFolder: Bool) -> String? {
         // Background sessions only start in folders Claude Code trusts. The terminal session was
         // already let in here (for the home folder, Claude Code asks every time and never saves
         // it), so record that before ending the terminal's process, never after.
@@ -218,6 +220,7 @@ final class Store {
     func reloadConfig(_ c: Config) {
         let accountsChanged = c.accounts.map(\.configDir) != config.accounts.map(\.configDir)
         config = c
+        Titles.auto = c.autoTitles
         projects = Projects(rules: c.projects)
         plugins.reload(c)
         if accountsChanged {
@@ -356,6 +359,7 @@ final class Store {
     /// Sessions active in the last week whose title says little, once each has a first prompt
     /// and a reply to read. One at a time, on the judge's queue.
     private func titleWeak() {
+        guard config.autoTitles else { return }
         let now = Date()
         let weak = state.sessions.values.filter {
             $0.weakTitle && $0.lastMessage != nil && $0.phase != .ended && $0.listedAt != nil

@@ -112,6 +112,10 @@ export const pages = {
 <p>Claude Code titles some sessions with only a slug (<code>acme-75</code>), something generic ("Continue Previous Task") or the first words of the prompt ("hi, do I need to do"). For those, Haiku reads the start of the session and names the task. It happens once per session and costs about $0.0003.</p>
 <h2>Rename a session</h2>
 <p>Right-click the row and choose <strong>Rename</strong>. Your name always wins. Maxwell never renames a session you named.</p>
+<h2>Name every session yourself</h2>
+<p>If you name your sessions yourself, turn off <strong>Settings › General › Sessions › Name sessions for me</strong>, or add this line to the config:</p>
+<pre><code>auto-titles = off</code></pre>
+<p>Each session then shows what Claude Code shows: the name you gave it with <code>/rename</code>, or its own title. Haiku never titles it, and Bring into Maxwell keeps its name.</p>
 <h2>See every title</h2>
 <p><code>Maxwell titles</code> lists every session's title and where it came from: Claude, Haiku or you.</p>`,
   },
@@ -384,6 +388,7 @@ rail = auto                   <span class="c"># auto slides in at the left edge,
 idle-after = 24h              <span class="c"># quiet time before a stopped session folds into Idle</span>
 judge = on                    <span class="c"># off skips the model read, so nothing is ever safe</span>
 skip-permissions = on         <span class="c"># off keeps Claude's own permission mode</span>
+auto-titles = on              <span class="c"># off: sessions keep the names you give them</span>
 wrap-line = on                <span class="c"># off: replies don't end with a status line</span>
 notify = true                 <span class="c"># a notification when a session needs you</span>
 notify-sound = Funk           <span class="c"># none, or a macOS sound: Glass, Ping, Submarine…</span>

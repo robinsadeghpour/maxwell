@@ -482,6 +482,7 @@ final class SettingsView: MXView {
         form.toggle("File tree", c.showTree, note: "Shows the session's folder above the viewer. ⇧⌘T toggles it.") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
         form.header("Sessions")
         form.toggle("Skip permission prompts", c.skipPermissions, note: "New and brought-in sessions run with --dangerously-skip-permissions. Off: Claude's own mode.") { [weak self] in self?.set("skip-permissions", $0 ? "on" : "off") }
+        form.toggle("Name sessions for me", c.autoTitles, note: "Titles sessions from what they work on, with Haiku when Claude's title says little. Off: a session keeps the name you give it (/rename or Rename…).") { [weak self] in self?.set("auto-titles", $0 ? "on" : "off") }
         form.choice("Fold into Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter)) { [weak self] in self?.set("idle-after", $0) }
         form.toggle("Final model check", c.judge, note: "Haiku reads the last reply once. If off, nothing is ever safe.") { [weak self] in self?.set("judge", $0 ? "on" : "off") }
         form.choice("Rows", [("detail", "Two lines"), ("compact", "One line")], current: c.rowStyle) { [weak self] in self?.set("row-style", $0) }
