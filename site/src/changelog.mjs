@@ -5,6 +5,24 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-15-tabs-that-keep-your-place",
+    date: "2026-11-15",
+    versions: "0.1.39",
+    title: "Viewer tabs that keep your place",
+    figure: "",
+    body: `
+<p>Going back to a tab now puts you where you were in it. Files keep their scroll position, and the two artifacts you looked at last stay loaded, so switching between them is instant.</p>
+<p>A tab that gets something new while you're reading another one shows a purple dot. When the tabs don't fit, ${k("⌄")} at the end of the strip lists them all and turns purple when one out of sight is new. ${k("⌥ ⌘ ←")} and ${k("⌥ ⌘ →")} step through the tabs, closing one takes you back to the tab you had before, and your tabs come back when Maxwell restarts.</p>
+<p>The folder now sits beside the page when the viewer is wide. In a narrow viewer it slides over the page for one pick, so the page keeps its full height.</p>`,
+    fixes: [
+      "TSV and CSV files now show as a table",
+      "Squeezed tabs keep their names readable and cut them in the middle, so the extension stays",
+      "Plain text files wrap, and code in the light theme is easier to read",
+      "An artifact link inside an artifact now opens as a tab of its own",
+      "The viewer gets two thirds of the height when it shares the right side with another panel",
+    ],
+  },
+  {
     slug: "2026-11-15-artifact-links-open-in-place",
     date: "2026-11-15",
     versions: "0.1.38",

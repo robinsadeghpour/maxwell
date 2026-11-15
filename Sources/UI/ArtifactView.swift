@@ -2,14 +2,20 @@ import AppKit
 import WebKit
 
 /// A claude.ai artifact in the viewer, signed in to the session's account.
-/// One web view at a time, on the account's own data store: each one costs a WebContent process of
-/// 200+ MB (claude.ai's pages; measured), so showing another account's artifact closes the previous
-/// view, and a view hidden behind a file is let go after a minute. Logins live in the data stores, not the views.
+/// A web view per artifact, on the account's own data store. Each costs a WebContent process of 200+ MB
+/// (claude.ai's pages; measured), so only the two shown last stay loaded: going back and forth between
+/// two artifact tabs is instant and keeps your place, a third reloads. A view out of sight is let go
+/// after a minute. Logins live in the data stores, not the views.
 /// Signing in happens right here on claude.ai's own page; Maxwell only draws the strip above it.
 final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
     enum State: Equatable { case idle, loading, ready, signedOut, signingIn, offline, noAccess, failed(String) }
 
-    private(set) var state = State.idle { didSet { if state != oldValue { layoutState(); onState?(state) } } }
+    private(set) var state = State.idle {
+        didSet {
+            if let key { states[key] = state }
+            if state != oldValue { layoutState(); onState?(state) }
+        }
+    }
     private(set) var link: ArtifactLink?
     private(set) var account: Account?
     /// The page's own title once it has one.
@@ -18,8 +24,14 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
     /// "Open in browser": the account's browser choice.
     var onOpenExternal: ((URL, Account) -> Void)?
 
+    /// Keyed by account and artifact.
     private var webs: [String: WKWebView] = [:]
+    private var states: [String: State] = [:]
     private var lastShown: [String: Date] = [:]
+    private var key: String?
+    static let keepLoaded = 2
+    /// An artifact link clicked inside the page: it opens as a tab of its own.
+    var onArtifactLink: ((ArtifactLink) -> Void)?
     private var popups: [PopupWindow] = []
     private let card = StateCard(frame: .zero)
     private let strip = SignInStrip(frame: .zero)
@@ -43,21 +55,34 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    private var web: WKWebView? { account.flatMap { webs[$0.name] } }
+    private var web: WKWebView? { key.flatMap { webs[$0] } }
+    private static func key(_ a: Account, _ l: ArtifactLink) -> String { "\(a.name)|\(l.id)" }
 
     /// Shows `link` as `account`. `reload` re-fetches it even when it is already showing (a republish).
     func show(_ link: ArtifactLink, account: Account, reload: Bool = false) {
-        let sameAccount = self.account?.name == account.name
-        let same = sameAccount && self.link == link
+        let k = Self.key(account, link)
+        let same = k == key
+        if let old = key, !same { lastShown[old] = Date() }
         self.link = link
         self.account = account
-        for (name, other) in webs where name != account.name { close(name, other) }
-        let w = webs[account.name] ?? make(account)
-        w.isHidden = false
-        lastShown[account.name] = Date()
+        key = k
+        let warm = webs[k]
+        let w = warm ?? make(account, key: k)
+        lastShown[k] = Date()
+        // Keep the views shown last; let the oldest go.
+        for (name, other) in webs.sorted(by: { (lastShown[$0.key] ?? .distantPast) < (lastShown[$1.key] ?? .distantPast) })
+            where webs.count > Self.keepLoaded && name != k { close(name, other) }
+        for (name, other) in webs { other.isHidden = name != k }
         watchProgress(w)
-        if same && !reload && state != .idle { needsLayout = true; return }
-        if state == .signingIn && sameAccount && !reload { return }
+        if same && !reload && state != .idle { layoutState(); return }
+        if let warm, !reload, let saved = states[k], saved == .ready || saved == .loading {
+            // Back to a page that is still loaded: as you left it, no reload.
+            state = saved
+            layoutState()
+            if saved == .loading, !warm.isLoading { classifySoon(warm) }
+            return
+        }
+        state = .idle
         load()
     }
 
@@ -65,7 +90,7 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
 
     /// Hidden (another file or nothing in the viewer): web views stay warm for `keepHidden`.
     func hide() {
-        if let a = account { lastShown[a.name] = Date() }
+        if let key { lastShown[key] = Date() }
     }
 
     private func load() {
@@ -79,20 +104,21 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
         }
     }
 
-    private func make(_ a: Account) -> WKWebView {
+    private func make(_ a: Account, key: String) -> WKWebView {
         let w = WKWebView(frame: bounds, configuration: ClaudeWeb.shared.configuration(a))
         w.navigationDelegate = self
         w.uiDelegate = self
         w.allowsBackForwardNavigationGestures = false
         w.setValue(false, forKey: "drawsBackground")
         addSubview(w, positioned: .below, relativeTo: card)
-        webs[a.name] = w
+        webs[key] = w
         return w
     }
 
+    /// Views out of sight for a minute go (the one on show stays while the viewer shows it).
     private func releaseIdle() {
-        guard isHiddenOrHasHiddenAncestor || window == nil else { return }
-        for (name, w) in webs where Date().timeIntervalSince(lastShown[name] ?? .distantPast) > Self.keepHidden { close(name, w) }
+        let offScreen = isHiddenOrHasHiddenAncestor || window == nil
+        for (name, w) in webs where (offScreen || name != key) && Date().timeIntervalSince(lastShown[name] ?? .distantPast) > Self.keepHidden { close(name, w) }
     }
 
     private func close(_ name: String, _ w: WKWebView) {
@@ -101,7 +127,8 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
         w.uiDelegate = nil
         w.removeFromSuperview()
         webs[name] = nil
-        if name == account?.name { classifyTimer?.invalidate(); state = .idle }
+        states[name] = nil
+        if name == key { classifyTimer?.invalidate(); state = .idle }
     }
 
     // MARK: sign in
@@ -269,7 +296,11 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
         if state == .signingIn { return decisionHandler(.allow) }
         // An artifact link inside the page opens here; any other link the user clicks opens in the account's browser.
         if a.navigationType == .linkActivated {
-            if let l = ArtifactLink.parse(u.absoluteString), let account { decisionHandler(.cancel); show(l, account: account); return }
+            if let l = ArtifactLink.parse(u.absoluteString), let account {
+                decisionHandler(.cancel)
+                if let open = onArtifactLink { open(l) } else { show(l, account: account) }
+                return
+            }
             if let account { decisionHandler(.cancel); onOpenExternal?(u, account); return }
         }
         decisionHandler(.allow)
@@ -284,7 +315,7 @@ final class ArtifactView: MXView, WKNavigationDelegate, WKUIDelegate {
             return p.web
         }
         if let u = a.request.url, let account {
-            if let l = ArtifactLink.parse(u.absoluteString) { show(l, account: account) } else { onOpenExternal?(u, account) }
+            if let l = ArtifactLink.parse(u.absoluteString) { if let open = onArtifactLink { open(l) } else { show(l, account: account) } } else { onOpenExternal?(u, account) }
         }
         return nil
     }

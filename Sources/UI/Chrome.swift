@@ -2,7 +2,8 @@ import AppKit
 
 /// Right pane: the selected session's open files and artifacts, as editor tabs. The header is the
 /// tab strip, then the active tab's buttons: keep, folder tree, and for an artifact reload and
-/// open-in-browser.
+/// open-in-browser. The folder sits beside the page when there's room for both, the way VS Code's
+/// explorer does; in a narrow viewer it slides over the page and gets out of the way once you pick a file.
 final class ViewerPane: MXView {
     let viewer = ViewerController()
     let strip = ViewerTabStrip(frame: .zero)
@@ -15,14 +16,57 @@ final class ViewerPane: MXView {
     private let treeLine = Fill { $0.hair2 }
     private let empty = EmptyState(frame: .zero)
     private var tree: FileTreeController?
+    private var rootPath: String?
+    /// Behind the sliding folder in a narrow viewer: dims the page, a click on it closes the folder.
+    private let scrim = Scrim(frame: .zero)
+    /// The sliding folder's sheet: one step lighter than the page, with an edge and a shadow.
+    private let drawerBack = Fill { $0.background }
+    private let drawerLift = Fill { $0.hover }
+    private let treeHead = TreeHeader(frame: .zero)
+    /// The folder slid over a narrow viewer (not saved: the next file you pick closes it).
+    private(set) var drawerOpen = false
+    /// The file last marked in the tree.
+    private var revealed: URL?
+    private let drawerTween = Tween(0)
+    /// Wide enough for the folder and a readable page side by side.
+    static let columnMin: CGFloat = 620, treeColumn: CGFloat = 220
     private(set) var tabs = ViewerTabs()
     var item: ViewerItem? { tabs.item }
     private var account: Account?
-    var showTree = false {
-        didSet { needsLayout = true; treeButton.isOn = showTree; treeButton.tip.text = showTree ? "Hide the folder" : "Show the folder" }
+    var showTree = false { didSet { if showTree != oldValue { ensureTree(); needsLayout = true; treeState() } } }
+    /// The folder sits beside the page (wide viewer), or slides over it (narrow).
+    private var columnMode: Bool { bounds.width >= Self.columnMin }
+    private var treeShown: Bool { rootPath != nil && (columnMode ? showTree : drawerOpen) }
+
+    private func treeState() {
+        treeButton.isOn = treeShown
+        treeButton.tip.text = treeShown ? "Hide the folder" : "Show the folder"
+    }
+
+    /// The folder button: beside the page it stays until you hide it (and is remembered); over a
+    /// narrow page it slides in for one pick.
+    func toggleTree(save: (Bool) -> Void) {
+        if columnMode { save(!showTree) } else { setDrawer(!drawerOpen) }
+    }
+
+    /// Esc closes the folder slid over the page.
+    override func cancelOperation(_ sender: Any?) {
+        if drawerOpen { setDrawer(false) } else { nextResponder?.tryToPerform(#selector(cancelOperation(_:)), with: sender) }
+    }
+
+    func setDrawer(_ open: Bool) {
+        guard open != drawerOpen else { return }
+        drawerOpen = open
+        ensureTree()
+        drawerTween.set(open ? 1 : 0)
+        if open, let o = tree?.outline { window?.makeFirstResponder(o) }
+        treeState()
+        needsLayout = true
     }
     var onTreeSelect: ((URL) -> Void)?
     var onTab: ((ViewerTabAction) -> Void)?
+    /// ⌥⌘P from the tab's menu: keep the tab, or let the session's next file replace it again.
+    var onKeepToggle: (() -> Void)?
     /// The page named itself: the tab takes that title.
     var onArtifactTitle: ((ArtifactLink, String) -> Void)?
     /// Room the panel's own ⋯ and × take at the header's right edge (set by the dock).
@@ -31,10 +75,17 @@ final class ViewerPane: MXView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         name.font = Fonts.mono(Metrics.fontSize)
-        name.text = "viewer"
-        [viewer.container, empty, strip, name, pin, treeButton, reload, external, headerLine, treeLine].forEach(addSubview)
-        empty.lines = ["Files and artifacts open here by themselves.", "", "When the session writes or names a .md file,", "or publishes a claude.ai artifact, it shows up",
-                       "here. ⌘-click a path or an artifact link in the", "terminal to open it."]
+        name.text = ""
+        [viewer.container, empty, scrim, drawerBack, drawerLift, strip, treeHead, name, pin, treeButton, reload, external, headerLine, treeLine].forEach(addSubview)
+        drawerBack.wantsLayer = true
+        drawerBack.layer?.masksToBounds = false
+        drawerBack.shadow = { let s = NSShadow(); s.shadowColor = NSColor.black.withAlphaComponent(0.4); s.shadowBlurRadius = 24; s.shadowOffset = NSSize(width: 8, height: 0); return s }()
+        empty.lines = ["Files the session opens show up here.", "⌘-click a path or link to open one."]
+        scrim.isHidden = true; drawerBack.isHidden = true
+        scrim.onClick = { [weak self] in self?.setDrawer(false) }
+        drawerTween.duration = 0.16
+        drawerTween.step = { [weak self] _ in self?.needsLayout = true }
+        drawerTween.done = { [weak self] in self?.needsLayout = true }
         viewer.artifact.onTitle = { [weak self] title in
             guard let self, case .artifact(let l, nil)? = self.item else { return }
             self.onArtifactTitle?(l, title)
@@ -70,10 +121,12 @@ final class ViewerPane: MXView {
         pin.tip.text = tabs.kept
             ? "Kept open\nThe next \(what) the session opens gets a tab of its own. Click to let it replace this one"
             : "Keep this tab open\nNow the next file or artifact the session opens replaces it"
-        pin.isHidden = item == nil
+        // VS Code has no keep button: double-click, ⌥⌘P or the tab's menu. The room goes to the tabs.
+        pin.isHidden = true
         self.reload.isHidden = item?.artifact == nil
         external.isHidden = item?.artifact == nil
-        treeButton.isHidden = item?.artifact != nil
+        treeButton.isHidden = rootPath == nil
+        treeState()
         needsLayout = true
         superview?.needsLayout = true
     }
@@ -87,20 +140,37 @@ final class ViewerPane: MXView {
                 let n = url.lastPathComponent
                 let clash = names.filter { $0 == n }.count > 1
                 return .init(title: clash ? "\(n) · \(url.deletingLastPathComponent().lastPathComponent)" : n,
-                             detail: (url.path as NSString).abbreviatingWithTildeInPath, preview: tabs.isPreview(i))
+                             detail: (url.path as NSString).abbreviatingWithTildeInPath, preview: tabs.isPreview(i),
+                             unseen: tabs.isUnseen(i), kind: kind(url))
             case .artifact(let link, let title):
                 let a = account?.name ?? "?"
                 return .init(title: title ?? "artifact \(link.id.prefix(8))",
-                             detail: "\(link.url.absoluteString)\nSigned in to claude.ai as \(a)", preview: tabs.isPreview(i))
+                             detail: "\(link.url.absoluteString)\nSigned in to claude.ai as \(a)", preview: tabs.isPreview(i),
+                             unseen: tabs.isUnseen(i), kind: .artifact)
             }
         }
+    }
+
+    static func kind(_ url: URL) -> ViewerTabStrip.Kind {
+        let ext = url.pathExtension.lowercased()
+        if ["md", "markdown", "mdx"].contains(ext) { return .markdown }
+        if ext == "pdf" { return .pdf }
+        if ["png", "jpg", "jpeg", "gif", "webp", "heic", "svg", "tiff"].contains(ext) { return .image }
+        let lang = ViewerController.codeLangs[ext]
+        return lang != nil && lang != "plaintext" ? .code : .other
     }
 
     private func menu(for i: Int) -> NSMenu {
         let m = NSMenu()
         guard tabs.tabs.indices.contains(i) else { return m }
         let send = { [weak self] (a: ViewerTabAction) -> () -> Void in { self?.onTab?(a) } }
-        if tabs.isPreview(i) { m.addItem(MenuAction("Keep Open", send(.keep(i)))) }
+        if tabs.isPreview(i) {
+            let keep = MenuAction("Keep Open", send(.keep(i)))
+            keep.keyEquivalent = "p"; keep.keyEquivalentModifierMask = [.command, .option]
+            m.addItem(keep)
+        } else if i == tabs.active {
+            m.addItem(MenuAction("Let the Session Replace It", { [weak self] in self?.onTab?(.select(i)); self?.onKeepToggle?() }))
+        }
         m.addItem(MenuAction("Close", send(.close(i))))
         if tabs.tabs.count > 1 {
             m.addItem(MenuAction("Close Others", send(.closeOthers(i))))
@@ -122,17 +192,33 @@ final class ViewerPane: MXView {
     var stripEnd: CGFloat { max(0, bounds.width - 4 - headerReserve - CGFloat([pin, treeButton, external, reload].filter { !$0.isHidden }.count) * 26 - 4) }
 
     /// The empty end of the header, after the last tab: drag it to move the panel.
-    var tabsEnd: CGFloat { tabs.tabs.isEmpty ? 12 + Text.width(name.text, font: Fonts.mono()) + 8 : strip.usedWidth(in: stripEnd) }
+    var tabsEnd: CGFloat { tabs.tabs.isEmpty ? stripStart : stripStart + strip.usedWidth(in: stripEnd - stripStart) }
+    /// With the folder beside the page, the tabs start at its divider, over the page they belong to.
+    private var stripStart: CGFloat { columnMode && showTree && tree != nil ? Self.treeColumn + 1 : 0 }
 
+    /// The session's folder, for the tree. The tree itself is only built once it shows.
     func setRoot(_ cwd: String?) {
-        guard showTree, let cwd else { tree?.scroll.removeFromSuperview(); tree = nil; return }
-        if tree?.root.url.path == cwd { return }
-        tree?.scroll.removeFromSuperview()
-        let t = FileTreeController(rootURL: URL(fileURLWithPath: cwd))
-        t.onSelect = { [weak self] in self?.onTreeSelect?($0) }
-        addSubview(t.scroll)
-        tree = t
+        guard cwd != rootPath else { return }
+        rootPath = cwd
+        if cwd == nil { setDrawer(false) }
+        treeButton.isHidden = cwd == nil
+        ensureTree()
+        treeState()
         needsLayout = true
+    }
+
+    private func ensureTree() {
+        guard let rootPath, showTree || drawerOpen else { tree?.scroll.removeFromSuperview(); tree = nil; return }
+        if tree?.root.url.path == rootPath { return }
+        tree?.scroll.removeFromSuperview()
+        let t = FileTreeController(rootURL: URL(fileURLWithPath: rootPath))
+        t.onSelect = { [weak self] url in
+            self?.onTreeSelect?(url)
+            if self?.columnMode == false { self?.setDrawer(false) }
+        }
+        addSubview(t.scroll, positioned: .above, relativeTo: drawerLift)
+        tree = t
+        revealed = nil
     }
 
     override func layout() {
@@ -145,26 +231,56 @@ final class ViewerPane: MXView {
             x -= 26
             b.frame = NSRect(x: x, y: 3, width: 26, height: Metrics.control)
         }
-        strip.frame = NSRect(x: 0, y: 0, width: stripEnd, height: h)
-        name.frame = NSRect(x: 12, y: 0, width: max(0, stripEnd - 18), height: h)
+        let x0Strip = stripStart
+        strip.frame = NSRect(x: x0Strip, y: 0, width: max(0, stripEnd - x0Strip), height: h)
+        name.frame = .zero
         // The strip draws its own bottom line, open under the active tab.
         let lineFrom = strip.isHidden ? 0 : stripEnd
         headerLine.frame = NSRect(x: lineFrom, y: h - 1, width: w - lineFrom, height: 1)
-        var y = h
-        // An artifact is a whole page: the folder doesn't squeeze in above it.
-        if showTree, let tree, item?.artifact == nil {
-            let th = min(220, bounds.height * 0.4)
+        treeHead.isHidden = x0Strip == 0
+        if x0Strip > 0 {
+            addSubview(treeHead, positioned: .above, relativeTo: strip)
+            treeHead.title = rootPath.map { ($0 as NSString).lastPathComponent } ?? ""
+            treeHead.frame = NSRect(x: 0, y: 0, width: x0Strip, height: h)
+        }
+        let bodyH = bounds.height - h
+        var x0: CGFloat = 0
+        scrim.isHidden = true; drawerBack.isHidden = true; drawerLift.isHidden = true; treeLine.isHidden = true
+        if columnMode, drawerOpen { drawerOpen = false; drawerTween.set(0, animated: false) }
+        if columnMode, showTree, let tree {
+            // Beside the page, full height, like VS Code's explorer.
             tree.scroll.isHidden = false
-            tree.scroll.frame = NSRect(x: 0, y: y, width: w, height: th)
-            treeLine.frame = NSRect(x: 0, y: y + th, width: w, height: 1)
+            tree.scroll.frame = NSRect(x: 0, y: h, width: Self.treeColumn, height: bodyH)
+            treeLine.frame = NSRect(x: Self.treeColumn, y: h, width: 1, height: bodyH)
             treeLine.isHidden = false
-            y += th + 1
+            x0 = Self.treeColumn + 1
+        } else if let tree, drawerOpen || drawerTween.isRunning || drawerTween.value > 0 {
+            // Over a narrow page: slides in from the left edge, the page dimmed behind it.
+            let dw = min(280, w - 48), k = CGFloat(Motion.easeOut(Double(drawerTween.value)))
+            let dx = -dw * (1 - k)
+            scrim.isHidden = false
+            scrim.alphaValue = k
+            scrim.frame = NSRect(x: 0, y: h, width: w, height: bodyH)
+            drawerBack.isHidden = false
+            drawerBack.frame = NSRect(x: dx, y: h, width: dw, height: bodyH)
+            drawerLift.isHidden = false
+            drawerLift.frame = drawerBack.frame
+            treeHead.isHidden = false
+            treeHead.title = rootPath.map { ($0 as NSString).lastPathComponent } ?? ""
+            treeHead.frame = NSRect(x: dx, y: h, width: dw, height: h)
+            addSubview(treeHead, positioned: .above, relativeTo: drawerLift)
+            tree.scroll.isHidden = false
+            tree.scroll.frame = NSRect(x: dx, y: h * 2, width: dw, height: bodyH - h)
+            treeLine.isHidden = false
+            treeLine.frame = NSRect(x: dx + dw, y: h, width: 1, height: bodyH)
+            addSubview(treeLine, positioned: .above, relativeTo: tree.scroll)
         } else {
             tree?.scroll.isHidden = true
-            treeLine.isHidden = true
         }
-        viewer.container.frame = NSRect(x: 0, y: y, width: w, height: bounds.height - y)
+        viewer.container.frame = NSRect(x: x0, y: h, width: w - x0, height: bodyH)
         empty.frame = viewer.container.frame
+        treeState()
+        if let tree, !tree.scroll.isHidden, revealed != item?.file { revealed = item?.file; tree.reveal(item?.file) }
     }
 }
 
@@ -353,4 +469,24 @@ final class StatusBar: MXView, TipSource {
             Text.draw(hints, in: NSRect(x: bounds.width - hw - 10, y: 1, width: hw, height: bounds.height - 1), color: t.fg3, font: font)
         }
     }
+}
+
+/// The folder's name over its column, in the band the tabs sit in.
+final class TreeHeader: MXView {
+    var title = "" { didSet { if title != oldValue { needsDisplay = true } } }
+    override func draw(_ r: NSRect) {
+        t.plane.setFill(); bounds.fill()
+        t.hair2.setFill()
+        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+        NSRect(x: bounds.width - 1, y: 0, width: 1, height: bounds.height).fill()
+        Text.draw(title, in: NSRect(x: 17, y: 0, width: bounds.width - 29, height: bounds.height - 1), color: t.fg2, font: Fonts.mono(Metrics.fontSize, .semibold))
+    }
+}
+
+/// A dimmed layer over the page that closes what is open above it when clicked.
+final class Scrim: MXView {
+    var onClick: (() -> Void)?
+    override func draw(_ r: NSRect) { NSColor.black.withAlphaComponent(0.35).setFill(); bounds.fill() }
+    override func mouseDown(with e: NSEvent) { onClick?() }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
 }

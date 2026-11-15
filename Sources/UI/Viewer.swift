@@ -46,6 +46,9 @@ final class ViewerController: NSObject, WKNavigationDelegate {
     private var pdf: PDFView?
     private var ql: QLPreviewView?
     private var watcher: FileWatcher?
+    /// Where you were in each file: going back to its tab puts you there again.
+    private var scrolls: [URL: Double] = [:]
+    private var pdfPages: [URL: Int] = [:]
     private(set) var current: URL?
     /// The artifact on show, when the viewer shows one instead of a file.
     private(set) var currentArtifact: ArtifactLink?
@@ -90,7 +93,17 @@ final class ViewerController: NSObject, WKNavigationDelegate {
         "csv": "plaintext", "txt": "plaintext", "log": "plaintext",
     ]
 
+    /// Notes how far down the file on show is, before something else replaces it.
+    private func rememberPlace() {
+        guard let url = current else { return }
+        if let pdf, !pdf.isHidden, let doc = pdf.document, let page = pdf.currentPage { pdfPages[url] = doc.index(for: page) }
+        if let web, webReady, !web.isHidden {
+            web.evaluateJavaScript("window.scrollY") { [weak self] y, _ in if let y = y as? Double { self?.scrolls[url] = y } }
+        }
+    }
+
     func clear() {
+        rememberPlace()
         current = nil
         currentArtifact = nil
         watcher = nil
@@ -100,6 +113,7 @@ final class ViewerController: NSObject, WKNavigationDelegate {
 
     /// A claude.ai artifact, signed in to `account`. `reload` re-fetches it when it already shows (a republish).
     func openArtifact(_ link: ArtifactLink, account: Account, reload: Bool = false) {
+        rememberPlace()
         current = nil
         watcher = nil
         currentArtifact = link
@@ -120,6 +134,7 @@ final class ViewerController: NSObject, WKNavigationDelegate {
     }
 
     func open(_ url: URL) {
+        if current != url { rememberPlace() }
         current = url
         currentArtifact = nil
         artifact.hide()
@@ -134,7 +149,8 @@ final class ViewerController: NSObject, WKNavigationDelegate {
             v.document = PDFDocument(url: url)
             show(v)
             body.layoutSubtreeIfNeeded()
-            DispatchQueue.main.async { if let first = v.document?.page(at: 0) { v.go(to: first) } }
+            let at = pdfPages[url] ?? 0
+            DispatchQueue.main.async { if let page = v.document?.page(at: at) ?? v.document?.page(at: 0) { v.go(to: page) } }
             onRendered?("pdf")
             watcher = FileWatcher(url: url) { [weak self] in self?.pdf?.document = PDFDocument(url: url) }
         default:
@@ -174,7 +190,9 @@ final class ViewerController: NSObject, WKNavigationDelegate {
         guard current == url else { return }
         guard let data = try? Data(contentsOf: url) else { return }
         let text = String(decoding: data, as: UTF8.self)
-        let payload: [String: Any] = ["kind": kind, "lang": lang, "text": text, "base": url.deletingLastPathComponent().path + "/", "reload": reload]
+        var payload: [String: Any] = ["kind": kind, "lang": lang, "text": text, "base": url.deletingLastPathComponent().path + "/", "reload": reload, "ext": url.pathExtension.lowercased()]
+        // Back to a tab: the page opens where you left it.
+        if !reload, let y = scrolls[url] { payload["scroll"] = y }
         let json = String(data: try! JSONSerialization.data(withJSONObject: payload), encoding: .utf8)!
         let js = "render(\(json))"
         let w = makeWeb()
@@ -186,6 +204,12 @@ final class ViewerController: NSObject, WKNavigationDelegate {
         webReady = true
         if let js = themeJS { w.evaluateJavaScript(js) }
         if let js = pendingJS { pendingJS = nil; w.evaluateJavaScript(js) { _, _ in self.onRendered?("first-web") } }
+    }
+
+    /// Test hook: runs JS in the file view.
+    func evaluate(_ js: String, done: @escaping (String) -> Void) {
+        guard let web, webReady else { return done("no web view") }
+        web.evaluateJavaScript(js) { r, e in done(r.map { "\($0)" } ?? "error \(String(describing: e))") }
     }
 
     /// Test hook: what the page shows (element counts, text, size) and WebKit's own snapshot,

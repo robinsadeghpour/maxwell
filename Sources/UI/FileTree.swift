@@ -60,7 +60,8 @@ final class FileTreeController: NSObject, NSOutlineViewDataSource, NSOutlineView
         icon.contentTintColor = .secondaryLabelColor
         let label = NSTextField(labelWithString: node.url.lastPathComponent)
         label.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        label.lineBreakMode = .byTruncatingMiddle
+        // Folders cut at the end, as Finder does; files in the middle, so the extension stays.
+        label.lineBreakMode = node.isDir ? .byTruncatingTail : .byTruncatingMiddle
         for v in [icon, label] { v.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(v) }
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
@@ -73,8 +74,35 @@ final class FileTreeController: NSObject, NSOutlineViewDataSource, NSOutlineView
         return cell
     }
 
+    private var revealing = false
+
     func outlineViewSelectionDidChange(_ n: Notification) {
-        guard let node = outline.item(atRow: outline.selectedRow) as? FileNode, !node.isDir else { return }
+        guard !revealing, let node = outline.item(atRow: outline.selectedRow) as? FileNode, !node.isDir else { return }
         onSelect?(node.url)
+    }
+
+    /// Marks the file on show in the tree: its folders open and its row selected (opening nothing).
+    func reveal(_ url: URL?) {
+        revealing = true
+        defer { revealing = false }
+        guard let url, url.path.hasPrefix(root.url.path + "/") else { outline.deselectAll(nil); return }
+        var node = root
+        let parts = url.path.dropFirst(root.url.path.count + 1).split(separator: "/").map(String.init)
+        for (i, name) in parts.enumerated() {
+            guard let next = node.children.first(where: { $0.url.lastPathComponent == name }) else { outline.deselectAll(nil); return }
+            if i < parts.count - 1 { outline.expandItem(next) }
+            node = next
+        }
+        let row = outline.row(forItem: node)
+        guard row >= 0 else { return }
+        outline.selectRowIndexes([row], byExtendingSelection: false)
+        // In the middle of the view, once the tree has its size.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let clip = self.scroll.contentView as NSClipView? else { return }
+            let r = self.outline.rect(ofRow: row)
+            let y = max(0, min(r.midY - clip.bounds.height / 2, self.outline.bounds.height - clip.bounds.height))
+            clip.scroll(to: NSPoint(x: 0, y: y))
+            self.scroll.reflectScrolledClipView(clip)
+        }
     }
 }

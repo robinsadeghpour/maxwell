@@ -13,8 +13,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var shownShell: TerminalView? { shell(current) }
     private var visited: [SessionID] = []
     private(set) var current: SessionID?
-    /// Per session: its open files and artifacts, as the viewer's tabs.
-    private var viewers: [SessionID: ViewerTabs] = [:]
+    /// Per session: its open files and artifacts, as the viewer's tabs. Written down a moment after
+    /// each change, so a restart brings them back.
+    private var viewers: [SessionID: ViewerTabs] = [:] { didSet { saveTabsSoon() } }
+    private lazy var savedTabs = SavedViewerTabs.load()
+    private var saveTabsTimer: Timer?
     private let search = SearchPanel(frame: .zero)
     private let glass = NSVisualEffectView()
     private var doubleShift: DoubleShift?
@@ -138,6 +141,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         // Browsing the tree previews, as in VS Code's explorer; double-click the tab to keep it.
         root.viewerPane.onTreeSelect = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
         root.viewerPane.onTab = { [weak self] in self?.tabAction($0) }
+        root.viewerPane.onKeepToggle = { [weak self] in self?.togglePin() }
         root.viewerPane.onArtifactTitle = { [weak self] link, title in
             guard let self, let id = self.current else { return }
             self.viewers[id, default: ViewerTabs()].setTitle(title, for: link)
@@ -150,6 +154,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.reload.action = { [weak self] in self?.reloadArtifact() }
         root.viewerPane.external.action = { [weak self] in self?.openInBrowser() }
         root.viewerPane.viewer.artifact.onOpenExternal = { [weak self] url, a in self?.openExternally(url, account: a) }
+        root.viewerPane.viewer.artifact.onArtifactLink = { [weak self] l in self?.show(.artifact(l, title: nil), for: self?.current, keep: false) }
         root.viewerPane.viewer.onLink = { [weak self] url in
             guard let self else { return }
             self.openWebLink(url, session: self.current)
@@ -888,6 +893,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     private func showViewer(for id: SessionID) {
+        if viewers[id] == nil, let saved = savedTabs.tabs(id) { viewers[id] = ViewerTabs(saved) }
         var v = viewers[id] ?? ViewerTabs()
         syncViewer()
         guard !v.scanned, let s = store.state.sessions[id] else { return }
@@ -908,6 +914,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if let i = v.index(of: item), i == v.active || !store.config.autoOpen {
             // Keep the title the page gave; take the transcript's when there was none.
             v.retitle(i, from: item)
+            if reload { v.updated(item) }
             viewers[id] = v
             if id == current { syncViewer(reload: reload && i == v.active) }
             return
@@ -1028,8 +1035,38 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         return fr.isDescendant(of: root.viewerPane)
     }
 
+    /// Beside the page the folder stays until hidden (saved in the config); in a narrow viewer it
+    /// slides over the page for one pick.
     func toggleTree() {
-        onConfigEdit?("file-tree", store.config.showTree ? "false" : "true")
+        root.viewerPane.toggleTree { [weak self] on in self?.onConfigEdit?("file-tree", on ? "true" : "false") }
+    }
+
+    /// Test runs: as if the session on show wrote or named it.
+    func sessionOpenedForTest(_ item: ViewerItem) { if let id = current { itemSeen(id, item, reload: false) } }
+
+    /// Test runs: the tab titles, which is on show, which is the preview and which are new.
+    var viewerTabsSummary: String {
+        guard let v = current.flatMap({ viewers[$0] }) else { return "no tabs" }
+        return v.tabs.enumerated().map { i, t in
+            (t.file?.lastPathComponent ?? "artifact") + (i == v.active ? "*" : "") + (v.isPreview(i) ? "(preview)" : "") + (v.isUnseen(i) ? "(new)" : "")
+        }.joined(separator: " | ")
+    }
+
+    /// ⌥⌘→ / ⌥⌘←: the next or previous viewer tab.
+    func stepViewerTab(_ d: Int) {
+        guard let id = current, viewers[id]?.tabs.isEmpty == false else { return }
+        viewers[id]?.step(d)
+        syncViewer()
+    }
+
+    private func saveTabsSoon() {
+        saveTabsTimer?.invalidate()
+        saveTabsTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { [weak self] _ in
+            guard let self, !CommandLine.arguments.contains("--snap") else { return }
+            // Plain terminals end with Maxwell and their ids come back for new ones: not theirs.
+            for (id, v) in self.viewers where self.shell(id) == nil && !id.hasPrefix("shell-") { self.savedTabs.set(id, v.saved) }
+            self.savedTabs.save()
+        }
     }
 
     // MARK: overlays, focus, toast
@@ -1524,6 +1561,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "reset-panels", title: "Reset Panel Layout", menu: "Panels") { [weak self] in self?.root.panels = PanelLayout() },
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
             Action(id: "toggle-viewer", title: "Show or Hide Viewer", menu: "View", shortcut: Shortcut("cmd+\\")) { [weak self] in self?.toggleViewer() },
+            Action(id: "next-viewer-tab", title: "Next Viewer Tab", menu: "View", shortcut: Shortcut("cmd+alt+right")) { [weak self] in self?.stepViewerTab(1) },
+            Action(id: "prev-viewer-tab", title: "Previous Viewer Tab", menu: "View", shortcut: Shortcut("cmd+alt+left")) { [weak self] in self?.stepViewerTab(-1) },
+            Action(id: "viewer-tabs", title: "All Viewer Tabs…", menu: "View") { [weak self] in
+                guard let self, !self.root.viewerPane.strip.isHidden else { return }
+                self.root.viewerPane.strip.showList()
+            },
             Action(id: "pin", title: "Keep Viewer Tab Open", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
             Action(id: "reload-artifact", title: "Reload Artifact", menu: "View", shortcut: Shortcut("cmd+alt+r"), isEnabled: hasArtifact) { [weak self] in self?.reloadArtifact() },
             Action(id: "open-in-browser", title: "Open Artifact in Browser", menu: "View", shortcut: Shortcut("cmd+shift+o"), isEnabled: hasArtifact) { [weak self] in self?.openInBrowser() },

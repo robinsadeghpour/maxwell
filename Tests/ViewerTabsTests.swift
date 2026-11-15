@@ -33,9 +33,10 @@ func viewerTabsTests() {
     check(w.preview == nil && w.tabs.count == 3, "opening the preview tab's file for real keeps it")
 
     w.close(1)
-    check(w.tabs == [a, b] && w.active == 1, "closing the active tab shows its right neighbour")
+    check(w.tabs == [a, b] && w.active == 0, "closing the active tab goes back to the one shown before it")
+    w.select(1)
     w.close(1)
-    check(w.tabs == [a] && w.active == 0, "or the left one at the end")
+    check(w.tabs == [a] && w.active == 0, "and again")
     w.close(0)
     check(w.tabs.isEmpty && w.active == nil && w.item == nil, "closing the last tab empties the viewer")
 
@@ -49,6 +50,40 @@ func viewerTabsTests() {
     check(m.tabs == [b] && m.preview == 0 && m.active == 0, "un-keeping a tab makes it the preview tab; the old preview tab closes")
     m.toggleKeep()
     check(m.preview == nil && m.kept, "the pin keeps it again")
+
+    var u = ViewerTabs()
+    u.open(a, keep: true)
+    u.sessionOpened(b)
+    check(u.active == 0 && u.isUnseen(1) && !u.isUnseen(0), "a file that waits behind a kept tab is marked new")
+    u.sessionOpened(c)
+    check(u.tabs == [a, c] && u.isUnseen(1), "and stays marked when the next one replaces it")
+    u.select(1)
+    check(!u.isUnseen(1), "showing the tab clears the mark")
+    u.select(0)
+    u.updated(c)
+    check(u.isUnseen(1), "a republish of a tab in the background marks it")
+    u.updated(a)
+    check(!u.isUnseen(0), "but never the tab on show")
+    u.step(1); check(u.active == 1, "⌥⌘→ steps right")
+    u.step(1); check(u.active == 0, "and wraps round")
+    u.step(-1); check(u.active == 1, "⌥⌘← steps left and wraps")
+
+    let link2 = ArtifactLink.parse("https://claude.ai/artifact/Dez5d8DPYa2wrqBrR3W2gs")!
+    let saved = ViewerTabs(tabs: [a, .artifact(link2, title: "Plan"), d], active: 2, preview: 1).saved
+    let back = ViewerTabs(saved, fileExists: { $0 != "/p/a.md" })
+    check(back.tabs == [.artifact(link2, title: "Plan"), d] && back.active == 1 && back.preview == 0, "saved tabs come back, without files that are gone")
+    let json = try? JSONEncoder().encode(saved)
+    check(json.flatMap { try? JSONDecoder().decode(ViewerTabs.Saved.self, from: $0) } == saved, "saved tabs survive JSON")
+
+    let suite = UserDefaults(suiteName: "maxwell-tests-\(UUID().uuidString)")!
+    var store = SavedViewerTabs()
+    store.set("s1", saved)
+    store.set("s2", ViewerTabs().saved)
+    store.save(suite)
+    let reread = SavedViewerTabs.load(suite)
+    check(reread.tabs("s1") == saved && reread.tabs("s2") == nil, "tabs are written down per session; a session without tabs leaves no entry")
+    for i in 0..<205 { store.set("x\(i)", saved) }
+    check(store.entries.count == 200, "only the 200 sessions changed last are kept")
 
     var o = ViewerTabs(tabs: [a, b, c], active: 2, preview: 1)
     o.closeOthers(1)

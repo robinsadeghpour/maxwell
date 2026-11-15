@@ -28,6 +28,8 @@ struct Shortcut: Equatable {
         case "backspace": return "\u{8}"
         case "up": return String(UnicodeScalar(NSUpArrowFunctionKey)!)
         case "down": return String(UnicodeScalar(NSDownArrowFunctionKey)!)
+        case "left": return String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+        case "right": return String(UnicodeScalar(NSRightArrowFunctionKey)!)
         case "enter", "return": return "\r"
         case "plus": return "+"
         default: return key
@@ -44,6 +46,8 @@ struct Shortcut: Equatable {
         case "backspace": s += "⌫"
         case "up": s += "↑"
         case "down": s += "↓"
+        case "left": s += "←"
+        case "right": s += "→"
         case "enter", "return": s += "⏎"
         default: s += key.uppercased()
         }

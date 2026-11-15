@@ -372,12 +372,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if let name = arg("--not-safe") { after("--not-safe-after", 4) { if let id = named(name) { self.main.notSafe(id) }; mark("not safe \(name)") } }
         if arg("--unfold-closed") != nil { after("--unfold-after", 3) { self.main.root.sidebar.list.toggle(.recentlyClosed) } }
         if arg("--expand-idle") != nil { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.main.root.sidebar.list.toggleIdle() } }
-        if let spec = arg("--action") {
-            // --action <id>@<seconds>: runs one action from the registry, as its shortcut would.
-            let parts = spec.split(separator: "@").map(String.init)
-            DispatchQueue.main.asyncAfter(deadline: .now() + (parts.count > 1 ? Double(parts[1]) ?? 3 : 3)) {
-                self.main.actions.first { $0.id == parts[0] }?.run()
-                mark("action \(parts[0])")
+        if let list = arg("--action") {
+            // --action <id>@<seconds>[,<id>@<seconds>…]: runs actions from the registry, as their shortcuts would.
+            for spec in list.split(separator: ",") {
+                let parts = spec.split(separator: "@").map(String.init)
+                DispatchQueue.main.asyncAfter(deadline: .now() + (parts.count > 1 ? Double(parts[1]) ?? 3 : 3)) {
+                    self.main.actions.first { $0.id == parts[0] }?.run()
+                    mark("action \(parts[0])")
+                }
+            }
+        }
+        // --session-open "<seconds>:<path>[;…]": as if the session on show wrote or named the file.
+        if let list = arg("--session-open") {
+            for step in list.split(separator: ";") {
+                let parts = step.split(separator: ":", maxSplits: 1).map(String.init)
+                guard parts.count == 2, let at = Double(parts[0]) else { continue }
+                DispatchQueue.main.asyncAfter(deadline: .now() + at) {
+                    self.main.sessionOpenedForTest(.file(URL(fileURLWithPath: parts[1])))
+                    mark("session opened \(parts[1])")
+                }
+            }
+        }
+        // --open-artifacts a,b: artifact tabs of their own, as ⌘-clicks would open them.
+        if let list = arg("--open-artifacts") {
+            after("--open-after", 4) {
+                for u in list.split(separator: ",") { if let l = ArtifactLink.parse(String(u)) { self.main.show(.artifact(l, title: nil), for: self.main.current) } }
+                mark("opened artifacts")
+            }
+        }
+        // --artifact-switch "work:url1,url2": shows url1, url2, then url1 again as that account, 3 s apart,
+        // and logs what the artifact view holds after each (how many pages stay loaded).
+        if let spec = arg("--artifact-switch") {
+            let parts = spec.split(separator: ":", maxSplits: 1).map(String.init)
+            let links = (parts.last ?? "").split(separator: ",").compactMap { ArtifactLink.parse(String($0)) }
+            for (i, l) in (links + links.prefix(1)).enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3 + Double(i) * 3) {
+                    guard let a = self.store.state.accounts.first(where: { $0.name == parts[0] }) else { return mark("no account \(parts[0])") }
+                    self.main.root.setViewer(open: true, animated: false)
+                    self.main.root.viewerPane.viewer.openArtifact(l, account: a)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.main.root.viewerPane.viewer.artifact.probe { mark("switch \(i): \($0)") } }
+                }
+            }
+        }
+        // --tabs-log 6,9: logs the viewer's tabs at those times.
+        if let list = arg("--tabs-log") {
+            for t in list.split(separator: ",").compactMap({ Double($0) }) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + t) { mark("tabs: \(self.main.viewerTabsSummary)") }
+            }
+        }
+        // --viewer-width 700: the right area this wide (not saved).
+        if let w = arg("--viewer-width").flatMap(Double.init) { main.root.panels.size[.right] = CGFloat(w) }
+        // --viewer-js "<seconds>:<js>[;;…]": runs JS in the file view and logs the result.
+        if let list = arg("--viewer-js") {
+            for step in list.components(separatedBy: ";;") {
+                let parts = step.split(separator: ":", maxSplits: 1).map(String.init)
+                guard parts.count == 2, let at = Double(parts[0]) else { continue }
+                DispatchQueue.main.asyncAfter(deadline: .now() + at) {
+                    self.main.root.viewerPane.viewer.evaluate(parts[1]) { mark("viewer js \(parts[1]) = \($0)") }
+                }
+            }
+        }
+        // --drag "<seconds>:x1,y1>x2,y2": a press, a drag in steps and a release (window points, as --click).
+        if let spec = arg("--drag") {
+            let parts = spec.split(separator: ":", maxSplits: 1).map(String.init)
+            let pts = (parts.last ?? "").split(separator: ">").map { $0.split(separator: ",").compactMap { Double($0) } }
+            DispatchQueue.main.asyncAfter(deadline: .now() + (parts.count > 1 ? Double(parts[0]) ?? 3 : 3)) {
+                guard pts.count == 2, pts.allSatisfy({ $0.count == 2 }), let w = self.main.window else { return }
+                let h = w.contentLayoutRect.height
+                func ev(_ t: NSEvent.EventType, _ x: Double, _ y: Double) -> NSEvent? {
+                    NSEvent.mouseEvent(with: t, location: NSPoint(x: x, y: h - y), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                       windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+                }
+                // The drag and the release go in the queue first: the press reads them from there.
+                for i in 1...8 {
+                    let k = Double(i) / 8
+                    if let e = ev(.leftMouseDragged, pts[0][0] + (pts[1][0] - pts[0][0]) * k, pts[0][1] + (pts[1][1] - pts[0][1]) * k) { NSApp.postEvent(e, atStart: false) }
+                }
+                if let up = ev(.leftMouseUp, pts[1][0], pts[1][1]) { NSApp.postEvent(up, atStart: false) }
+                if let down = ev(.leftMouseDown, pts[0][0], pts[0][1]) { NSApp.sendEvent(down) }
+                mark("dragged \(spec)")
             }
         }
         if let q = arg("--search") { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.main.showSearch(query: q == "-" ? "" : q) } }
@@ -523,7 +596,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         for (name, flag) in [("cmd+", NSEvent.ModifierFlags.command), ("shift+", .shift), ("alt+", .option), ("ctrl+", .control)] where key.contains(name) {
             mods.insert(flag); key = key.replacingOccurrences(of: name, with: "")
         }
-        let named: [String: (String, UInt16)] = ["esc": ("\u{1b}", 53), "return": ("\r", 36), "down": ("\u{F701}", 125), "up": ("\u{F700}", 126)]
+        let named: [String: (String, UInt16)] = ["esc": ("\u{1b}", 53), "return": ("\r", 36), "down": ("\u{F701}", 125), "up": ("\u{F700}", 126), "left": ("\u{F702}", 123), "right": ("\u{F703}", 124)]
         let (chars, code) = named[key] ?? (key, Self.keyCodes[key] ?? 0)
         for t in [NSEvent.EventType.keyDown, .keyUp] {
             if let e = NSEvent.keyEvent(with: t, location: .zero, modifierFlags: mods, timestamp: now, windowNumber: w.windowNumber,

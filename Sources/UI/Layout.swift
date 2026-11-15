@@ -618,7 +618,9 @@ final class DockView: MXView {
         let flexRoom = along - fixedSum - gaps
         for (i, (p, v)) in views.enumerated() {
             var size = fixed[i] ?? flexSize
-            if flexIndices.count == 2, let r = split {
+            // A document next to a list gets two thirds of the room until the divider is dragged.
+            let docShare: CGFloat? = flexIndices.count == 2 ? (views[flexIndices[0]].0 == .viewer ? 0.66 : views[flexIndices[1]].0 == .viewer ? 0.34 : nil) : nil
+            if flexIndices.count == 2, let r = split ?? docShare {
                 size = (i == flexIndices[0] ? r : 1 - r) * flexRoom
             }
             if flexCount == 0, dock == .bottom { size = (along - gaps) / CGFloat(views.count) }
