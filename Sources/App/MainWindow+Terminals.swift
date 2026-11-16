@@ -27,11 +27,10 @@ extension MainWindowController {
         t.onCwd = { [weak self] in if let self { self.render(self.store.state); self.saveShells() } }
         t.onOpenURL = { raw, cwd in
             if raw.hasPrefix("http://") || raw.hasPrefix("https://") { if let u = URL(string: raw) { NSWorkspace.shared.open(u) }; return }
-            var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
-            if let r = path.range(of: #":\d+(:\d+)?$"#, options: .regularExpression) { path.removeSubrange(r) }
-            path = (path as NSString).expandingTildeInPath
-            if !path.hasPrefix("/") { path = ((cwd ?? dir) as NSString).appendingPathComponent(path) }
-            if FileManager.default.fileExists(atPath: path) { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+            // Folders too: they open in Finder.
+            if let u = FileLink.resolve(raw, bases: [cwd ?? dir], home: Paths.home.path, isFile: { FileManager.default.fileExists(atPath: $0) }) {
+                NSWorkspace.shared.open(u)
+            }
         }
         shells.insert((id, t), at: min(index ?? shells.count, shells.count))
         return id

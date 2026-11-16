@@ -634,7 +634,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if let self { self.render(self.store.state) }
         }
         t.onOpenURL = { [weak self] url, cwd in self?.openURL(url, cwd: cwd, session: id) }
-        t.claimsLink = { ArtifactLink.parse($0) != nil }
+        // A plain click takes artifact links and files that exist; anything else goes to Claude Code.
+        t.claimsLink = { [weak self, weak t] raw in
+            ArtifactLink.parse(raw) != nil || self?.fileLink(raw, cwd: t?.cwd, session: id) != nil
+        }
         terminals[id] = t
         lastShown[id] = Date()
         detached.remove(id)
@@ -1106,23 +1109,27 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.viewer.artifact.reload()
     }
 
-    /// ⌘-click in a terminal: files open in that session's viewer, web links as above.
+    /// A click on a link in a session's terminal: files open in that session's viewer, web links as above.
     private func openURL(_ raw: String, cwd: String?, session id: SessionID) {
         if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
             if let u = URL(string: raw) { openWebLink(u, session: id) }
             return
         }
-        var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
-        if let r = path.range(of: #":\d+(:\d+)?$"#, options: .regularExpression) { path.removeSubrange(r) }
-        path = (path as NSString).expandingTildeInPath
-        // A relative path is the session's: its cwd moves into a worktree while the terminal's
-        // (where `claude attach` started) stays put, so try the session first.
-        let bases = path.hasPrefix("/") ? [""] : [store.state.sessions[id]?.cwd, cwd, Paths.home.path].compactMap { $0 }
-        let found = bases.lazy.map { URL(fileURLWithPath: ($0 as NSString).appendingPathComponent(path)).standardizedFileURL }
-            .first { FileManager.default.fileExists(atPath: $0.path) }
-        mark("cmd-click \(raw) -> \(found?.path ?? "not found")")
+        let found = fileLink(raw, cwd: cwd, session: id)
+        mark("open link \(raw) -> \(found?.path ?? "not found")")
         guard let url = found else { return toast("No such file: \(raw)") }
         showFile(url, for: id)
+    }
+
+    /// The file a path in a session's terminal names. A relative path is the session's: its cwd
+    /// moves into a worktree while the terminal's (where `claude attach` started) stays put, so
+    /// the session's folder goes first.
+    private func fileLink(_ raw: String, cwd: String?, session id: SessionID) -> URL? {
+        let bases = [store.state.sessions[id]?.cwd, cwd, Paths.home.path].compactMap { $0 }.filter { !$0.isEmpty }
+        return FileLink.resolve(raw, bases: bases, home: Paths.home.path) {
+            var dir: ObjCBool = false
+            return FileManager.default.fileExists(atPath: $0, isDirectory: &dir) && !dir.boolValue
+        }
     }
 
     /// The pin keeps the active tab open, or lets the session's next file replace it again.
