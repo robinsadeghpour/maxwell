@@ -25,6 +25,21 @@ final class TerminalHosts {
         return out
     }
 
+    /// What a terminal is running, by its foreground process: nil when that is its shell, at the
+    /// prompt (as Terminal decides whether closing a window would end something).
+    static func runningCommand(foreground pid: pid_t?) -> String? {
+        guard let pid else { return nil }
+        var buf = [CChar](repeating: 0, count: 256)
+        guard proc_name(pid, &buf, UInt32(buf.count)) > 0 else { return nil }
+        let name = String(cString: buf)
+        return isShell(name) ? nil : name
+    }
+
+    static func isShell(_ name: String) -> Bool {
+        let bare = name.hasPrefix("-") ? String(name.dropFirst()) : name
+        return ["zsh", "bash", "sh", "fish", "dash", "ksh", "tcsh", "csh", "nu", "login"].contains(bare)
+    }
+
     /// Another process's environment, read with sysctl (the same user's processes only).
     /// Layout of KERN_PROCARGS2: argc, the executable path, argv, then the environment, NUL-separated.
     static func environment(of pid: pid_t) -> [String: String] {

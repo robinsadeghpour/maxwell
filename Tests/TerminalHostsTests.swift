@@ -8,6 +8,9 @@ func terminalHostsTests() {
     p.environment = ["PATH": "/bin", "MX_TEST_WAIT": "1", TerminalHosts.envKey: TerminalHosts.tag("shell-2")]
     guard (try? p.run()) != nil else { return check(false, "could not start a process to read") }
     defer { p.terminate() }
+    check(TerminalHosts.runningCommand(foreground: p.processIdentifier) == URL(fileURLWithPath: CommandLine.arguments[0]).lastPathComponent, "a command in the foreground is named")
+    check(TerminalHosts.runningCommand(foreground: nil) == nil, "nothing in the foreground: nothing running")
+    check(TerminalHosts.isShell("-zsh") && TerminalHosts.isShell("bash") && !TerminalHosts.isShell("npm"), "the shell at its prompt is not a running command")
     let env = TerminalHosts.environment(of: p.processIdentifier)
     check(env[TerminalHosts.envKey] == TerminalHosts.tag("shell-2") && env["PATH"] == "/bin", "another process's environment is read")
 

@@ -7,6 +7,9 @@ import UniformTypeIdentifiers
 
 final class GhosttyRuntime {
     static let shared = GhosttyRuntime()
+    /// Set for one call: Ghostty reports a dump's file path through the clipboard, and this takes
+    /// it instead, so the user's clipboard is left alone (see `TerminalView.writeScreenDump`).
+    fileprivate var takeClipboard: ((String) -> Void)?
     private(set) var app: ghostty_app_t?
     private var config: ghostty_config_t?
 
@@ -32,6 +35,7 @@ final class GhosttyRuntime {
                     let c = contents[i]
                     let data = c.data; guard String(cString: c.mime).hasPrefix("text/plain") else { continue }
                     let s = String(decoding: UnsafeRawBufferPointer(start: data, count: c.len), as: UTF8.self)
+                    if let take = GhosttyRuntime.shared.takeClipboard { return take(s) }
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(s, forType: .string)
                     return
@@ -219,9 +223,13 @@ final class TerminalView: NSView, NSTextInputClient {
     /// Pasteboard change count at the last click, to tell whether the drag since then copied.
     private var clipboardAtClick = NSPasteboard.general.changeCount
     var cwd: String?
-    /// A command is running instead of the prompt (Ghostty's shell integration marks the prompt;
-    /// needs `confirm-close-surface = true`, which only makes Ghostty answer: Maxwell asks itself).
-    var hasRunningCommand: Bool { surface.map { ghostty_surface_needs_confirm_quit($0) } ?? false }
+    /// The process in the foreground of this terminal: its shell at the prompt, or the command
+    /// running (Ghostty asks the terminal's tty).
+    var foregroundPid: pid_t? {
+        guard let surface else { return nil }
+        let pid = ghostty_surface_foreground_pid(surface)
+        return pid > 0 ? pid_t(pid) : nil
+    }
     var onOpenURL: ((String, String?) -> Void)?
     /// Links a plain click opens in Maxwell (claude.ai artifacts, files that exist) instead of
     /// passing the click on. TerminalLinks.swift finds them under the pointer.
@@ -518,6 +526,19 @@ final class TerminalView: NSView, NSTextInputClient {
         }
         mods |= momentum << 1
         ghostty_surface_mouse_scroll(surface, x, y, mods)
+    }
+
+    /// Has Ghostty write the screen and scrollback, with their colours as escape sequences, to a
+    /// file in a temporary folder of its own, and returns that file. Ghostty hands the path back
+    /// through the clipboard; the clipboard callback catches it while this runs.
+    func writeScreenDump() -> URL? {
+        guard let surface else { return nil }
+        var path: String?
+        GhosttyRuntime.shared.takeClipboard = { path = $0 }
+        defer { GhosttyRuntime.shared.takeClipboard = nil }
+        let action = "write_screen_file:copy,vt"
+        guard ghostty_surface_binding_action(surface, action, UInt(action.utf8.count)) else { return nil }
+        return path.map { URL(fileURLWithPath: $0) }
     }
 
     func viewportText() -> String {

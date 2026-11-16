@@ -15,8 +15,9 @@ extension MainWindowController {
         saveShells()
     }
 
-    /// A terminal's shell and row, not yet shown. `at`: its place in the list (the end by default).
-    func makeShell(in dir: String, command: String? = nil, at index: Int? = nil) -> String {
+    /// A terminal's shell and row, not yet shown. `at`: its place in the list (the end by default);
+    /// `output`: its output file, when it is one coming back.
+    func makeShell(in dir: String, command: String? = nil, at index: Int? = nil, output: String? = nil) -> String {
         let size = root.sessionPane.content.bounds.size
         shellsMade += 1
         let id = "shell-\(shellsMade)"
@@ -33,13 +34,15 @@ extension MainWindowController {
             }
         }
         shells.insert((id, t), at: min(index ?? shells.count, shells.count))
+        shellOutputs[id] = output ?? UUID().uuidString
         return id
     }
 
-    /// The terminals open when Maxwell last quit, fresh shells in the same folders, with their names.
+    /// The terminals open when Maxwell last quit: fresh shells in the same folders, with their
+    /// names, under what they showed.
     func restoreShells() {
         for saved in SavedTerminals.load().terminals {
-            shellNames[makeShell(in: Self.reopenFolder(saved.folder))] = saved.name
+            shellNames[reopenShell(in: saved.folder, output: saved.output)] = saved.name
         }
         if !shells.isEmpty { mark("reopened \(shells.count) terminal\(shells.count == 1 ? "" : "s")") }
     }
@@ -48,8 +51,44 @@ extension MainWindowController {
         SavedTerminals.reopenFolder(folder, home: Paths.home.path) { FileManager.default.fileExists(atPath: $0) }
     }
 
+    /// A terminal coming back (after a restart or an Undo): its old output first, if it was kept.
+    private func reopenShell(in folder: String, output: String?, at index: Int? = nil) -> String {
+        let file = output.map { TerminalOutput.file($0, app: Self.appId) }
+        let savedAt = file.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date }
+        let replay = savedAt.flatMap { at in file.map { TerminalOutput.replay($0, savedAt: at) } }
+        return makeShell(in: Self.reopenFolder(folder), command: replay, at: index, output: output)
+    }
+
+    private static var appId: String { Bundle.main.bundleIdentifier ?? "maxwell" }
+
     func saveShells() {
-        SavedTerminals(terminals: shells.map { .init(folder: $0.view.cwd ?? Paths.home.path, name: shellNames[$0.id]) }).save()
+        SavedTerminals(terminals: shells.map { .init(folder: $0.view.cwd ?? Paths.home.path, name: shellNames[$0.id], output: shellOutputs[$0.id]) }).save()
+    }
+
+    /// What every terminal shows, for the next launch (when Maxwell quits). Files no terminal
+    /// names any more (closed ones, an Undo not taken) go.
+    func saveShellOutputs() {
+        var keep = Set<String>()
+        for sh in shells {
+            guard let key = shellOutputs[sh.id] else { continue }
+            if writeOutput(of: sh.view, key: key) { keep.insert(key + ".vt") }
+        }
+        let dir = TerminalOutput.folder(app: Self.appId)
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [] where !keep.contains(name) {
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
+        }
+        saveShells()
+    }
+
+    @discardableResult
+    private func writeOutput(of t: TerminalView, key: String) -> Bool {
+        guard let dump = t.writeScreenDump() else { return false }
+        defer { try? FileManager.default.removeItem(at: dump.deletingLastPathComponent()) }
+        guard let vt = try? String(contentsOf: dump, encoding: .utf8) else { return false }
+        let file = TerminalOutput.file(key, app: Self.appId)
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Only you can read it: a terminal shows tokens and paths.
+        return FileManager.default.createFile(atPath: file.path, contents: Data(TerminalOutput.tail(vt).utf8), attributes: [.posixPermissions: 0o600])
     }
 
     func shellMenu(_ id: String) -> NSMenu {
@@ -78,10 +117,11 @@ extension MainWindowController {
     func requestCloseShell(_ id: String) {
         guard let t = shell(id) else { return }
         let title = shellNames[id] ?? Self.folderName(t.cwd)
-        mark("close terminal \(title): \(t.hasRunningCommand ? "a command is running, asking" : "at its prompt")")
-        guard t.hasRunningCommand, let w = window else { return closeShellWithUndo(id, title: title) }
+        let running = TerminalHosts.runningCommand(foreground: t.foregroundPid)
+        mark("close terminal \(title): \(running.map { "\($0) is running, asking" } ?? "at its prompt")")
+        guard let running, let w = window else { return closeShellWithUndo(id, title: title) }
         let a = NSAlert()
-        a.messageText = "“\(title)” is still running a command. Close it anyway?"
+        a.messageText = "“\(title)” is still running \(running). Close it anyway?"
         a.informativeText = "Closing the terminal ends what runs in it."
         a.addButton(withTitle: "Close Terminal")
         a.addButton(withTitle: "Cancel")
@@ -93,10 +133,13 @@ extension MainWindowController {
     private func closeShellWithUndo(_ id: String, title: String) {
         guard let index = shells.firstIndex(where: { $0.id == id }) else { return }
         let folder = shells[index].view.cwd ?? Paths.home.path, name = shellNames[id]
+        // Undo brings back what it showed too: kept under a new name, since closing drops the old file.
+        let kept = UUID().uuidString
+        let output = writeOutput(of: shells[index].view, key: kept) ? kept : nil
         closeShell(id)
         root.status.show(toast: "Closed “\(title)”.", action: ("Undo", { [weak self] in
             guard let self else { return }
-            let back = self.makeShell(in: Self.reopenFolder(folder), at: index)
+            let back = self.reopenShell(in: folder, output: output, at: index)
             self.shellNames[back] = name
             self.saveShells()
             self.open(back)
@@ -108,6 +151,7 @@ extension MainWindowController {
         guard let i = shells.firstIndex(where: { $0.id == id }) else { return }
         shells.remove(at: i).view.removeFromSuperview()
         shellNames[id] = nil
+        if let key = shellOutputs.removeValue(forKey: id) { try? FileManager.default.removeItem(at: TerminalOutput.file(key, app: Self.appId)) }
         visited.removeAll { $0 == id }
         saveShells()
         if current == id { current = shells.last?.id ?? visited.first }
