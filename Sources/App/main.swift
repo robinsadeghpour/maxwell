@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ClaudeCLI.scrubOwnEnvironment()
         Fonts.register()
         var config = Config.load()
+        CrashReports.apply(enabled: config.crashReports)
+        CrashReports.runTests()
         if let t = arg("--theme") { config.themeOverride = t }
         Metrics.fontSize = CGFloat(config.fontSize - 1)
         let theme = Theme.load(config.theme(systemDark: SystemAppearance.isDark))
@@ -166,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if c.wrapLine != store.config.wrapLine { Wrap.publish(c.wrapLine) }
         store.reloadConfig(c)
         main.refreshSetup()
+        CrashReports.apply(enabled: c.crashReports)
         main.applyLook(c)
         IconArt.choice = c.appIcon
         IconArt.apply(dark: Look.theme.dark)

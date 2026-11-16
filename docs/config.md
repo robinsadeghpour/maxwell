@@ -23,6 +23,7 @@ file-tree = false
 app-icon = auto               # auto | light | dark | paper | graphite | light-eyes | dark-eyes
 idle-after = 24h              # stopped sessions quiet this long fold into Idle (24h, 90m, 2d)
 judge = on                    # off: no model read, so nothing is ever safe to close
+crash-reports = on            # off: never send crash reports (runmaxwell.com/docs/privacy#crash-reports)
 account = work ~/.claude      # <name> <CLAUDE_CONFIG_DIR>, one line per account
 project = Orbit ~/projects/orbit*     # <name> <path glob>; default: the git repo, worktrees included
 project-pin = Acme            # one line per project kept on the rail, in order; none = all

@@ -65,6 +65,14 @@ notarize() {
 ./build.sh test
 ./build.sh release "$V"
 
+# Debug symbols to Sentry, so a crash report names Maxwell's functions. SENTRY_AUTH_TOKEN is an org
+# token with the org:ci scope (the release environment's secret in CI, ~/.sentryclirc on a Mac).
+if [[ -n ${SENTRY_AUTH_TOKEN:-} || -f ~/.sentryclirc ]]; then
+  npx -y @sentry/cli@3.8.0 debug-files upload --project maxwell --wait build/release/Maxwell.dSYM
+else
+  echo "warning: no SENTRY_AUTH_TOKEN, so crash reports from v$V will have no function names"
+fi
+
 # Sign inside out: the hook helper, then the app. Hardened runtime and a secure timestamp are
 # what notarization requires; Maxwell needs no extra entitlements.
 # Every executable in the bundle needs this, plugins included, so find them instead of listing them.

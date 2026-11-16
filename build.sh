@@ -7,11 +7,15 @@ set -euo pipefail
 cd "$(dirname "$0")"
 GHOSTTY_COMMIT=8046a2360340ec9788e0089da5a9ed0378adf0ea
 XCF=vendor/ghostty/macos/GhosttyKit.xcframework/macos-arm64
-APP=build/Maxwell.app
+SENTRY_VERSION=9.34.0
+SENTRY_SHA256=1ee80dfb1bd94295f419a7a026467ce35a68143fb8da9f5e672264546b8f7c0d
+SENTRY=vendor/sentry-$SENTRY_VERSION/Sentry.xcframework/macos-arm64_arm64e_x86_64
+APP=build/Maxwell.app DEBUG_INFO=()
 BUNDLE_ID=dev.maxwell.app.dev NAME="Maxwell Dev" VERSION="0.0.0-dev.$(git rev-parse --short HEAD)"
 if [[ ${1:-} == release ]]; then
   VERSION=${2:?usage: ./build.sh release <version>}
   APP=build/release/Maxwell.app BUNDLE_ID=dev.maxwell.app NAME=Maxwell
+  DEBUG_INFO=(-g)   # build/release/Maxwell.dSYM, which release.sh uploads so crash reports have symbols
 fi
 
 ghostty() {
@@ -22,6 +26,14 @@ ghostty() {
   git -C vendor/ghostty checkout -q $GHOSTTY_COMMIT
   (cd vendor/ghostty && zig build -Dsentry=false -Di18n=false -Demit-macos-app=false \
     -Demit-xcframework=true -Dxcframework-target=native -Doptimize=ReleaseFast)
+}
+
+# Sentry's static framework (crash reports), at a pinned version and checksum.
+sentry() {
+  local zip=vendor/sentry-$SENTRY_VERSION.zip
+  curl -fsSL -o $zip https://github.com/getsentry/sentry-cocoa/releases/download/$SENTRY_VERSION/Sentry.xcframework.zip
+  echo "$SENTRY_SHA256  $zip" | shasum -a 256 -c - >/dev/null || { echo "Sentry.xcframework.zip checksum mismatch"; rm -f $zip; exit 1; }
+  rm -rf vendor/sentry-$SENTRY_VERSION && mkdir -p vendor/sentry-$SENTRY_VERSION && unzip -q $zip -d vendor/sentry-$SENTRY_VERSION && rm $zip
 }
 
 if [[ ${1:-} == ghostty ]]; then ghostty; exit; fi
@@ -36,23 +48,27 @@ if [[ ${1:-} == test ]]; then
 fi
 
 [[ -f $XCF/libghostty-internal.a ]] || ghostty
+[[ -d $SENTRY/Sentry.framework ]] || sentry
 [[ $(git -C vendor/ghostty rev-parse HEAD) == $GHOSTTY_COMMIT ]] || { echo "vendor/ghostty is not at the pinned commit; run ./build.sh ghostty"; exit 1; }
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cc -O2 -Wall -o "$APP/Contents/MacOS/maxwell-hook" hook/maxwell-hook.c
 
-swiftc -O -swift-version 5 \
+swiftc -O -swift-version 5 "${DEBUG_INFO[@]}" \
   -target arm64-apple-macos14.0 \
-  -I "$XCF/Headers" \
+  -I "$XCF/Headers" -F "$SENTRY" \
   Sources/**/*.swift \
   "$XCF/libghostty-internal.a" \
-  -lc++ \
+  -lc++ -lz -framework Sentry \
   -framework AppKit -framework WebKit -framework PDFKit -framework Quartz -framework UserNotifications \
   -framework Metal -framework MetalKit -framework QuartzCore -framework CoreText \
   -framework CoreGraphics -framework IOSurface -framework Carbon -framework UniformTypeIdentifiers \
   -framework GameController \
   -o "$APP/Contents/MacOS/Maxwell"
+if [[ -d "$APP/Contents/MacOS/Maxwell.dSYM" ]]; then
+  rm -rf "${APP:h}/Maxwell.dSYM" && mv "$APP/Contents/MacOS/Maxwell.dSYM" "${APP:h}/Maxwell.dSYM"
+fi
 
 cp -R Resources/web Resources/themes Resources/fonts "$APP/Contents/Resources/"
 # Plugins that ship with Maxwell: each is a folder with plugin.json and its program.

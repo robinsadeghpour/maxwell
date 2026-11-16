@@ -17,4 +17,6 @@ Robin doesn't review PRs, test or release by hand. Get confident yourself (`./bu
 
 GhosttyKit is cached in Actions by its pin; zig only runs (~7 min) when `GHOSTTY_COMMIT` in `build.sh` changes. The Developer ID certificate and notary key are secrets of the `release` environment, usable only from `v1` and `main`. If the certificate is replaced, Robin runs `packaging/ci/set-release-secrets.sh cert` once. Never go back to unsigned DMGs (Gatekeeper blocks them for every new user) or ad-hoc signing (every update would ask for the Keychain again). Only the Account Holder can create a new Developer ID certificate.
 
+Crash reports go to the Sentry project `maxwell` (org `bunlo`, EU region). `release.sh` uploads each release's debug symbols with `SENTRY_AUTH_TOKEN`, an org token with the `org:ci` scope, kept as a secret of the `release` environment. Without it the release still ships, but its crash reports show addresses instead of function names.
+
 **If CI is down:** `./release.sh <v> "<notes>"` from an up-to-date `v1` in `~/projects/maxwell-oss` (release from a commit that is already on `v1`; `release.sh` can't push `v1` past its protection), which has `vendor` and `.release.env` (`MAXWELL_ASC_PROFILE`). The login keychain holds the certificate.

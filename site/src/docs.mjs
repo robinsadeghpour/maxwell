@@ -479,7 +479,7 @@ linear.sync = suggest</code></pre>
 
   privacy: {
     title: "What Maxwell touches",
-    lede: "Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads and the cloud session listing, which go through your own Claude account, and what plugins you turn on.",
+    lede: "Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads and the cloud session listing, which go through your own Claude account, crash reports you can turn off, and what plugins you turn on.",
     figure: fig.pipeline("Hooks write one log. One pure reducer turns it into the state of every session."),
     body: `
 <h2>Files and settings</h2>
@@ -502,6 +502,12 @@ linear.sync = suggest</code></pre>
 <li><strong>Cloud sessions</strong>: every 20 seconds Maxwell asks Claude Code's Sessions API for each account's cloud sessions, signed in with that account's own Claude Code login, which it reads from the Keychain item Claude Code keeps it in. The login is never stored, logged or sent anywhere else.</li>
 <li><strong>Linear</strong>, once you add a key: reads tickets and makes the moves you accept.</li>
 <li><strong>Slack</strong>, once you add a token: reads your DMs, mentions and threads.</li>
-</ul>`,
+<li><strong>Crash reports</strong>, unless you turn them off: see below.</li>
+</ul>
+<h2 id="crash-reports">Crash reports</h2>
+<p>When the released Maxwell crashes, or its window stops responding for 3 seconds, it sends a report to <a href="https://sentry.io">Sentry</a>, so a crash gets fixed without anyone having to write in. A crash is sent the next time Maxwell opens. Development builds never send one.</p>
+<p>A report holds the kind of crash, the stack of each thread (Maxwell's own functions and the system libraries they called), Maxwell's version, the macOS version, the Mac model, chip and memory, and a random ID for this Mac, so one Mac crashing ten times counts once.</p>
+<p>It holds nothing from your work. Before a report leaves your Mac, Maxwell removes every path, file name, quoted text, email address and your macOS user name from it, keeps only the file name of each program, and drops the breadcrumbs, the locale, time zone, disk sizes and the Mac's name. Your sessions, prompts, transcripts, projects and accounts are never part of it. The code that does this is <a href="${GH}/blob/v1/Sources/Model/CrashScrub.swift">CrashScrub.swift</a>.</p>
+<p>To turn crash reports off, untick <strong>Send crash reports</strong> in Settings › General, or add <code>crash-reports = off</code> to your config.</p>`,
   },
 };
