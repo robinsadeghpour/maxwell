@@ -510,7 +510,6 @@ final class TerminalView: NSView, NSTextInputClient {
 
     override func scrollWheel(with e: NSEvent) {
         guard let surface else { return }
-        endHover()
         var x = e.scrollingDeltaX, y = e.scrollingDeltaY
         var mods: Int32 = 0
         if e.hasPreciseScrollingDeltas { x *= 2; y *= 2; mods |= 1 }

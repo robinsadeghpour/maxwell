@@ -11,7 +11,7 @@ struct LinkHover {
     /// moving under a pointer that stays put.
     var point = (x: 0.0, y: 0.0)
     var row = ""
-    /// The terminal with a link under the pointer, if any.
+    /// The terminal under the pointer, watched for text moving under it.
     static weak var view: TerminalView?
     /// The underline Maxwell draws, over exactly what opens.
     let underline: CALayer = {
@@ -32,6 +32,8 @@ extension TerminalView {
     /// The pointer moved: when it reaches another cell, look for a claimed link there.
     func hoverMoved(_ e: NSEvent) {
         guard claimsLink != nil, let surface else { return }
+        // Watched while the pointer is over it, link or not: output can bring a path under it.
+        LinkHover.view = self
         let p = convert(e.locationInWindow, from: nil), y = bounds.height - p.y
         let cell = cellAt(x: p.x, y: y)
         if cell == hover.cell, hover.link != nil {
@@ -61,13 +63,13 @@ extension TerminalView {
     func endHover() {
         if hover.link != nil { showHover(nil, at: nil, x: -1, y: -1) }
         hover.cell = nil
+        if LinkHover.view === self { LinkHover.view = nil }
     }
 
     private func showHover(_ link: String?, at cell: TerminalCell?, x: Double, y: Double) {
         let was = hover.link
         if (link == nil) != (was == nil) { (link == nil ? NSCursor.arrow : NSCursor.pointingHand).set() }
         hover.link = link
-        LinkHover.view = link == nil ? (LinkHover.view === self ? nil : LinkHover.view) : self
         hover.underline.isHidden = true
         if was != nil, hover.ghosttyMods != nil, let surface {
             // Shift alone makes Ghostty look again without the link modifier: its underline goes.
@@ -142,25 +144,24 @@ extension TerminalView {
         return linkAt(x: p.x, y: bounds.height - p.y, restoring: Self.mouseMods(e.modifierFlags))
     }
 
-    /// The modifiers Ghostty finds links with. With mouse reporting on (Claude Code's full-screen
-    /// view) it wants ⌘⇧, without it ⌘ alone; the last that worked is tried first.
-    private var linkMods: ghostty_input_mods_e { Self.linkModsFound }
-    private static var linkModsFound = TerminalView.mouseMods(.command)
+    /// The modifiers Ghostty finds links with. While the program has the mouse (Claude Code turns
+    /// mouse reporting on) it wants ⌘⇧, and the shift keeps the probe from reaching the program as
+    /// pointer moves; otherwise ⌘ alone.
+    var linkMods: ghostty_input_mods_e {
+        guard let surface, ghostty_surface_mouse_captured(surface) else { return Self.mods(.command) }
+        return Self.mouseMods(.command)
+    }
 
     /// x, y from the top left, in points. `restoring` is the modifier state Ghostty is left with.
     private func linkAt(x: Double, y: Double, restoring mods: ghostty_input_mods_e) -> String? {
         guard let surface, claimsLink != nil else { return nil }
         let ch = Double(ghostty_surface_size(surface).cell_height_px) / (window?.backingScaleFactor ?? 2)
-        var found: String?
-        let tries = [linkMods] + [Self.mouseMods(.command), Self.mods(.command)].filter { $0 != linkMods }
-        for cmd in tries where found == nil {
-            // Ghostty only looks again when the pointer changes cell, so step off the cell and back.
-            ghostty_surface_mouse_pos(surface, x, y + ch < bounds.height ? y + ch : y - ch, cmd)
-            linkUnderPointer = nil
-            ghostty_surface_mouse_pos(surface, x, y, cmd)
-            found = linkUnderPointer
-            if found != nil { Self.linkModsFound = cmd }
-        }
+        let cmd = linkMods
+        // Ghostty only looks again when the pointer changes cell, so step off the cell and back.
+        ghostty_surface_mouse_pos(surface, x, y + ch < bounds.height ? y + ch : y - ch, cmd)
+        linkUnderPointer = nil
+        ghostty_surface_mouse_pos(surface, x, y, cmd)
+        let found = linkUnderPointer
         // Leaving the view (with shift, so Claude Code isn't told) clears Ghostty's hover and marks the
         // row for redrawing; a link modifier merely let go of leaves the underline drawn.
         ghostty_surface_mouse_pos(surface, -1, -1, Self.mods(.shift))
@@ -199,7 +200,8 @@ extension TerminalView {
               let down2 = ev(.leftMouseDown, clicks: 2), let up2 = ev(.leftMouseUp, clicks: 2) else { return nil }
         mouseMoved(with: move)
         let shown = hover.link == nil ? "none" : hover.underline.isHidden ? "hand, Ghostty's underline" : "hand, underline \(Int(hover.underline.frame.width))pt"
-        if hoverOnly { return "hover \(shown)" }
+        let mouse = surface.map { ghostty_surface_mouse_captured($0) } == true ? "mouse reporting on" : "mouse reporting off"
+        if hoverOnly { return "hover \(shown), \(mouse)" }
         let link = linkUnderClick(down)
         let background = acceptsFirstMouse(for: down)
         mouseDown(with: down)

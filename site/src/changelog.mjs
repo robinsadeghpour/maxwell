@@ -7,13 +7,15 @@ export default [
   {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
-    versions: "0.1.50 – 0.1.59",
+    versions: "0.1.50 – 0.1.60",
     title: "Cloud sessions",
     figure: "",
     body: `
 <p>Maxwell now works with Claude Code sessions that run on Anthropic's cloud machines. They sit in the same groups as your other sessions, marked <strong>cloud</strong>, and a question from one shows in Needs you with a notification. Opening one shows its claude.ai page in the middle pane, signed in to its account.</p>
 <p>${k("⌥ ⌘ N")} starts a session in the cloud from a project and a task. With <strong>Cloud</strong> picked, the new-session panel says what won't go along, such as commits that aren't pushed. ${k("⌥ ⌘ ↑")} sends a session from your Mac to the cloud: it commits, pushes and writes a brief, and a cloud session continues from there. ${k("⌥ ⌘ ↓")} brings a cloud session back into a fresh worktree. <a href="/docs/cloud">How cloud sessions work</a>.</p>`,
     fixes: [
+      "Fixed hovering over text in a session sending Claude Code stray pointer moves while Maxwell looked for a link",
+      "A path's underline now follows the text when output or scrolling moves it under a resting pointer",
       "Maxwell now sends a report when it crashes or stops responding, scrubbed of paths, prompts and names, so crashes get fixed without anyone writing in. Settings › General › Send crash reports turns it off. <a href=\"/docs/privacy#crash-reports\">What a report holds</a>",
       "Clicking an artifact link in a session's terminal now opens it in the viewer the first time, also when Maxwell is in the background. Before, the first click only brought the window forward, and the next one counted as a double click and opened the link in the browser",
       "File paths in a session are now links: hover one and it's underlined, click it and the file opens in the viewer, no ⌘ needed",
