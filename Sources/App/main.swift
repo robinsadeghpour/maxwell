@@ -280,8 +280,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             }
         }
-        if let spec = arg("--click") {
-            // --click "3:700,600": a left click at window point x,y (from the top left) at 3 s.
+        // --click "3:700,600;5:900,14": left clicks at window points x,y (from the top left), at 3 s and 5 s.
+        for spec in (arg("--click") ?? "").split(separator: ";").map(String.init) where !spec.isEmpty {
             let parts = spec.split(separator: ":").map(String.init)
             let xy = (parts.last ?? "").split(separator: ",").compactMap { Double($0) }
             DispatchQueue.main.asyncAfter(deadline: .now() + (parts.count > 1 ? Double(parts[0]) ?? 3 : 3)) {

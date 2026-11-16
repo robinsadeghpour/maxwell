@@ -255,10 +255,12 @@ final class ViewerPane: MXView {
             treeLine.isHidden = false
             x0 = Self.treeColumn + 1
         } else if let tree, drawerOpen || drawerTween.isRunning || drawerTween.value > 0 {
-            // Over a narrow page: slides in from the left edge, the page dimmed behind it.
-            let dw = min(280, w - 48), k = CGFloat(Motion.easeOut(Double(drawerTween.value)))
+            // Over a narrow page: slides in from the left edge, the page dimmed behind it. With no
+            // page open there is nothing to dim, so it takes the whole viewer.
+            let full = item == nil
+            let dw = full ? w : min(280, w - 48), k = CGFloat(Motion.easeOut(Double(drawerTween.value)))
             let dx = -dw * (1 - k)
-            scrim.isHidden = false
+            scrim.isHidden = full
             scrim.alphaValue = k
             scrim.frame = NSRect(x: 0, y: h, width: w, height: bodyH)
             drawerBack.isHidden = false
@@ -271,7 +273,7 @@ final class ViewerPane: MXView {
             addSubview(treeHead, positioned: .above, relativeTo: drawerLift)
             tree.scroll.isHidden = false
             tree.scroll.frame = NSRect(x: dx, y: h * 2, width: dw, height: bodyH - h)
-            treeLine.isHidden = false
+            treeLine.isHidden = full
             treeLine.frame = NSRect(x: dx + dw, y: h, width: 1, height: bodyH)
             addSubview(treeLine, positioned: .above, relativeTo: tree.scroll)
         } else {
