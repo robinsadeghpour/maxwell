@@ -288,7 +288,8 @@ final class ViewerPane: MXView {
 
 /// Title bar: traffic lights (system), tabs of visited sessions, and the three buttons.
 final class TitleBar: MXView, TipSource {
-    struct Tab { var id: SessionID; var title: String; var group: PhaseGroup }
+    /// A session's tab shows its state; a plain terminal's (no group) a prompt mark.
+    struct Tab { var id: SessionID; var title: String; var group: PhaseGroup? }
     var tabs: [Tab] = [] { didSet { needsDisplay = true } }
     var current: SessionID? { didSet { needsDisplay = true } }
     var onSelect: ((SessionID) -> Void)?
@@ -334,7 +335,11 @@ final class TitleBar: MXView, TipSource {
             t.hair2.setFill()
             NSRect(x: rr.minX, y: 0, width: 1, height: rr.height).fill()
             if i == tabs.count - 1 { NSRect(x: rr.maxX - 1, y: 0, width: 1, height: rr.height).fill() }
-            Glyph.draw(tab.group, at: NSPoint(x: rr.minX + 16, y: rr.midY), color: t.color(for: tab.group))
+            if let g = tab.group {
+                Glyph.draw(g, at: NSPoint(x: rr.minX + 16, y: rr.midY), color: t.color(for: g))
+            } else {
+                Text.draw("❯", in: NSRect(x: rr.minX + 10, y: 0, width: 12, height: rr.height), color: sel ? t.fg : t.fg2, font: Fonts.mono(Metrics.fontSize - 1, .semibold), align: .center)
+            }
             let closeW: CGFloat = hoverTab == i ? 18 : 0
             Text.draw(tab.title, in: NSRect(x: rr.minX + 28, y: 0, width: rr.width - 36 - closeW, height: rr.height),
                       color: sel ? t.fg : hoverTab == i ? t.fg2 : t.fg3)
@@ -357,9 +362,10 @@ final class TitleBar: MXView, TipSource {
         guard let i = rects.firstIndex(where: { $0.contains(p) }) else { return nil }
         let r = rects[i], tab = tabs[i]
         if p.x > r.maxX - 22 {
-            return (Tip("Close tab", action: tab.id == current ? "close-tab" : nil).adding("The session keeps running"), NSRect(x: r.maxX - 22, y: r.minY, width: 22, height: r.height))
+            let keeps = tab.group == nil ? "The terminal keeps running in the sidebar" : "The session keeps running"
+            return (Tip("Close tab", action: tab.id == current ? "close-tab" : nil).adding(keeps), NSRect(x: r.maxX - 22, y: r.minY, width: 22, height: r.height))
         }
-        if p.x < r.minX + 26 { return (tab.group.tip, NSRect(x: r.minX + 6, y: r.minY, width: 20, height: r.height)) }
+        if p.x < r.minX + 26 { return (tab.group?.tip ?? Tip("Terminal"), NSRect(x: r.minX + 6, y: r.minY, width: 20, height: r.height)) }
         return (Tip(tab.title), NSRect(x: r.minX + 26, y: r.minY, width: r.width - 48, height: r.height))
     }
 

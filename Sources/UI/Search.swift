@@ -1,8 +1,8 @@
 import AppKit
 
-/// One thing search can find: a session, an action or a project.
+/// One thing search can find: a session, a terminal, an action or a project.
 struct SearchItem {
-    enum Kind { case session, action, project }
+    enum Kind { case session, terminal, action, project }
     var kind: Kind
     var title: String
     /// Text to match with its weight: title 3, project and branch 2, the rest 1.
@@ -112,7 +112,7 @@ final class SearchPanel: MXView, NSTextFieldDelegate {
         let pool = actionsOnly ? all.filter { $0.kind == .action } : all
         if tokens.isEmpty {
             // Before typing: what needs him and what he opened last, then (for "> ") every action.
-            shown = (actionsOnly ? pool : pool.filter { $0.kind == .session && $0.boost > 0 }.sorted { $0.boost > $1.boost }.prefix(10).map { $0 })
+            shown = (actionsOnly ? pool : pool.filter { ($0.kind == .session || $0.kind == .terminal) && $0.boost > 0 }.sorted { $0.boost > $1.boost }.prefix(10).map { $0 })
                 .map { Hit(item: $0, score: 0, hits: [], why: nil) }
         } else {
             shown = pool.compactMap { item in
@@ -204,6 +204,7 @@ final class SearchPanel: MXView, NSTextFieldDelegate {
             var x = rr.minX + 10
             switch e.kind {
             case .session: Glyph.draw(e.group ?? .idle, at: NSPoint(x: x + 4, y: rr.midY), color: t.color(for: e.group ?? .idle))
+            case .terminal: Text.draw("❯", in: NSRect(x: x, y: rr.minY, width: 10, height: rr.height), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1, .semibold), align: .center)
             case .action: Text.draw("›", in: NSRect(x: x, y: rr.minY, width: 10, height: rr.height), color: t.fg3, align: .center)
             case .project:
                 t.fg3.setFill()

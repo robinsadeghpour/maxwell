@@ -92,7 +92,7 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘J | Next session that needs you |
 | ⌘0 / ⌘1–9 | All projects / one project |
 | ⌘T | New session in the open session's folder or project, on the account with the most room |
-| ⌥⌘T | New terminal: a plain shell at the top of the sidebar, in the current session's folder (or right-click a session › Open Terminal Here). Run `claude` in it and the row becomes that session. Double-click its row to rename it. Terminals come back after a restart, in the same folders, with their names |
+| ⌥⌘T | New terminal: a plain shell at the top of the sidebar, in the current session's folder (or right-click a session › Open Terminal Here). Run `claude` in it and the row becomes that session. Double-click its row to rename it. Terminals come back after a restart, in the same folders, with their names. Closing one asks first if a command is still running, and offers Undo |
 | ⌘N | New session: pick the project (search all your repos) and account. From a terminal: `open -a Maxwell .` |
 | Esc or click outside | Close search, the palette or a panel |
 | ⇧⌘⌫ | Close the session: at once when it's safe, otherwise after saying what's still open |
