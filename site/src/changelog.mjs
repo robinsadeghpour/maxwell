@@ -7,13 +7,14 @@ export default [
   {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
-    versions: "0.1.50 – 0.1.56",
+    versions: "0.1.50 – 0.1.57",
     title: "Cloud sessions",
     figure: "",
     body: `
 <p>Maxwell now works with Claude Code sessions that run on Anthropic's cloud machines. They sit in the same groups as your other sessions, marked <strong>cloud</strong>, and a question from one shows in Needs you with a notification. Opening one shows its claude.ai page in the middle pane, signed in to its account.</p>
 <p>${k("⌥ ⌘ N")} starts a session in the cloud from a project and a task. With <strong>Cloud</strong> picked, the new-session panel says what won't go along, such as commits that aren't pushed. ${k("⌥ ⌘ ↑")} sends a session from your Mac to the cloud: it commits, pushes and writes a brief, and a cloud session continues from there. ${k("⌥ ⌘ ↓")} brings a cloud session back into a fresh worktree. <a href="/docs/cloud">How cloud sessions work</a>.</p>`,
     fixes: [
+      "Clicking an artifact link in a session's terminal now opens it in the viewer the first time, also when Maxwell is in the background. Before, the first click only brought the window forward, and the next one counted as a double click and opened the link in the browser",
       "File paths in a session are now links: hover one and it's underlined, click it and the file opens in the viewer, no ⌘ needed",
       "The folder now fills a narrow viewer when no file is open, instead of leaving a dimmed empty strip beside it",
       "Terminals now come back after a restart, in the same folders and order, with fresh shells; one whose folder is gone opens in the nearest folder still there",

@@ -230,7 +230,7 @@ final class TerminalView: NSView, NSTextInputClient {
     var linkUnderPointer: String?
     /// A plain press on a claimed link, held back: it opens the link on release, or goes through
     /// late when the pointer drags away (a selection that starts on the link).
-    private var heldLink: (url: String, down: NSEvent)?
+    private(set) var heldLink: (url: String, down: NSEvent)?
     /// The claimed link under the pointer, shown with a hand and an underline.
     var hover = LinkHover()
     var onExit: (() -> Void)?
@@ -468,12 +468,24 @@ final class TerminalView: NSView, NSTextInputClient {
     override func mouseDown(with e: NSEvent) {
         window?.makeFirstResponder(self)
         clipboardAtClick = NSPasteboard.general.changeCount
-        let plain = e.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty
-        if plain, e.clickCount == 1, let url = linkUnderClick(e), claimsLink?(url) == true {
+        // Every click on the link, not only the first: a second click passed on reaches Claude Code,
+        // which opens the link in the system browser.
+        if let url = claimedLink(e) {
             heldLink = (url, e)
             return
         }
         press(e)
+    }
+    /// With Maxwell in the background, a click on a claimed link opens it straight away. Any other
+    /// first click only brings the window forward and never reaches the program, as in Ghostty.
+    /// Without this, the click that activates the window is lost and the next one counts as a
+    /// double click.
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { e.flatMap(claimedLink) != nil }
+    /// The link under a plain click (no modifiers) when Maxwell opens it itself.
+    private func claimedLink(_ e: NSEvent) -> String? {
+        guard e.type == .leftMouseDown, e.modifierFlags.intersection([.command, .shift, .option, .control]).isEmpty,
+              let url = linkUnderClick(e), claimsLink?(url) == true else { return nil }
+        return url
     }
     private func press(_ e: NSEvent) {
         pos(e)
