@@ -183,25 +183,33 @@ extension TerminalView {
 
     /// Test hook: a plain click (no modifiers) on the last place `needle` shows, through
     /// mouseMoved, mouseDown and mouseUp as a real click goes. The link it found, or "-" for none,
-    /// and how the hover showed. "hover:<needle>" only moves the pointer there.
+    /// how the hover showed, and whether a click with Maxwell in the background and a second click
+    /// (a double click) open the link too. "hover:<needle>" only moves the pointer there.
     func plainClick(on needle: String) -> String? {
         let hoverOnly = needle.hasPrefix("hover:")
         let needle = hoverOnly ? String(needle.dropFirst(6)) : needle
         guard let window, let (x, y) = point(of: needle) else { return nil }
         let at = window.convertPoint(toScreen: convert(NSPoint(x: x, y: bounds.height - y), to: nil))
         let loc = window.convertPoint(fromScreen: at)
-        func ev(_ t: NSEvent.EventType) -> NSEvent? {
+        func ev(_ t: NSEvent.EventType, clicks: Int = 1) -> NSEvent? {
             NSEvent.mouseEvent(with: t, location: loc, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)
         }
-        guard let move = ev(.mouseMoved), let down = ev(.leftMouseDown), let up = ev(.leftMouseUp) else { return nil }
+        guard let move = ev(.mouseMoved), let down = ev(.leftMouseDown), let up = ev(.leftMouseUp),
+              let down2 = ev(.leftMouseDown, clicks: 2), let up2 = ev(.leftMouseUp, clicks: 2) else { return nil }
         mouseMoved(with: move)
         let shown = hover.link == nil ? "none" : hover.underline.isHidden ? "hand, Ghostty's underline" : "hand, underline \(Int(hover.underline.frame.width))pt"
         if hoverOnly { return "hover \(shown)" }
         let link = linkUnderClick(down)
+        let background = acceptsFirstMouse(for: down)
         mouseDown(with: down)
         mouseUp(with: up)
-        return (link ?? "-") + ", hover " + shown
+        guard let link else { return "-, hover " + shown }
+        // A second click on the link (a double click) must open it too, not reach Claude Code.
+        mouseDown(with: down2)
+        let again = heldLink != nil
+        mouseUp(with: up2)
+        return "\(link), hover \(shown), background click \(background ? "opens" : "lost"), double click \(again ? "opens" : "passed on")"
     }
 
     /// Middle of the cell where `needle` starts (its last showing), from the top left in points.
