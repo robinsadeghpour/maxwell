@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
-    versions: "0.1.50 – 0.1.54",
+    versions: "0.1.50 – 0.1.55",
     title: "Cloud sessions",
     figure: "",
     body: `
@@ -17,6 +17,10 @@ export default [
       "The folder now fills a narrow viewer when no file is open, instead of leaving a dimmed empty strip beside it",
       "Terminals now come back after a restart, in the same folders and order, with fresh shells; one whose folder is gone opens in the nearest folder still there",
       "Terminals can now be renamed: double-click a terminal's row, or right-click it and pick Rename…; the name stays after a restart",
+      "Terminals now have tabs, like sessions, and closing a terminal's tab leaves it running in the sidebar",
+      "Search (⌘P) now finds terminals by name and folder",
+      "Rename… is now in the Session menu and in ⌘K, for the open session or terminal",
+      "Closing a terminal now offers Undo, and asks first when a command is still running in it",
       "The window's corners are now round, instead of a stepped bevel inside the rim macOS draws",
     ],
   },

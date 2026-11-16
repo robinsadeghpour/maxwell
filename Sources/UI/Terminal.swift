@@ -216,6 +216,9 @@ final class TerminalView: NSView, NSTextInputClient {
     /// Pasteboard change count at the last click, to tell whether the drag since then copied.
     private var clipboardAtClick = NSPasteboard.general.changeCount
     var cwd: String?
+    /// A command is running instead of the prompt (Ghostty's shell integration marks the prompt;
+    /// needs `confirm-close-surface = true`, which only makes Ghostty answer: Maxwell asks itself).
+    var hasRunningCommand: Bool { surface.map { ghostty_surface_needs_confirm_quit($0) } ?? false }
     var onOpenURL: ((String, String?) -> Void)?
     /// Links a plain click opens in Maxwell (claude.ai artifacts) instead of passing the click on.
     var claimsLink: ((String) -> Bool)?

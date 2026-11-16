@@ -10,21 +10,21 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// Sessions you asked to resume: opening one attaches even though Claude Code stopped it.
     private var resuming = Set<SessionID>()
     /// Plain terminals, listed above the sessions and shown in the session pane. They end with Maxwell.
-    private var shells: [(id: String, view: TerminalView)] = []
-    private var shellsMade = 0
-    private func shell(_ id: String?) -> TerminalView? { shells.first { $0.id == id }?.view }
+    var shells: [(id: String, view: TerminalView)] = []
+    var shellsMade = 0
+    func shell(_ id: String?) -> TerminalView? { shells.first { $0.id == id }?.view }
     /// Names you gave terminals; a terminal without one is called after its folder. Kept with
     /// each terminal's folder in `SavedTerminals`, so both come back after a restart.
-    private var shellNames: [String: String] = [:]
+    var shellNames: [String: String] = [:]
     /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
-    private var hosted: [SessionID: String] = [:]
+    var hosted: [SessionID: String] = [:]
     private let terminalHosts = TerminalHosts()
     /// The terminal a session runs in: its own attached one, or the Maxwell terminal hosting it.
     private func terminal(for id: SessionID) -> TerminalView? { terminals[id] ?? hosted[id].flatMap(shell) }
     /// The terminal on screen when it is a plain one (test runs type into it).
     var shownShell: TerminalView? { shell(current) }
-    private var visited: [SessionID] = []
-    private(set) var current: SessionID?
+    var visited: [SessionID] = []
+    var current: SessionID?
     /// Per session: its open files and artifacts, as the viewer's tabs. Written down a moment after
     /// each change, so a restart brings them back.
     private var viewers: [SessionID: ViewerTabs] = [:] { didSet { saveTabsSoon() } }
@@ -107,7 +107,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
-        root.sidebar.list.onCloseShell = { [weak self] in self?.closeShell($0) }
+        root.sidebar.list.onCloseShell = { [weak self] in self?.requestCloseShell($0) }
         root.sidebar.list.shellMenuFor = { [weak self] in self?.shellMenu($0) }
         root.sidebar.list.onRenameShell = { [weak self] in self?.renameShell($0) }
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
@@ -284,7 +284,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.current = current
         root.status.counts = PhaseGroup.allCases.map { g in (g, all.first { $0.0 == g }?.1.count ?? 0) }
         root.status.warning = unverifiedWarning(state)
-        root.titleBar.tabs = visited.compactMap { id in state.sessions[id].map { TitleBar.Tab(id: id, title: $0.title, group: state.group($0, now: now, rules: rules) ?? .idle) } }
+        let terminalTabs = Dictionary(uniqueKeysWithValues: shellRows().map { ($0.id, $0.title) })
+        root.titleBar.tabs = visited.compactMap { id in
+            if let title = terminalTabs[id] { return TitleBar.Tab(id: id, title: title, group: nil) }
+            return state.sessions[id].map { TitleBar.Tab(id: id, title: $0.title, group: state.group($0, now: now, rules: rules) ?? .idle) }
+        }
         root.titleBar.current = current
         let s = current.flatMap { state.sessions[$0] ?? state.closed[$0]?.session }
         root.sessionPane.show(s, group: s.flatMap { state.group($0, now: now, rules: rules) },
@@ -367,7 +371,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if current != home { m.addItem(MenuAction("Move back to \(home)") { [weak self] in self?.store.moveProject(s.id, to: nil) }) }
         m.addItem(.separator())
         if let shellId = hosted[s.id] {
-            m.addItem(MenuAction("Close Terminal") { [weak self] in self?.closeShell(shellId) })
+            m.addItem(MenuAction("Close Terminal") { [weak self] in self?.requestCloseShell(shellId) })
         } else if case .elsewhere = s.reach {
             m.addItem(MenuAction("Bring into Maxwell") { [weak self] in self?.bringIn(s.id, force: false) })
             let close = MenuAction("Close Session (runs in another terminal)") {}
@@ -418,7 +422,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// A sheet asking for a name; `done` gets what was typed when Rename is pressed.
-    private func askName(_ title: String, note: String, current: String, placeholder: String?, done: @escaping (String) -> Void) {
+    func askName(_ title: String, note: String, current: String, placeholder: String?, done: @escaping (String) -> Void) {
         guard let w = window else { return }
         let a = NSAlert()
         a.messageText = title
@@ -594,6 +598,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func open(_ id: SessionID) {
         if let t = shell(id) {
             current = id
+            remember(id)
             render(store.state)
             syncViewer()
             window?.makeFirstResponder(t)
@@ -604,9 +609,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         // Opening a session from another project switches the rail to it, so its row is in the list.
         let p = store.state.project(s, in: projects)
         if let sc = scope, sc != p { scope = p; UserDefaults.standard.set(p, forKey: "Maxwell.project") }
-        visited.removeAll { $0 == id }
-        visited.insert(id, at: 0)
-        if visited.count > 8 { visited.removeLast() }
+        remember(id)
         // A session Claude Code stopped while idle starts again only when you ask (Resume, ⌘R),
         // so moving through the list doesn't wake every session it passes.
         let resume = resuming.remove(id) != nil
@@ -649,94 +652,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if !due.isEmpty { mark("let go of \(due.count) terminal\(due.count == 1 ? "" : "s") off screen") }
     }
 
-    /// A new terminal at the top of the sidebar, in the session's folder (or the one ⌘T would start in), opened in the pane.
-    /// `command`: run first in the new terminal's shell, which stays open after it.
-    func openShell(in folder: String? = nil, command: String? = nil) {
-        dismissOverlays()
-        let state = store.state
-        let here = current.flatMap { state.sessions[$0]?.cwd } ?? shell(current)?.cwd
-        let usable = { (f: String?) in f.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } }
-        let dir = usable(folder) ?? usable(here) ?? folderHere(state) ?? Paths.home.path
-        open(makeShell(in: dir, command: command))
-        saveShells()
-    }
-
-    /// A terminal's shell and row, not yet shown.
-    private func makeShell(in dir: String, command: String? = nil) -> String {
-        let size = root.sessionPane.content.bounds.size
-        shellsMade += 1
-        let id = "shell-\(shellsMade)"
-        let shellThen = command.map { "/bin/zsh -lc " + Self.shellQuote($0 + "; exec /bin/zsh -l") }
-        let t = TerminalView(frame: NSRect(origin: .zero, size: size == .zero ? NSSize(width: 800, height: 600) : size), workingDirectory: dir,
-                             command: shellThen, env: [TerminalHosts.envKey: TerminalHosts.tag(id)])
-        t.onExit = { [weak self] in self?.closeShell(id) }
-        t.onCwd = { [weak self] in if let self { self.render(self.store.state); self.saveShells() } }
-        t.onOpenURL = { raw, cwd in
-            if raw.hasPrefix("http://") || raw.hasPrefix("https://") { if let u = URL(string: raw) { NSWorkspace.shared.open(u) }; return }
-            var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
-            if let r = path.range(of: #":\d+(:\d+)?$"#, options: .regularExpression) { path.removeSubrange(r) }
-            path = (path as NSString).expandingTildeInPath
-            if !path.hasPrefix("/") { path = ((cwd ?? dir) as NSString).appendingPathComponent(path) }
-            if FileManager.default.fileExists(atPath: path) { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
-        }
-        shells.append((id, t))
-        return id
-    }
-
-    /// The terminals open when Maxwell last quit, fresh shells in the same folders, with their names.
-    private func restoreShells() {
-        for saved in SavedTerminals.load().terminals {
-            let dir = SavedTerminals.reopenFolder(saved.folder, home: Paths.home.path) { FileManager.default.fileExists(atPath: $0) }
-            shellNames[makeShell(in: dir)] = saved.name
-        }
-        if !shells.isEmpty { mark("reopened \(shells.count) terminal\(shells.count == 1 ? "" : "s")") }
-    }
-
-    private func saveShells() {
-        SavedTerminals(terminals: shells.map { .init(folder: $0.view.cwd ?? Paths.home.path, name: shellNames[$0.id]) }).save()
-    }
-
-    private func shellMenu(_ id: String) -> NSMenu {
-        let m = NSMenu()
-        m.addItem(MenuAction("Rename…") { [weak self] in self?.renameShell(id) })
-        m.addItem(.separator())
-        m.addItem(MenuAction("Close Terminal") { [weak self] in self?.closeShell(id) })
-        return m
-    }
-
-    /// Your own name for a terminal; it stays after a restart. Empty goes back to the folder's name.
-    func renameShell(_ id: String) {
-        guard let t = shell(id) else { return }
-        let folder = t.cwd.map { $0 == Paths.home.path ? "~" : ($0 as NSString).lastPathComponent }
-        askName("Rename Terminal", note: "Shown in the list and above the terminal. Leave it empty to go back to the folder's name.",
-                current: shellNames[id] ?? "", placeholder: folder) { [weak self] text in
-            guard let self else { return }
-            let name = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            self.shellNames[id] = name.isEmpty ? nil : name
-            self.saveShells()
-            self.render(self.store.state)
-        }
-    }
-
-    /// Ends a terminal's shell and drops its row; the pane goes to the last terminal or session.
-    func closeShell(_ id: String) {
-        guard let i = shells.firstIndex(where: { $0.id == id }) else { return }
-        shells.remove(at: i).view.removeFromSuperview()
-        shellNames[id] = nil
-        saveShells()
-        if current == id { current = shells.last?.id ?? visited.first }
-        if let next = current { open(next) } else { render(store.state); syncViewer() }
-    }
-
-    private func shellRows() -> [ShellRow] {
-        let busy = Set(hosted.values)
-        return shells.filter { !busy.contains($0.id) }.map { sh in
-            let dir = sh.view.cwd ?? Paths.home.path
-            let title = shellNames[sh.id] ?? (dir == Paths.home.path ? "~" : (dir as NSString).lastPathComponent)
-            return ShellRow(id: sh.id, title: title, detail: (dir as NSString).abbreviatingWithTildeInPath)
-        }
-    }
-
     /// `claude` started in a Maxwell terminal: its row takes the terminal's place, and the pane
     /// follows. When it exits, the terminal's row comes back and the pane goes back to it.
     private func followHostedTerminals(_ state: AppState) {
@@ -752,6 +667,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
+    /// The tabs: what you opened last, newest first.
+    func remember(_ id: SessionID) {
+        visited.removeAll { $0 == id }
+        visited.insert(id, at: 0)
+        if visited.count > 8 { visited.removeLast() }
+    }
+
     func reattach(_ id: SessionID) {
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         detached.remove(id)
@@ -759,9 +681,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         open(id)
     }
 
-    /// Closing a tab frees its terminal; the session keeps running.
+    /// Closing a tab frees its terminal; the session keeps running. A plain terminal keeps running
+    /// too, in its sidebar row.
     func forget(_ id: SessionID) {
-        if shell(id) != nil { return closeShell(id) }
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         visited.removeAll { $0 == id }
         if current == id { current = visited.first }
@@ -888,6 +810,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// ⇧⌘⌫ (⌘⌫ itself belongs to the terminal: delete to line start), the row menu and the banner button. Safe sessions close at once; any other asks
     /// first and says what is still open. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
+        if shell(id) != nil { return requestCloseShell(id) }
         guard let s = store.state.sessions[id], s.phase != .ended else { return }
         if case .elsewhere = s.reach { return toast("“\(s.title)” runs in another terminal. Bring it into Maxwell first, or close it there.") }
         if s.isCloud { return closeCloud(id) }
@@ -1063,7 +986,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// The viewer shows the current session's file or artifact and is open exactly when there is one,
     /// unless ⌘\\ overrode that for this session.
-    private func syncViewer(reload: Bool = false) {
+    func syncViewer(reload: Bool = false) {
         let v = current.flatMap { viewers[$0] } ?? ViewerTabs()
         root.viewerPane.show(v, account: current.flatMap(account(of:)), reload: reload)
         root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
@@ -1310,6 +1233,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 ], detail: "\(project.lowercased()) · \(acct) · \(Format.age(s.lastEventAt, now: now))", group: g, boost: boost) { [weak self] in self?.open(s.id) })
             }
         }
+        items += terminalSearchItems()
         for (i, name) in projectNames.enumerated() {
             items.append(SearchItem(kind: .project, title: name, fields: [(name, 3, "")], detail: i < 9 ? "project ⌘\(i + 1)" : "project", boost: 2) { [weak self] in self?.setScope(name) })
         }
@@ -1424,7 +1348,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Where ⌘T starts: the open session's folder when it belongs to the project on screen,
     /// else that project's most recent folder of its own. Nil when the project has none.
-    private func folderHere(_ state: AppState) -> String? {
+    func folderHere(_ state: AppState) -> String? {
         let inScope = { (s: Session) in !s.cwd.isEmpty && (self.scope == nil || state.project(s, in: self.projects) == self.scope) }
         if let s = current.flatMap({ state.sessions[$0] }), inScope(s), let f = startFolder(s.cwd) { return f }
         // From All projects with nothing open there is no "here": ⌘T asks, like ⌘N, instead of guessing.
@@ -1576,7 +1500,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    private func dismissOverlays() {
+    func dismissOverlays() {
         if search.superview != nil { search.removeFromSuperview() }
         if newPanel.superview != nil { newPanel.removeFromSuperview() }
         if closeSheet.superview != nil { closeSheet.removeFromSuperview() }
@@ -1615,7 +1539,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         cursor-style = bar
         shell-integration = zsh
         scrollback-limit = 20000000
-        confirm-close-surface = false
+        confirm-close-surface = true
         mouse-hide-while-typing = true
         \(t.dark ? "" : "minimum-contrast = 3.5")
         """
@@ -1735,6 +1659,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             },
             Action(id: "undo-close", title: "Undo Close", menu: "Session", shortcut: Shortcut("cmd+z"), isEnabled: { [weak self] in self?.root.status.toastAction != nil }) { [weak self] in
                 self?.root.status.runToastAction()
+            },
+            Action(id: "rename", title: "Rename…", menu: "Session", isEnabled: hasCurrent) { [weak self] in
+                guard let self, let id = self.current else { return }
+                if self.shell(id) != nil { self.renameShell(id) } else { self.rename(id) }
             },
             Action(id: "close-session", title: "Close Session", menu: "Session", shortcut: Shortcut("cmd+shift+backspace"), isEnabled: hasCurrent) { [weak self] in
                 if let id = self?.current { self?.close(id) }
