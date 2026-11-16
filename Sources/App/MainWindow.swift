@@ -16,6 +16,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// Names you gave terminals; a terminal without one is called after its folder. Kept with
     /// each terminal's folder in `SavedTerminals`, so both come back after a restart.
     var shellNames: [String: String] = [:]
+    /// Each terminal's output file (`TerminalOutput`), named once and kept across restarts.
+    var shellOutputs: [String: String] = [:]
     /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
     var hosted: [SessionID: String] = [:]
     private let terminalHosts = TerminalHosts()
@@ -1546,7 +1548,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         cursor-style = bar
         shell-integration = zsh
         scrollback-limit = 20000000
-        confirm-close-surface = true
+        confirm-close-surface = false
         mouse-hide-while-typing = true
         \(t.dark ? "" : "minimum-contrast = 3.5")
         """

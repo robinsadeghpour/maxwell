@@ -542,6 +542,7 @@ viewerTabsTests()
 savedTerminalsTests()
 fileLinkTests()
 fileLinkUnderlineTests()
+terminalOutputTests()
 projectFoldersTests()
 terminalHostsTests()
 

@@ -1,12 +1,15 @@
 import Foundation
 
 /// The plain terminals open in Maxwell, in sidebar order, so they come back after a restart:
-/// each one's folder and the name you gave it. The shell itself doesn't survive; it starts fresh
-/// in that folder, the way Terminal and Warp bring back their windows.
+/// each one's folder, the name you gave it and what it showed (`TerminalOutput`). The shell
+/// itself doesn't survive; a fresh one starts in that folder under the old output, the way
+/// Terminal and Warp bring back their windows.
 struct SavedTerminals: Codable, Equatable {
     struct Terminal: Codable, Equatable {
         var folder: String
         var name: String?
+        /// Names this terminal's output file; it stays the same across restarts.
+        var output: String?
     }
     var terminals: [Terminal] = []
     static let key = "Maxwell.terminals"

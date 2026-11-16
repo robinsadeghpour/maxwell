@@ -112,7 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
     private var pendingFolder: String?
     private var launched = false
-    func applicationWillTerminate(_ n: Notification) { store?.plugins.shutdownAll() }
+    func applicationWillTerminate(_ n: Notification) {
+        main?.saveShellOutputs()
+        store?.plugins.shutdownAll()
+    }
     /// `open Maxwell.app` while a run of the same bundle is up reopens that instance. A quiet run
     /// stays quiet and still quits on time: a reopened test run once sat in front for an hour.
     func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows: Bool) -> Bool {
