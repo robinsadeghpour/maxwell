@@ -13,6 +13,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private var shells: [(id: String, view: TerminalView)] = []
     private var shellsMade = 0
     private func shell(_ id: String?) -> TerminalView? { shells.first { $0.id == id }?.view }
+    /// Names you gave terminals; a terminal without one is called after its folder.
+    private var shellNames: [String: String] = [:]
     /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
     private var hosted: [SessionID: String] = [:]
     private let terminalHosts = TerminalHosts()
@@ -103,6 +105,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
         root.sidebar.list.onCloseShell = { [weak self] in self?.closeShell($0) }
+        root.sidebar.list.shellMenuFor = { [weak self] in self?.shellMenu($0) }
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
         root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
@@ -405,21 +408,25 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Your own title for a session, kept in Maxwell. Empty goes back to the automatic one.
     func rename(_ id: SessionID) {
-        guard let s = store.state.sessions[id], let w = window else { return }
+        guard let s = store.state.sessions[id] else { return }
+        askName("Rename Session", note: "Shown in the list, tabs and search. Leave it empty to go back to the automatic title.",
+                current: s.named?.byYou == true ? s.title : "", placeholder: s.title) { [weak self] in self?.store.rename(id, to: $0) }
+    }
+
+    /// A sheet asking for a name; `done` gets what was typed when Rename is pressed.
+    private func askName(_ title: String, note: String, current: String, placeholder: String?, done: @escaping (String) -> Void) {
+        guard let w = window else { return }
         let a = NSAlert()
-        a.messageText = "Rename Session"
-        a.informativeText = "Shown in the list, tabs and search. Leave it empty to go back to the automatic title."
-        let field = NSTextField(string: s.named?.byYou == true ? s.title : "")
-        field.placeholderString = s.title
+        a.messageText = title
+        a.informativeText = note
+        let field = NSTextField(string: current)
+        field.placeholderString = placeholder
         field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
         a.accessoryView = field
         a.addButton(withTitle: "Rename")
         a.addButton(withTitle: "Cancel")
         a.window.initialFirstResponder = field
-        a.beginSheetModal(for: w) { [weak self] r in
-            guard r == .alertFirstButtonReturn else { return }
-            self?.store.rename(id, to: field.stringValue)
-        }
+        a.beginSheetModal(for: w) { r in if r == .alertFirstButtonReturn { done(field.stringValue) } }
     }
 
     func suggestTitle(_ id: SessionID) {
@@ -664,10 +671,32 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         open(id)
     }
 
+    private func shellMenu(_ id: String) -> NSMenu {
+        let m = NSMenu()
+        m.addItem(MenuAction("Rename…") { [weak self] in self?.renameShell(id) })
+        m.addItem(.separator())
+        m.addItem(MenuAction("Close Terminal") { [weak self] in self?.closeShell(id) })
+        return m
+    }
+
+    /// Your own name for a terminal, kept until it closes. Empty goes back to the folder's name.
+    func renameShell(_ id: String) {
+        guard let t = shell(id) else { return }
+        let folder = t.cwd.map { $0 == Paths.home.path ? "~" : ($0 as NSString).lastPathComponent }
+        askName("Rename Terminal", note: "Shown in the list and above the terminal. Leave it empty to go back to the folder's name.",
+                current: shellNames[id] ?? "", placeholder: folder) { [weak self] text in
+            guard let self else { return }
+            let name = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.shellNames[id] = name.isEmpty ? nil : name
+            self.render(self.store.state)
+        }
+    }
+
     /// Ends a terminal's shell and drops its row; the pane goes to the last terminal or session.
     func closeShell(_ id: String) {
         guard let i = shells.firstIndex(where: { $0.id == id }) else { return }
         shells.remove(at: i).view.removeFromSuperview()
+        shellNames[id] = nil
         if current == id { current = shells.last?.id ?? visited.first }
         if let next = current { open(next) } else { render(store.state); syncViewer() }
     }
@@ -676,7 +705,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let busy = Set(hosted.values)
         return shells.filter { !busy.contains($0.id) }.map { sh in
             let dir = sh.view.cwd ?? Paths.home.path
-            let title = dir == Paths.home.path ? "~" : (dir as NSString).lastPathComponent
+            let title = shellNames[sh.id] ?? (dir == Paths.home.path ? "~" : (dir as NSString).lastPathComponent)
             return ShellRow(id: sh.id, title: title, detail: (dir as NSString).abbreviatingWithTildeInPath)
         }
     }

@@ -46,6 +46,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     /// Plain terminals, drawn first under their own header; × on a row ends it.
     var shells: [ShellRow] = [] { didSet { if shells != oldValue { rebuildItems() } } }
     var onCloseShell: ((String) -> Void)?
+    /// Right-click on a terminal row.
+    var shellMenuFor: ((String) -> NSMenu?)?
     var onNewShell: (() -> Void)?
     var onCloseAllSafe: (() -> Void)?
     /// Stops the idle sessions Maxwell can stop (background ones); Undo reopens them.
@@ -602,8 +604,14 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     }
 
     override func rightMouseDown(with e: NSEvent) {
-        guard let i = index(at: convert(e.locationInWindow, from: nil)), case .session(let r) = items[i],
-              let m = menuFor?(r.session) else { return super.rightMouseDown(with: e) }
+        let menu: NSMenu? = index(at: convert(e.locationInWindow, from: nil)).flatMap { i in
+            switch items[i] {
+            case .session(let r): return menuFor?(r.session)
+            case .shell(let r): return shellMenuFor?(r.id)
+            default: return nil
+            }
+        }
+        guard let m = menu else { return super.rightMouseDown(with: e) }
         NSMenu.popUpContextMenu(m, with: e, for: self)
     }
 
