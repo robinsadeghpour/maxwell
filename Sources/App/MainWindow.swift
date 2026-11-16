@@ -13,7 +13,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private var shells: [(id: String, view: TerminalView)] = []
     private var shellsMade = 0
     private func shell(_ id: String?) -> TerminalView? { shells.first { $0.id == id }?.view }
-    /// Names you gave terminals; a terminal without one is called after its folder.
+    /// Names you gave terminals; a terminal without one is called after its folder. Kept with
+    /// each terminal's folder in `SavedTerminals`, so both come back after a restart.
     private var shellNames: [String: String] = [:]
     /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
     private var hosted: [SessionID: String] = [:]
@@ -91,6 +92,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
         w.onFocusChange = { [weak self] in self?.updateDim() }
         wire()
+        restoreShells()
         actions = makeActions()
         tooltips = Tooltips(window: w)
         Tooltips.shortcut = { [weak self] id in self?.actions.first { $0.id == id }?.shortcut?.display }
@@ -107,6 +109,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
         root.sidebar.list.onCloseShell = { [weak self] in self?.closeShell($0) }
         root.sidebar.list.shellMenuFor = { [weak self] in self?.shellMenu($0) }
+        root.sidebar.list.onRenameShell = { [weak self] in self?.renameShell($0) }
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
         root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
@@ -654,6 +657,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let here = current.flatMap { state.sessions[$0]?.cwd } ?? shell(current)?.cwd
         let usable = { (f: String?) in f.flatMap { FileManager.default.fileExists(atPath: $0) ? $0 : nil } }
         let dir = usable(folder) ?? usable(here) ?? folderHere(state) ?? Paths.home.path
+        open(makeShell(in: dir, command: command))
+        saveShells()
+    }
+
+    /// A terminal's shell and row, not yet shown.
+    private func makeShell(in dir: String, command: String? = nil) -> String {
         let size = root.sessionPane.content.bounds.size
         shellsMade += 1
         let id = "shell-\(shellsMade)"
@@ -661,7 +670,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let t = TerminalView(frame: NSRect(origin: .zero, size: size == .zero ? NSSize(width: 800, height: 600) : size), workingDirectory: dir,
                              command: shellThen, env: [TerminalHosts.envKey: TerminalHosts.tag(id)])
         t.onExit = { [weak self] in self?.closeShell(id) }
-        t.onCwd = { [weak self] in if let self { self.render(self.store.state) } }
+        t.onCwd = { [weak self] in if let self { self.render(self.store.state); self.saveShells() } }
         t.onOpenURL = { raw, cwd in
             if raw.hasPrefix("http://") || raw.hasPrefix("https://") { if let u = URL(string: raw) { NSWorkspace.shared.open(u) }; return }
             var path = raw.hasPrefix("file://") ? (URL(string: raw)?.path ?? raw) : raw
@@ -671,7 +680,20 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if FileManager.default.fileExists(atPath: path) { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
         }
         shells.append((id, t))
-        open(id)
+        return id
+    }
+
+    /// The terminals open when Maxwell last quit, fresh shells in the same folders, with their names.
+    private func restoreShells() {
+        for saved in SavedTerminals.load().terminals {
+            let dir = SavedTerminals.reopenFolder(saved.folder, home: Paths.home.path) { FileManager.default.fileExists(atPath: $0) }
+            shellNames[makeShell(in: dir)] = saved.name
+        }
+        if !shells.isEmpty { mark("reopened \(shells.count) terminal\(shells.count == 1 ? "" : "s")") }
+    }
+
+    private func saveShells() {
+        SavedTerminals(terminals: shells.map { .init(folder: $0.view.cwd ?? Paths.home.path, name: shellNames[$0.id]) }).save()
     }
 
     private func shellMenu(_ id: String) -> NSMenu {
@@ -682,7 +704,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         return m
     }
 
-    /// Your own name for a terminal, kept until it closes. Empty goes back to the folder's name.
+    /// Your own name for a terminal; it stays after a restart. Empty goes back to the folder's name.
     func renameShell(_ id: String) {
         guard let t = shell(id) else { return }
         let folder = t.cwd.map { $0 == Paths.home.path ? "~" : ($0 as NSString).lastPathComponent }
@@ -691,6 +713,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             guard let self else { return }
             let name = text.trimmingCharacters(in: .whitespacesAndNewlines)
             self.shellNames[id] = name.isEmpty ? nil : name
+            self.saveShells()
             self.render(self.store.state)
         }
     }
@@ -700,6 +723,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         guard let i = shells.firstIndex(where: { $0.id == id }) else { return }
         shells.remove(at: i).view.removeFromSuperview()
         shellNames[id] = nil
+        saveShells()
         if current == id { current = shells.last?.id ?? visited.first }
         if let next = current { open(next) } else { render(store.state); syncViewer() }
     }

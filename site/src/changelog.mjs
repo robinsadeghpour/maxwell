@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
-    versions: "0.1.50 – 0.1.53",
+    versions: "0.1.50 – 0.1.54",
     title: "Cloud sessions",
     figure: "",
     body: `
@@ -15,7 +15,8 @@ export default [
 <p>${k("⌥ ⌘ N")} starts a session in the cloud from a project and a task. With <strong>Cloud</strong> picked, the new-session panel says what won't go along, such as commits that aren't pushed. ${k("⌥ ⌘ ↑")} sends a session from your Mac to the cloud: it commits, pushes and writes a brief, and a cloud session continues from there. ${k("⌥ ⌘ ↓")} brings a cloud session back into a fresh worktree. <a href="/docs/cloud">How cloud sessions work</a>.</p>`,
     fixes: [
       "The folder now fills a narrow viewer when no file is open, instead of leaving a dimmed empty strip beside it",
-      "Terminals can now be renamed: right-click a terminal's row and pick Rename…",
+      "Terminals now come back after a restart, in the same folders and order, with fresh shells; one whose folder is gone opens in the nearest folder still there",
+      "Terminals can now be renamed: double-click a terminal's row, or right-click it and pick Rename…; the name stays after a restart",
       "The window's corners are now round, instead of a stepped bevel inside the rim macOS draws",
     ],
   },

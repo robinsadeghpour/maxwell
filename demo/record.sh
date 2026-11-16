@@ -13,6 +13,8 @@ ROOT=$HOME/demo
 FRAMES=build/demo/frames
 python3 demo/world.py "$ROOT" --live >/dev/null
 python3 demo/forget_tabs.py "$ROOT"
+# Maxwell Dev reopens the terminals open when it last quit; the demo starts without any.
+defaults delete dev.maxwell.app.dev Maxwell.terminals 2>/dev/null || true
 rm -rf $FRAMES; mkdir -p $FRAMES "$(dirname $OUT)"
 
 # Times are seconds after launch.
