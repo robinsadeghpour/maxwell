@@ -48,6 +48,8 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     var onCloseShell: ((String) -> Void)?
     /// Right-click on a terminal row.
     var shellMenuFor: ((String) -> NSMenu?)?
+    /// Double-click on a terminal row.
+    var onRenameShell: ((String) -> Void)?
     var onNewShell: (() -> Void)?
     var onCloseAllSafe: (() -> Void)?
     /// Stops the idle sessions Maxwell can stop (background ones); Undo reopens them.
@@ -590,6 +592,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         switch items[i] {
         case .shell(let r):
             if shellCloseRect(in: rowRects()[i]).contains(p) { onCloseShell?(r.id); return }
+            if e.clickCount == 2 { onRenameShell?(r.id); return }
             cursor = r.id
             onOpen?(r.id)
         case .group(let g, _) where g.folds: toggle(g)

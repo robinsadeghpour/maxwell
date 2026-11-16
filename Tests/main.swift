@@ -539,6 +539,7 @@ pluginHostTests()
 linearTests()
 linearPluginTests()
 viewerTabsTests()
+savedTerminalsTests()
 projectFoldersTests()
 terminalHostsTests()
 
