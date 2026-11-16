@@ -34,11 +34,11 @@
 - [Keyboard shortcuts](https://www.runmaxwell.com/docs/keyboard-shortcuts): Every action has a key, and every key can be changed in Settings › Keys or with a keybind line.
 - [Configuration](https://www.runmaxwell.com/docs/configuration): One plain text file, one key = value per line. Maxwell reloads it the moment you save, and the Settings window writes the same file.
 - [Command line](https://www.runmaxwell.com/docs/command-line): The Maxwell binary answers a few commands in a terminal, for auditing and undoing.
-- [What Maxwell touches](https://www.runmaxwell.com/docs/privacy): Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads and the cloud session listing, which go through your own Claude account, and what plugins you turn on.
+- [What Maxwell touches](https://www.runmaxwell.com/docs/privacy): Everything stays on your Mac. Maxwell sends nothing anywhere, apart from the Haiku reads and the cloud session listing, which go through your own Claude account, crash reports you can turn off, and what plugins you turn on.
 
 ## Changelog
 
-- [Cloud sessions](https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions) (2026-11-16, v0.1.50 – 0.1.58)
+- [Cloud sessions](https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions) (2026-11-16, v0.1.50 – 0.1.59)
 - [Safe to close trusts the session's own word](https://www.runmaxwell.com/changelog/2026-11-15-safe-to-close-trusts-the-session) (2026-11-15, v0.1.49)
 - [Idle sessions free their memory](https://www.runmaxwell.com/changelog/2026-11-15-idle-sessions-free-their-memory) (2026-11-15, v0.1.48)
 - [Agents that wait still count](https://www.runmaxwell.com/changelog/2026-11-15-agents-waiting) (2026-11-15, v0.1.47)

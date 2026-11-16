@@ -121,6 +121,7 @@ jobs:
           NOTARY_KEY: ${{ secrets.MAXWELL_NOTARY_KEY }}
           MAXWELL_NOTARY_KEY_ID: ${{ secrets.MAXWELL_NOTARY_KEY_ID }}
           MAXWELL_NOTARY_ISSUER: ${{ secrets.MAXWELL_NOTARY_ISSUER }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
         run: |
           export MAXWELL_NOTARY_KEY=$RUNNER_TEMP/notary.p8

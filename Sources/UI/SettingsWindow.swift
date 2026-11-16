@@ -587,6 +587,8 @@ final class SettingsView: MXView {
             form.row("Maxwell \(Updater.current)", [(check, check.intrinsicContentSize.width)],
                      note: model.updateStatus ?? "Checks every 4 hours and downloads in the background. Nothing installs until you restart.")
         }
+        form.toggle("Send crash reports", c.crashReports,
+                    note: Updater.isRelease ? "Crashes and hangs, without paths, prompts or names. runmaxwell.com/docs/privacy#crash-reports" : "Development builds never send them. The released Maxwell does, unless this is off.") { [weak self] in self?.set("crash-reports", $0 ? "on" : "off") }
         notifications()
         form.header("Files", note: "Markdown files open in the viewer, the pane beside the session.")
         form.toggle("Open files as sessions write them", c.autoOpen, note: "Also files a session mentions. ⌘-click any path in the terminal to open it yourself.") { [weak self] in self?.set("auto-open", $0 ? "true" : "false") }
