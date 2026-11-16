@@ -22,6 +22,21 @@ final class MXWindow: NSWindow {
         setFrameOrigin(NSPoint(x: right + 2000, y: 0))
         orderBack(nil)
     }
+
+    /// macOS doesn't clip a see-through window's content to the window's rounded corners, and the
+    /// rim it draws then stair-steps around the content's square ones. The views that fill such a
+    /// window clip themselves to its radius: 20 pt on macOS 26 for a window with a toolbar, 10 pt
+    /// before, square in full screen.
+    static func clipCorners(_ views: [NSView], fullScreen: Bool) {
+        let radius: CGFloat
+        if fullScreen { radius = 0 } else if #available(macOS 26, *) { radius = 20 } else { radius = 10 }
+        for v in views {
+            v.wantsLayer = true
+            v.layer?.cornerRadius = radius
+            v.layer?.cornerCurve = .continuous
+            v.layer?.masksToBounds = true
+        }
+    }
 }
 
 /// Window frames per screen. Opens on the screen with the mouse when the last screen is gone

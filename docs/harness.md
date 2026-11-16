@@ -15,3 +15,4 @@ For videos and screenshots that leave the Mac, use the invented world in `demo/`
 - A bare `ghostty_surface_key` without characters never reaches Claude. Send keys through `TerminalView.keyDown` with a real NSEvent.
 - Test sessions: use `--model haiku`. To keep a test subagent busy (a hook blocks `sleep`, and long foreground commands get moved to the background), repeat `ping -c 90 -i 1 127.0.0.1` six times, about nine minutes.
 - The demo's stand-in `demo/bin/claude` must learn every new `claude -p` use, or the demo shows wrong text.
+- `--snap` leaves out the window's rim and shadow, so a corner that only goes wrong in the rim looks fine in it. To check the corners, capture the Maxwell Dev window by its process ID with `CGWindowListCreateImage` without `.boundsIgnoreFraming`, next to a plain window for comparison.
