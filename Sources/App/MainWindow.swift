@@ -75,6 +75,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         content.addSubview(glass)
         content.addSubview(root)
         w.contentView = content
+        MXWindow.clipCorners([glass, root], fullScreen: false)
         super.init(window: w)
         WindowPlacement.restore(w)
         w.delegate = self
@@ -481,11 +482,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func windowWillEnterFullScreen(_ n: Notification) {
         window?.toolbar = nil
         root.titleBar.fullScreen = true
+        MXWindow.clipCorners([glass, root], fullScreen: true)
     }
     func windowDidExitFullScreen(_ n: Notification) {
         window?.toolbar = NSToolbar()
         window?.toolbarStyle = .unifiedCompact
         root.titleBar.fullScreen = false
+        MXWindow.clipCorners([glass, root], fullScreen: false)
     }
 
     // MARK: panels

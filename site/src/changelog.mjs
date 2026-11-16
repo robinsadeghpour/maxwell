@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
-    versions: "0.1.50 – 0.1.52",
+    versions: "0.1.50 – 0.1.53",
     title: "Cloud sessions",
     figure: "",
     body: `
@@ -16,6 +16,7 @@ export default [
     fixes: [
       "The folder now fills a narrow viewer when no file is open, instead of leaving a dimmed empty strip beside it",
       "Terminals can now be renamed: right-click a terminal's row and pick Rename…",
+      "The window's corners are now round, instead of a stepped bevel inside the rim macOS draws",
     ],
   },
   {
