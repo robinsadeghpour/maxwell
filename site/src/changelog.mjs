@@ -7,7 +7,7 @@ export default [
   {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
-    versions: "0.1.50 – 0.1.57",
+    versions: "0.1.50 – 0.1.58",
     title: "Cloud sessions",
     figure: "",
     body: `
