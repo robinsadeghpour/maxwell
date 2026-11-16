@@ -540,6 +540,8 @@ linearTests()
 linearPluginTests()
 viewerTabsTests()
 savedTerminalsTests()
+fileLinkTests()
+fileLinkUnderlineTests()
 projectFoldersTests()
 terminalHostsTests()
 

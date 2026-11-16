@@ -38,7 +38,7 @@
 
 ## Changelog
 
-- [Cloud sessions](https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions) (2026-11-16, v0.1.50 – 0.1.55)
+- [Cloud sessions](https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions) (2026-11-16, v0.1.50 – 0.1.56)
 - [Safe to close trusts the session's own word](https://www.runmaxwell.com/changelog/2026-11-15-safe-to-close-trusts-the-session) (2026-11-15, v0.1.49)
 - [Idle sessions free their memory](https://www.runmaxwell.com/changelog/2026-11-15-idle-sessions-free-their-memory) (2026-11-15, v0.1.48)
 - [Agents that wait still count](https://www.runmaxwell.com/changelog/2026-11-15-agents-waiting) (2026-11-15, v0.1.47)

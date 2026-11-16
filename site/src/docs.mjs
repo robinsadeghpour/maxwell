@@ -222,10 +222,10 @@ keybind = cmd+shift+j=next-needs-you</code></pre>
     figure: fig.artifact("An artifact opens signed in to the account its session runs on."),
     body: `
 <h2>Markdown files</h2>
-<p>When a session writes or mentions a Markdown file, it opens in the viewer, rendered. ${k("⌘")}-click any path in the terminal to open it.</p>
+<p>When a session writes or mentions a Markdown file, it opens in the viewer, rendered. Click any file path in a session's terminal to open it there too: the pointer turns into a hand and the path is underlined when Maxwell can find the file. Relative paths are looked up from the session's folder. In a terminal you opened yourself, ${k("⌘")}-click a path.</p>
 <h2>Tabs</h2>
 <p>The viewer keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Double-click the tab, or press ${k("⌥ ⌘ P")}, to keep it. While you're reading a tab you kept, the session's next file waits in a preview tab behind it.</p>
-<p>A path you ${k("⌘")}-click gets a tab of its own. Files you click in the folder tree open in the preview tab. Click × or middle-click to close a tab, or press ${k("⌘ W")} while you're in the viewer. Drag tabs to reorder them. Right-click a tab for Close Others, Close All, Reveal in Finder and Copy Path.</p>
+<p>A path you click gets a tab of its own. Files you click in the folder tree open in the preview tab. Click × or middle-click to close a tab, or press ${k("⌘ W")} while you're in the viewer. Drag tabs to reorder them. Right-click a tab for Close Others, Close All, Reveal in Finder and Copy Path.</p>
 <p>Each tab keeps your place: go back to it and it's scrolled where you left it. A tab that gets something new while you're on another one shows a purple dot. When the tabs don't fit, ${k("⌄")} at the end of the strip lists them all, and turns purple when a tab out of sight has something new. ${k("⌥ ⌘ ←")} and ${k("⌥ ⌘ →")} step through the tabs. Tabs come back when Maxwell restarts.</p>
 <h2>The folder</h2>
 <p>${k("⇧ ⌘ T")} shows the session's folder. In a wide viewer it sits beside the page and stays. In a narrow one it slides over the page, and goes away once you pick a file, press ${k("Esc")} or click the page. The file on show is selected in it.</p>
