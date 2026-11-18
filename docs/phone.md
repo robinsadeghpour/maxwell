@@ -27,8 +27,8 @@ The relay URL is `phone-relay` in the config (`docs/config.md`). Settings › Ph
 
    - `mac`: this Mac's room id, 16 random bytes, base64url without padding. Made once and kept in the Keychain.
    - `k`: 32 random bytes, base64url. A new one for each code shown. The code expires after 10 minutes or the first pairing, whichever is first.
-2. The phone scans it, makes its own phone id (16 random bytes, base64url), joins the room as that phone and sends `pair` (below), encrypted with `k`.
-3. The bridge tries `k` of every unexpired code. When one opens the message, `k` becomes that phone's key, stored in the Keychain under the phone id, and the code is spent. It answers `paired`.
+2. The phone scans it, makes its own phone id (16 random bytes, base64url), joins the room as that phone and sends `pair` (below), encrypted with `k` like every later message: `phoneToMac` from `k` (see Encryption). The `phone` field must be the id it joined with.
+3. The bridge tries `k` of every unexpired code. When one opens the message, `k` becomes that phone's key, stored in the Keychain under the phone id, and the code is spent. It answers `paired`, sealed with `macToPhone` from `k`. A known phone may pair again with a new code; the new key replaces the old.
 4. From then on the phone sends `hello` on every connect.
 
 Removing a phone deletes its key. Its messages no longer open, and the bridge ignores them.
@@ -67,7 +67,7 @@ Every message is `{"t": "<type>", …}` inside a box.
 |---|---|---|
 | `pair` | `phone` (id), `name` (e.g. "Robin's iPhone"), `app` (version) | `paired` |
 | `hello` | `app`, `push` (Expo push token or null), `focus` (session id or null) | `state`, then `transcript` for `focus` |
-| `focus` | `session` (id or null), `terminal` (`{cols, rows}` or null) | `transcript` with `reset: true`; with `terminal`, `term` data too |
+| `focus` | `session` (id or null), `terminal` (`{cols, rows}` or null) | `transcript` with `reset: true`; with `terminal`, `term` data too. `hello`'s `focus` is a focus without `terminal`. |
 | `cmd` | `id` (unique, made by the phone), `op`, op fields (below) | `ack` with the same `id` |
 | `input` | `session`, `data` (UTF-8 text typed in the Terminal tab, including control characters) | none |
 | `resize` | `session`, `cols`, `rows` | none |
@@ -84,11 +84,26 @@ Every message is `{"t": "<type>", …}` inside a box.
 | `closeSafe` | `sessions` (ids the phone showed as safe) | Close all safe, re-checked on the Mac. `result`: `{"closed": [ids], "skipped": [ids]}`. |
 | `forceClose` | `session` | Closes even when not safe (the phone asked "Close anyway?" first). |
 | `move` | `session`, `account` (id or null for most room) | Moves a limited session to another account with a handover prompt. `result`: `{"session": new id}`. |
-| `resumeAtReset` | `session` | Sends "continue" when the account's limit resets. |
+| `resumeAtReset` | `session` | Sends "continue" when the account's limit resets. `result`: `{"at": ISO}`, when it will. |
 | `rename` | `session`, `title` | Renames, like the Mac's Rename. |
 | `artifactLogin` | `account` | `result`: `{"cookies": [cookie…]}`, the account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone. Fails with `signed-out` when that account isn't signed in on the Mac. |
 
-The Mac remembers the last 500 command ids. A repeated id gets the first answer again and does nothing twice, so the phone can safely resend anything not yet acknowledged.
+The Mac remembers the last 500 command ids. A repeated id gets the first answer again and does nothing twice, so the phone can safely resend anything not yet acknowledged. A resend while the first is still running gets no second answer; the first answer comes when it is done.
+
+Error codes in `ack.error.code`:
+
+| `code` | When |
+|---|---|
+| `unknown-session` | The Mac doesn't know that session any more. |
+| `read-only` | `send`, `permission`, `interrupt`, `close`, `forceClose` or `resumeAtReset` on a session with `reach` `terminal` or `cloud`. |
+| `no-prompt` | `permission` while the session shows no permission prompt. |
+| `not-safe` | `close` on a session that isn't safe now; `detail` is the checks still open, `[{"name", "ok": false, "detail"}]`. |
+| `untrusted` | `start` in a folder Claude Code hasn't been allowed to work in yet. Start one there on the Mac once. |
+| `no-room` | `start` or `move` with no account that has room. |
+| `signed-out` | `artifactLogin` for an account not signed in to claude.ai on the Mac. |
+| `bad-request` | A field is missing or wrong (no text, unknown decision, a folder that isn't on the Mac). |
+| `unknown-op` | An op this Maxwell doesn't know (an older Mac). |
+| `failed` | Anything else; `message` says what, in words for the user. |
 
 ### Mac → Phone
 
@@ -97,7 +112,7 @@ The Mac remembers the last 500 command ids. A repeated id gets the first answer 
 | `paired` | `mac` (`{"name": "Robin's MacBook Pro"}`) |
 | `state` | `rev` (rises by one each time), `mac`, `accounts`, `sessions`, `projects`, `artifacts`, `at` (ISO time). The whole picture, sent after `hello` and after every change (at most every 300 ms). |
 | `transcript` | `session`, `reset` (true: replace what you have), `items` (append in order) |
-| `term` | `session`, `data` (base64 of the terminal's output bytes) |
+| `term` | `session`, `data` (base64 of the terminal's output bytes, at most 256 KB a message; a long burst comes as several) |
 | `ack` | `id`, `ok`, `result` (object) or `error` (`code`, `message`, `detail`) |
 | `bye` | `reason` (`removed`: this phone was removed in Settings) |
 
@@ -113,6 +128,9 @@ The Mac remembers the last 500 command ids. A repeated id gets the first answer 
 | `limitResetsAt` | ISO time, for Limited |
 | `contextPercent` | Context window used, 0–100, or null |
 | `reach` | `background` (Maxwell can type into it), `terminal` (runs in a terminal elsewhere: read-only), `cloud` |
+| `pinned` | You pinned it on the Mac (bool). |
+
+`lastMessage` is cut to its first 1500 characters here (the conversation has all of it), and left out (null) when the whole state would come near the relay's 1 MB. `question.options` is empty for now: Claude Code's question dialog doesn't say its options anywhere Maxwell reads yet.
 
 **Account**: `id`, `name`, `email` (or null), `fiveHour` and `week` (`{"percent": 49, "resetsAt": ISO}` or null), `sampledAt`, `limited` (bool), `mostRoom` (bool, exactly one account, the one ⌘T would pick), `webSignedIn` (bool).
 
@@ -125,19 +143,19 @@ The Mac remembers the last 500 command ids. A repeated id gets the first answer 
 ```json
 {"k": "you", "text": "Add magic-link sign-in…", "at": "…"}
 {"k": "claude", "text": "Tests pass. The migration adds…", "at": "…"}        // Markdown
-{"k": "tool", "tool": "Edit", "summary": "auth/callback.ts", "added": 42, "removed": 8}
-{"k": "tool", "tool": "Bash", "summary": "npm test", "status": "ok"|"failed"|"running"}
+{"k": "tool", "id": "toolu_…", "tool": "Edit", "summary": "auth/callback.ts", "added": 42, "removed": 8}
+{"k": "tool", "id": "toolu_…", "tool": "Bash", "summary": "npm test", "status": "ok"|"failed"|"running"}
 {"k": "artifact", "url": "https://claude.ai/artifact/…", "title": "Onboarding copy v3"}
 {"k": "note", "text": "Session moved to personal"}
 ```
 
-Items come from the session's transcript file. The first `focus` sends the last 300; then new ones as they are written.
+Items come from the session's transcript file. The first `focus` sends the last 300; then new ones as they are written. A tool item shows when Claude calls the tool (a command as `running`, an edit without counts) and comes again with the same `id` once its result is in: **replace the item with that `id`**, don't append it. `status` can also be `failed` on other tools whose call failed. `you` and `claude` items are cut at 20,000 characters. A `transcript` too big for one message comes in parts; only the first carries `reset: true`.
 
 **Cookie**: `name`, `value`, `domain`, `path`, `expires` (ISO or null), `secure`, `httpOnly`.
 
 ## Pushes
 
-The bridge sends a push for each new Needs you (and Your turn, if the phone turned that on) to every paired phone with a push token, through `https://exp.host/--/api/v2/push/send`. It sends none while the Mac is in use: input in the last 2 minutes and the screen unlocked.
+The bridge sends a push for each new Needs you to every paired phone with a push token (Your turn pushes wait for a setting the phone can send), through `https://exp.host/--/api/v2/push/send`. It sends none while the Mac is in use: input in the last 2 minutes and the screen unlocked.
 
 ```json
 {"to": "<expo token>", "title": "web-auth needs you", "body": "Run npm run db:migrate -- --env staging?",
@@ -148,6 +166,18 @@ The bridge sends a push for each new Needs you (and Your turn, if the phone turn
 Categories: `permission` (Allow, Allow for this folder, Deny, Reply), `question` (Reply, plus up to three options), `turn` (Reply, Go on). `counts` keeps the phone's widgets current even while the app isn't running.
 
 Note: the title and body pass through Expo and Apple in readable form, like any notification. Everything else stays end-to-end encrypted.
+
+## Checking the bridge
+
+End to end against a local relay (`npx wrangler dev --port 8787` in the relay's folder), with a test phone made from the relay's `tools/protocol.mjs`:
+
+```sh
+cp ~/.config/maxwell/config /tmp/mx-phone.config && echo 'phone-relay = ws://127.0.0.1:8787' >> /tmp/mx-phone.config
+MAXWELL_CONFIG=/tmp/mx-phone.config MAXWELL_PHONE_PAIR_FILE=/tmp/mx-pair-link build/Maxwell.app/Contents/MacOS/Maxwell --quit-after 300 &
+node tools/test-phone.mjs /tmp/mx-pair-link <session name prefix> [message] [--permission]
+```
+
+`MAXWELL_PHONE_PAIR_FILE` works only in a quiet run (`Sources/Harness/PhoneHarness.swift`): Maxwell makes a code at launch and writes its link there. Quiet runs keep keys in memory, so each run is a new room.
 
 ## Changelog
 

@@ -20,6 +20,9 @@ struct PairingCodes {
 
     mutating func prune(now: Date) { codes.removeAll { $0.expires <= now } }
 
+    /// Settings › Phone › Done: no code works any more.
+    mutating func cancelAll() { codes = [] }
+
     /// The code whose key opens a `pair` box from this phone, spent on the spot.
     mutating func spend(box: String, from phone: String, now: Date) -> (key: Data, message: [String: Any])? {
         prune(now: now)

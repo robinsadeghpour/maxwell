@@ -518,6 +518,7 @@ final class SettingsView: MXView {
     var onPluginRestart: ((PluginID) -> Void)?
     var onPairPhone: (() -> Void)?
     var onRemovePhone: ((String) -> Void)?
+    var onCancelPairing: (() -> Void)?
     private let sections = SectionList(frame: .zero)
     private let scroll = NSScrollView()
     let form = FormView(frame: .zero)

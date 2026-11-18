@@ -123,6 +123,13 @@ final class PhoneBridge {
         return status.pairLink
     }
 
+    /// Settings › Phone › Done: the code goes and stops working.
+    func cancelPairingCodes() {
+        codes.cancelAll()
+        codeExpiry.cancel()
+        onStatus?()
+    }
+
     /// Settings › Phone › Remove: the phone hears `bye`, then its key is gone and its boxes no longer open.
     func remove(_ phone: String) {
         send(["t": "bye", "reason": "removed"], to: phone)

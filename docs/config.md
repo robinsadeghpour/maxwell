@@ -24,6 +24,7 @@ app-icon = auto               # auto | light | dark | paper | graphite | light-e
 idle-after = 24h              # stopped sessions quiet this long fold into Idle (24h, 90m, 2d)
 judge = on                    # off: no model read, so nothing is ever safe to close
 crash-reports = on            # off: never send crash reports (runmaxwell.com/docs/privacy#crash-reports)
+phone-relay = wss://relay.example.com   # the relay Maxwell's iPhone app reaches this Mac through; unset: phone off
 account = work ~/.claude      # <name> <CLAUDE_CONFIG_DIR>, one line per account
 project = Orbit ~/projects/orbit*     # <name> <path glob>; default: the git repo, worktrees included
 project-pin = Acme            # one line per project kept on the rail, in order; none = all
@@ -103,3 +104,11 @@ linear.writes = live          # live | dry-run: dry run logs moves and comments 
 
 Settings › Keys lists every action. Click a shortcut, press the new keys; ⌫ clears it, Esc cancels.
 It writes `keybind = <keys>=<action>` lines; `none` removes a default shortcut.
+
+## Phone
+
+`phone-relay = wss://…` turns on the bridge to Maxwell's iPhone app ([phone.md](phone.md)). There is no
+default yet: until the relay is deployed, set it to your own (`ws://127.0.0.1:8787` for `wrangler dev`).
+While it is unset the bridge stays off and Settings › Phone says how to set it. Changing it reconnects at
+once. Pair a phone in Settings › Phone; the Mac's room id, its token and each phone's key live in the
+Keychain (service `Maxwell phone <bundle id>`, so Maxwell Dev has its own room).
