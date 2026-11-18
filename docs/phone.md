@@ -4,6 +4,8 @@ Maxwell's phone app shows the same sessions as the Mac: every group, the convers
 
 Protocol version: **1**.
 
+What the phone app keeps and who sees what, in plain words: [phone-privacy.md](phone-privacy.md).
+
 ## How the phone reaches the Mac
 
 ```
