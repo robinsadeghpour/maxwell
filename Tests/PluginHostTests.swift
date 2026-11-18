@@ -43,9 +43,11 @@ func pluginHostTests() {
     pump { refreshed }
     check(refreshed && annotations == 1 && silent.isEmpty, "a re-check at close asks the plugin again and waits for its answer")
     var notRunning: Set<PluginID> = []
+    let asked = Date()
     host.refresh("s1", plugins: ["hello", "gone"]) { notRunning = $0 }
     pump { !notRunning.isEmpty }
     check(notRunning == ["gone"], "a plugin that can't answer at close is reported, so its checks count as unknown")
+    check(Date().timeIntervalSince(asked) < 4, "and reported as soon as the running ones answer, not after the timeout")
 
     host.reload(Config.parse("hello.enabled = false\naccount = work ~/.claude\n"))
     check(st.notes["s1"]?["hello"] == nil && host.status["hello"]?.run == .off, "turning it off removes its notes")

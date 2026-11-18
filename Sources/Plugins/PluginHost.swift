@@ -164,19 +164,21 @@ final class PluginHost {
         let all = Set(plugins)
         let live = plugins.filter { ready.contains($0) }
         guard !live.isEmpty, let d = lastSessions[session] else { return done(all) }
-        var silent = all
+        // A plugin that isn't running can't answer: it is reported at once, not after the timeout.
+        let notRunning = all.subtracting(live)
+        var silent = Set(live)
         var finished = false
         for p in live {
             waiters.append((p, session, {
                 guard !finished else { return }
                 silent.remove(p)
-                if silent.isEmpty { finished = true; done([]) }
+                if silent.isEmpty { finished = true; done(notRunning) }
             }))
             running[p]?.notify("sessions/changed", ["full": false, "sessions": [d], "removed": []])
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
             self?.waiters.removeAll { w in live.contains(w.plugin) && w.session == session }
-            if !finished { finished = true; done(silent) }
+            if !finished { finished = true; done(silent.union(notRunning)) }
         }
     }
 
