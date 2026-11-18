@@ -25,7 +25,7 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
     private var backoff: TimeInterval = 0.5
     private var stopped = false
     private var pinger: Timer?
-    private lazy var pongWait = Debounce(10) { [weak self] in self?.dropped("no answer to ping in 10 s") }
+    private lazy var pongWait = Debounce(10) { [weak self] in self?.dropped("it stopped answering pings") }
     private lazy var retry = Debounce(0.5) { [weak self] in self?.open() }
     private let path = NWPathMonitor()
     private var wake: NSObjectProtocol?
@@ -159,7 +159,7 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
         task = nil
         generation += 1
         status = .cantReach(why)
-        mark("phone relay: \(why); retrying in \(String(format: "%.1f", backoff)) s")
+        mark("phone relay: \(url.host ?? "?"): \(why); retrying in \(String(format: "%.1f", backoff)) s")
         retry.poke(after: backoff * Double.random(in: 0.8...1.2))
         backoff = min(backoff * 2, 15)
     }
@@ -169,19 +169,19 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
         if let http = t.response as? HTTPURLResponse, http.statusCode != 101 {
             switch http.statusCode {
             case 403: return "the relay says this room belongs to another Mac (403)"
-            case 400: return "the relay refused the connection (400: bad id or token)"
-            case 404: return "no relay at that address (404)"
+            case 400: return "the relay refused this Mac's id or token (400)"
+            case 404: return "there is no relay at that address (404)"
             default: return "the relay answered \(http.statusCode)"
             }
         }
         let ns = e as NSError
         guard ns.domain == NSURLErrorDomain else { return ns.localizedDescription }
         switch ns.code {
-        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "no network"
-        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "can't find \(url.host ?? "the relay")"
-        case NSURLErrorCannotConnectToHost: return "\(url.host ?? "the relay") isn't answering"
-        case NSURLErrorTimedOut: return "timed out"
-        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted: return "secure connection failed"
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "this Mac is offline"
+        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "that address can't be found"
+        case NSURLErrorCannotConnectToHost: return "nothing is answering there"
+        case NSURLErrorTimedOut: return "it took too long to answer"
+        case NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted: return "the secure connection failed"
         default: return ns.localizedDescription
         }
     }

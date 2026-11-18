@@ -30,7 +30,7 @@ extension SettingsView {
         case .connected:
             form.row("Connected", [], note: address, icon: StatusSquare(.on))
         case .cantReach(let why):
-            form.row("Can't reach the relay", [], note: "\(address): \(why). Maxwell keeps trying.", icon: StatusSquare(.warn), warn: true)
+            form.row("Can't reach \(address)", [], note: "\(why.prefix(1).uppercased() + why.dropFirst()). Maxwell keeps trying.", icon: StatusSquare(.warn), warn: true)
         }
     }
 
@@ -44,7 +44,7 @@ extension SettingsView {
             return form.row("", [(show, show.intrinsicContentSize.width)],
                             note: "Scan the code with Maxwell on your iPhone. Each code works once, for 10 minutes.")
         }
-        form.wide("Scan with Maxwell on your iPhone", note: "Works once, until \(Format.clock.string(from: expires)).", QRCodeView(text: link), height: 220)
+        form.wide("Scan with Maxwell on your iPhone", note: "Works once, until \(Format.clock.string(from: expires)).", QRCodeView(text: link), height: 160)
         let copy = MXButton("Copy link", small: true) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(link, forType: .string)
@@ -104,7 +104,7 @@ final class QRCodeView: MXView {
     }
 }
 
-/// A row's status: filled green when on, outlined when off, filled amber when something is wrong.
+/// A row's status: green when on, grey when off, the Needs you colour when something is wrong.
 final class StatusSquare: MXView {
     enum Kind { case on, off, warn }
     private let kind: Kind
@@ -114,12 +114,8 @@ final class StatusSquare: MXView {
         let sq = NSRect(x: bounds.midX - 4, y: bounds.midY - 4, width: 8, height: 8)
         switch kind {
         case .on: t.safe.setFill(); sq.fill()
-        case .warn: t.chk.setFill(); sq.fill()
-        case .off:
-            t.fg3.setStroke()
-            let b = NSBezierPath(rect: sq.insetBy(dx: 0.5, dy: 0.5))
-            b.lineWidth = 1
-            b.stroke()
+        case .warn: t.on.setFill(); sq.fill()
+        case .off: t.fg3.setFill(); sq.fill()
         }
     }
 }

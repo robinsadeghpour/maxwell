@@ -64,7 +64,9 @@ extension PhoneBridge {
         let sid = s.id
         t.tail.onLines = { [weak self, weak t] lines in
             guard let self, let t else { return }
-            let new = lines.flatMap { t.parser.read($0) }
+            // A call and its result written together go out once, as the result.
+            var new: [ChatItem] = []
+            for line in lines { ChatParser.merge(t.parser.read(line), into: &new, limit: .max) }
             guard !new.isEmpty else { return }
             ChatParser.merge(new, into: &t.items, limit: Self.transcriptItems)
             self.noteArtifacts(new, session: sid)
