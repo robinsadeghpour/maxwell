@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-18-resume-from-any-folder",
+    date: "2026-11-18",
+    versions: "0.1.62",
+    title: "/resume works across folders",
+    figure: "",
+    body: `
+<p>Type <code>/resume</code> in a session and pick a conversation from another folder, and Maxwell now opens it. Claude Code can't switch folders inside a running session, so it only prints a <code>cd … &amp;&amp; claude --resume …</code> command to paste into a terminal. Maxwell reads that command off the session and runs it: the conversation resumes in its own folder as a background session and opens in the pane.</p>
+<p>If the session you typed <code>/resume</code> in has no reply yet, Maxwell closes it, since it was only opened to get to the other one. A conversation Maxwell already lists is opened instead of started twice.</p>`,
+    fixes: [],
+  },
+  {
     slug: "2026-11-16-cloud-sessions",
     date: "2026-11-16",
     versions: "0.1.50 – 0.1.61",

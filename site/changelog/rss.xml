@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>/resume works across folders</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-18-resume-from-any-folder</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-18-resume-from-any-folder</guid>
+<pubDate>Wed, 18 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Type &lt;code&gt;/resume&lt;/code&gt; in a session and pick a conversation from another folder, and Maxwell now opens it. Claude Code can't switch folders inside a running session, so it only prints a &lt;code&gt;cd … &amp;amp;&amp;amp; claude --resume …&lt;/code&gt; command to paste into a terminal. Maxwell reads that command off the session and runs it: the conversation resumes in its own folder as a background session and opens in the pane.&lt;/p&gt;
+&lt;p&gt;If the session you typed &lt;code&gt;/resume&lt;/code&gt; in has no reply yet, Maxwell closes it, since it was only opened to get to the other one. A conversation Maxwell already lists is opened instead of started twice.&lt;/p&gt;</description>
+</item>
+<item>
 <title>Cloud sessions</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions</guid>

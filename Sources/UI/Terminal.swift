@@ -10,6 +10,8 @@ final class GhosttyRuntime {
     /// Set for one call: Ghostty reports a dump's file path through the clipboard, and this takes
     /// it instead, so the user's clipboard is left alone (see `TerminalView.writeScreenDump`).
     fileprivate var takeClipboard: ((String) -> Void)?
+    /// Called after Ghostty handled new output or input, so what a terminal shows may have changed.
+    var afterTick: (() -> Void)?
     private(set) var app: ghostty_app_t?
     private var config: ghostty_config_t?
 
@@ -25,6 +27,7 @@ final class GhosttyRuntime {
                 DispatchQueue.main.async {
                     if let a = GhosttyRuntime.shared.app { ghostty_app_tick(a) }
                     TerminalView.recheckHover()
+                    GhosttyRuntime.shared.afterTick?()
                 }
             },
             action_cb: { _, target, action in GhosttyRuntime.shared.handle(target: target, action: action) },
@@ -242,6 +245,8 @@ final class TerminalView: NSView, NSTextInputClient {
     /// The claimed link under the pointer, shown with a hand and an underline.
     var hover = LinkHover()
     var onExit: (() -> Void)?
+    /// When a key was last pressed in this terminal: what it shows right after is an answer to you.
+    private(set) var lastKeyDownAt: Date?
     /// The shell reported a new working folder.
     var onCwd: (() -> Void)?
     /// App shortcuts win over Ghostty's own bindings (cmd+k, cmd+n ...).
@@ -373,6 +378,7 @@ final class TerminalView: NSView, NSTextInputClient {
     }
 
     override func keyDown(with e: NSEvent) {
+        lastKeyDownAt = Date()
         if let ctrlV = Self.imagePasteAsCtrlV(e) {
             for c in ctrlV { c.type == .keyDown ? keyDown(with: c) : keyUp(with: c) }
             return

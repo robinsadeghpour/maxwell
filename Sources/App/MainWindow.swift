@@ -22,11 +22,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var hosted: [SessionID: String] = [:]
     private let terminalHosts = TerminalHosts()
     /// The terminal a session runs in: its own attached one, or the Maxwell terminal hosting it.
-    private func terminal(for id: SessionID) -> TerminalView? { terminals[id] ?? hosted[id].flatMap(shell) }
+    func terminal(for id: SessionID) -> TerminalView? { terminals[id] ?? hosted[id].flatMap(shell) }
     /// The terminal on screen when it is a plain one (test runs type into it).
     var shownShell: TerminalView? { shell(current) }
     var visited: [SessionID] = []
     var current: SessionID?
+    /// The conversation each session's `/resume` answer named and Maxwell already followed (MainWindow+ResumeElsewhere).
+    var resumeFollowed: [SessionID: SessionID] = [:]
     /// Per session: its open files and artifacts, as the viewer's tabs. Written down a moment after
     /// each change, so a restart brings them back.
     private var viewers: [SessionID: ViewerTabs] = [:] { didSet { saveTabsSoon() } }
@@ -208,6 +210,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         newPanel.onStartCloud = { [weak self] a, f, task in self?.startCloudSession(account: a, folder: f, task: task) }
         root.sessionPane.cloudPage.onOpenExternal = { [weak self] url, a in self?.openExternally(url, account: a) }
         root.sessionPane.cloudPage.onState = { mark("cloud page: \($0)") }
+        GhosttyRuntime.shared.afterTick = { [weak self] in self?.followResumeElsewhere() }
         TerminalView.isAppShortcut = { [weak self] e in self?.actions.contains { $0.shortcut?.matches(e) == true } ?? false }
     }
 

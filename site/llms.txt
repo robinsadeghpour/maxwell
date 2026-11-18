@@ -38,6 +38,7 @@
 
 ## Changelog
 
+- [/resume works across folders](https://www.runmaxwell.com/changelog/2026-11-18-resume-from-any-folder) (2026-11-18, v0.1.62)
 - [Cloud sessions](https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions) (2026-11-16, v0.1.50 – 0.1.61)
 - [Safe to close trusts the session's own word](https://www.runmaxwell.com/changelog/2026-11-15-safe-to-close-trusts-the-session) (2026-11-15, v0.1.49)
 - [Idle sessions free their memory](https://www.runmaxwell.com/changelog/2026-11-15-idle-sessions-free-their-memory) (2026-11-15, v0.1.48)

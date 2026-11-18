@@ -350,6 +350,28 @@ final class Store {
         }
     }
 
+    /// A conversation `/resume` named from another folder: resumed there as a background session,
+    /// under its own id. Claude Code starts a copy when it still sees the old process; then the copy's id.
+    func resume(_ id: SessionID, in cwd: String, account: Account, done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
+        let skip = config.skipPermissions
+        DispatchQueue.global().async { [weak self] in
+            let r = ClaudeCLI.resumeBackground(account: account, cwd: cwd, sessionId: id, name: nil, skipPermissions: skip)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch r {
+                case .failure(let e): done(.failure(e))
+                case .success(let started):
+                    self.agents?.refresh(account.id) {
+                        let listed = self.state.sessions.values.first { $0.reach == .background(shortId: started.short) }
+                        let resumed = listed?.id ?? id
+                        self.apply([.started(resumed, account.id, name: listed?.name ?? started.short, cwd: cwd, shortId: started.short, at: Date())])
+                        done(.success(resumed))
+                    }
+                }
+            }
+        }
+    }
+
     func checks(_ s: Session, now: Date = Date()) -> [Check] { state.checks(s, now: now, rules: config.rules) }
 
     /// Sessions safe to close right now (the same verdict the sidebar shows).
