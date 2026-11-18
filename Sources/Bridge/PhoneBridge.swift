@@ -51,7 +51,7 @@ final class PhoneBridge {
     private var sweep: Timer?
     private lazy var stateSend = Debounce(0.3, .atMost) { [weak self] in self?.stateTick() }
     /// Settings drops the QR code when it expires.
-    private lazy var codeExpiry = Debounce(PairingCodes.lifetime + 1) { [weak self] in self?.syncConnection() }
+    private lazy var codeExpiry = Debounce(PairingCodes.lifetime + 1) { [weak self] in self?.sendControl(); self?.syncConnection() }
     /// Settings shows the status: redraw it.
     var onStatus: (() -> Void)?
     /// A phone paired (the harness removes it again to check the connection closes).
@@ -101,6 +101,7 @@ final class PhoneBridge {
         }
         let r = RelayConnection(url: room)
         r.onFrame = { [weak self] in self?.frame($0) }
+        r.onOpen = { [weak self] in self?.sendControl() }
         r.onStatus = { [weak self] st in
             if st != .connected, let self { for id in self.links.keys { self.wentOffline(id) } }
             self?.onStatus?()
@@ -155,6 +156,7 @@ final class PhoneBridge {
         guard relayURL != nil else { return nil }
         _ = codes.make(now: Date())
         codeExpiry.poke()
+        sendControl()
         syncConnection()
         return status.pairLink
     }
@@ -163,18 +165,28 @@ final class PhoneBridge {
     func cancelPairingCodes() {
         codes.cancelAll()
         codeExpiry.cancel()
-        syncConnection()
+        sendControl { [weak self] in self?.syncConnection() }
+    }
+
+    /// Tells the relay which phones may join this Mac's room (hashes of their ids) and whether a code is
+    /// showing (then any phone may, to pair). The relay closes a removed phone's connection at once.
+    /// `then` runs once it is out, or at once when the relay isn't connected.
+    func sendControl(then done: (() -> Void)? = nil) {
+        let frame = PhoneConnection.control(phones: Array(registry.phones.keys), pairing: codes.current(now: Date()) != nil)
+        guard relay?.send(frame, then: done) == true else { done?(); return }
     }
 
     /// Settings › Phone › Remove: the phone hears `bye`, then its key is gone and its boxes no longer open.
     func remove(_ phone: String) {
-        let told = send(["t": "bye", "reason": "removed"], to: phone) { [weak self] in self?.syncConnection() }
+        // Bye first, then the relay hears the phone is no longer allowed, then (the last phone gone) the
+        // connection closes: each step once the one before is out.
+        let after = { [weak self] in self?.sendControl { self?.syncConnection() } ?? () }
+        let told = send(["t": "bye", "reason": "removed"], to: phone, then: after)
         unfocus(phone)
         links[phone] = nil
         registry.remove(phone)
         mark("phone: removed a paired phone")
-        // The last phone gone: the connection closes once `bye` is out.
-        if !told { syncConnection() } else { onStatus?() }
+        if !told { after() } else { onStatus?() }
     }
 
     /// Maxwell quits: terminals hang up (the sessions keep running) and the room goes quiet.
@@ -224,6 +236,7 @@ final class PhoneBridge {
         links[id] = PhoneLink(online: true)
         mark("phone: paired \(name)")
         send(["t": "paired", "mac": ["name": Self.macName]], to: id)
+        sendControl()
         onStatus?()
         onPaired?(id)
     }
@@ -260,7 +273,8 @@ final class PhoneBridge {
         links[id, default: PhoneLink()].online = true
         links[id]?.ready = true
         links[id]?.offlineSince = nil
-        refreshLookups()
+        // Folders and emails are looked up when the relay connects; a hello before they land gets state
+        // now and again when they do (`refreshLookups` sends state on change).
         if let payload = statePayload() { send(payload, to: id) }
         focus(id, session: m["focus"] as? String, terminal: nil)
         onStatus?()

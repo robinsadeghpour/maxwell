@@ -62,6 +62,7 @@ The receiver drops a message whose `n` is not above the last one it took from th
 - **Frames** are JSON text:
   - Mac → relay: `{"to": "<phone id>", "box": "…"}`. Only the phone with that id gets it.
   - Phone → relay: `{"box": "…"}`. The relay delivers `{"from": "<phone id>", "box": "…"}` to the Mac; it sets `from` from the connection, so a phone can't pretend to be another.
+  - Mac → relay, control: `{"allow": ["<hex SHA-256 of a phone id>", …], "pairing": true|false}`. Which phones may join the room, and whether any phone may (a pairing code is showing; the relay keeps it open for at most 15 minutes). A phone not allowed gets 403 and, when the Mac takes it off the list, its connection is closed. The Mac sends it when it connects, when a code is made, used, cancelled or expires, and after the `bye` to a removed phone. The relay sees only the hashes.
   - Relay → anyone: `{"presence": {"mac": true|false}}` to phones, `{"presence": {"phone": "<id>", "online": true|false}}` to the Mac, sent on connect and on every change.
 - **Keepalive**: either side sends the exact text `{"ping":1}` every 25 s; the relay answers `{"pong":1}` (Cloudflare answers it without waking the room). No pong for 10 s means the connection is dead: close it and reconnect.
 - **Reconnect**: after 0.5 s, then doubling to 15 s at most, with ±20% jitter. On the phone, also at once when the app comes to the foreground or the network changes.

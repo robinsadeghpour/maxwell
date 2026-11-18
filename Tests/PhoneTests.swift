@@ -66,6 +66,10 @@ private func phonePairingTests(_ dir: URL) {
     check(ReplayGuard.checkPair(["t": "pair", "ts": ms(now.addingTimeInterval(-540))], now: now) == .fresh
             && ReplayGuard.checkPair(["t": "pair", "ts": ms(now.addingTimeInterval(-660))], now: now) == .stale(seconds: 660), "pair: no n, ts within 10 minutes")
 
+    check(PhoneConnection.allowHash("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "allow hashes are hex SHA-256 of the id")
+    let control = PhoneConnection.control(phones: ["abc"], pairing: true)
+    check(control["allow"] as? [String] == [PhoneConnection.allowHash("abc")] && control["pairing"] as? Bool == true, "the relay control frame")
+
     let relay = Config.defaultPhoneRelay
     check(!PhoneConnection.wanted(relay: relay, pairedPhones: 0, codeShowing: false), "no phone and no code: no connection")
     check(PhoneConnection.wanted(relay: relay, pairedPhones: 0, codeShowing: true), "a code on screen connects")

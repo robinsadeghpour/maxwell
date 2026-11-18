@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Pairing codes shown in Settings › Phone: each holds a fresh key, lasts 10 minutes and is spent
@@ -69,6 +70,17 @@ enum ReplayGuard {
 /// Whether the bridge keeps a connection to the relay. Maxwell is public and the relay is shared, so
 /// only while it has a reason: a paired phone, or a pairing code on screen. Never with the phone off.
 enum PhoneConnection {
+    /// How the relay knows a phone without learning its id: lowercase hex SHA-256 of the id (`allow`).
+    static func allowHash(_ phone: String) -> String {
+        SHA256.hash(data: Data(phone.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The Mac's control frame for the relay: which phones may join the room, and whether any may
+    /// (a pairing code is showing). Sent in the clear; it holds no ids, only their hashes.
+    static func control(phones: [String], pairing: Bool) -> [String: Any] {
+        ["allow": phones.sorted().map(allowHash), "pairing": pairing]
+    }
+
     static func wanted(relay: String?, pairedPhones: Int, codeShowing: Bool) -> Bool {
         relay != nil && (pairedPhones > 0 || codeShowing)
     }
