@@ -232,3 +232,31 @@ struct KnownBrowser {
         return out
     }
 }
+
+/// Every artifact one transcript published, opened or named, read line by line in order (the viewer's
+/// reading, `ArtifactTranscript`). The newest sighting sets `at`; a later one without a title keeps the title.
+struct ArtifactLedger: Equatable {
+    struct Entry: Equatable { var title: String?; var at: Date }
+    private(set) var entries: [String: Entry] = [:]
+
+    mutating func read(_ line: Substring) {
+        // Cheap test first: most lines never mention an artifact.
+        guard line.contains("artifact/"), line.contains("claude.ai/"), let a = ArtifactTranscript.sighting(inLine: String(line)) else { return }
+        let at = Self.time(line) ?? entries[a.link.url.absoluteString]?.at ?? .distantPast
+        let url = a.link.url.absoluteString
+        entries[url] = Entry(title: a.title ?? entries[url]?.title, at: max(at, entries[url]?.at ?? .distantPast))
+    }
+
+    /// The line's `timestamp`, read without parsing the whole line again.
+    private static func time(_ line: Substring) -> Date? {
+        guard let r = line.range(of: "\"timestamp\":\"") else { return nil }
+        let rest = line[r.upperBound...]
+        guard let end = rest.firstIndex(of: "\"") else { return nil }
+        return iso.date(from: String(rest[..<end]))
+    }
+    private static let iso: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+}

@@ -137,7 +137,7 @@ Error codes in `ack.error.code`:
 
 **Project**: `name`, `folder`, `pinned`.
 
-**Artifact**: `url`, `title`, `session`, `account`, `at`.
+**Artifact**: `url`, `title`, `session`, `account`, `at`. Every artifact the listed sessions (live, idle, and Recently closed from the last 7 days) published, opened or named, read from their transcripts the way the Mac's viewer reads them (`ArtifactTranscript`), newest first, at most 200. `at` is the newest line that names it; `title` is null when Claude never gave one. Right after the Mac connects the list may still be filling (the first read of every transcript takes a few seconds); later states carry the rest.
 
 **Transcript item**, one of:
 

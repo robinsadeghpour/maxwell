@@ -92,6 +92,13 @@ private func chatItemTests(_ dir: URL) {
           "a command with no result yet is running")
     check(!items.contains(.artifact(url: "https://claude.ai/artifact/LumenPasskeyPlan01", title: nil)), "the same artifact named again right after isn't repeated")
 
+    // The phone's artifact list: every artifact a transcript published or named, with its title and newest time.
+    var ledger = ArtifactLedger()
+    for line in lines { ledger.read(line) }
+    let plan = ledger.entries["https://claude.ai/artifact/LumenPasskeyPlan01"]
+    check(ledger.entries.count == 1 && plan?.title == "Passkey rollout plan", "one artifact, titled from its publish")
+    check(plan.map { Int($0.at.timeIntervalSince1970) } == 1_794_996_720, "its time is the newest line that names it (10:12)")
+
     // Live: lines one at a time, the result comes back under the call's id.
     var p = ChatParser(cwd: "/Users/me/projects/lumen")
     let call = lines.firstIndex { $0.contains("\"id\":\"toolu_test1\"") }!

@@ -37,6 +37,9 @@ final class PhoneBridge {
     let terminals = PhoneTerminals()
     var transcripts: [SessionID: PhoneTranscript] = [:]
     var artifacts: [String: PhoneArtifact] = [:]
+    private let artifactScanner = ArtifactScanner()
+    /// Transcripts are read for artifacts at most this often; the viewer's live sightings come in between.
+    private lazy var artifactScan = Debounce(5, .atMost) { [weak self] in self?.scanArtifacts() }
     private var pushes = PushPlanner()
     private var rev = 0
     private var folders: [ProjectFolder] = []
@@ -101,6 +104,7 @@ final class PhoneBridge {
         relay = r
         r.start()
         refreshLookups()
+        scanArtifacts()
         for a in store.state.accounts { ClaudeWeb.shared.refresh(a) }
         if sweep == nil {
             let t = Timer(timeInterval: 30, repeats: true) { [weak self] _ in self?.releaseOffline() }
@@ -287,6 +291,7 @@ final class PhoneBridge {
 
     private func stateTick() {
         pushNews()
+        artifactScan.poke()
         let phones = readyPhones
         guard !phones.isEmpty, let payload = statePayload() else { return }
         for id in phones { send(payload, to: id) }
@@ -323,6 +328,26 @@ final class PhoneBridge {
                 self.emails = emails
                 if changed { self.stateChanged() }
             }
+        }
+    }
+
+    /// Every artifact the listed sessions (live, idle and closed in the last 7 days) published or opened,
+    /// from their transcripts. Sessions no longer listed drop out.
+    private func scanArtifacts() {
+        guard relay != nil else { return }
+        let st = store.state
+        let listed = st.grouped(now: Date(), rules: store.config.rules).flatMap(\.1).sorted { $0.lastEventAt > $1.lastEventAt }
+        let sessions = listed.compactMap { s in Transcripts.path(s, account: st.account(s.accountId)).map { (id: s.id, account: s.accountId, transcript: $0) } }
+        artifactScanner.scan(sessions) { [weak self] found in
+            guard let self else { return }
+            var next: [String: PhoneArtifact] = [:]
+            for a in found where next[a.url].map({ $0.at < a.at }) ?? true { next[a.url] = a }
+            // A sighting the viewer just reported and the scan hasn't read yet stays.
+            let keep = Set(sessions.map(\.id))
+            for (url, a) in self.artifacts where next[url] == nil && keep.contains(a.session) { next[url] = a }
+            guard next != self.artifacts else { return }
+            self.artifacts = next
+            self.stateChanged()
         }
     }
 
