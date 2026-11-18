@@ -15,7 +15,7 @@ iPhone app  ⇄  relay (Cloudflare Worker, one room per Mac)  ⇄  bridge in Max
 - The relay keeps no messages. When either side is offline, the other side's commands wait in its own outbox and are sent again on reconnect. State is a snapshot, so a missed update never matters: the next one replaces it.
 - Pushes go from the Mac straight to Expo's push service with the phone's push token. They do not pass through the relay.
 
-The relay URL is `phone-relay` in the config (`docs/config.md`). Settings › Phone shows the pairing code, the paired phones and a Remove button for each.
+Maxwell's relay is `wss://maxwell-relay.maxwell-relay.workers.dev`, the default for `phone-relay` in the config (`docs/config.md`); a config can name another, or turn the phone off with `phone-relay = off`. Settings › Phone shows the pairing code, the paired phones and a Remove button for each.
 
 ## Pairing
 
@@ -177,7 +177,7 @@ MAXWELL_CONFIG=/tmp/mx-phone.config MAXWELL_PHONE_PAIR_FILE=/tmp/mx-pair-link bu
 node tools/test-phone.mjs /tmp/mx-pair-link <session name prefix> [message] [--permission]
 ```
 
-`MAXWELL_PHONE_PAIR_FILE` works only in a quiet run (`Sources/Harness/PhoneHarness.swift`): Maxwell makes a code at launch and writes its link there. Quiet runs keep keys in memory, so each run is a new room.
+Against the live relay, write `phone-relay = wss://maxwell-relay.maxwell-relay.workers.dev` instead: a quiet run uses only a relay its config names. `MAXWELL_PHONE_PAIR_FILE` works only in a quiet run (`Sources/Harness/PhoneHarness.swift`): Maxwell makes a code at launch and writes its link there. Quiet runs keep keys in memory, so each run is a new room.
 
 ## Changelog
 

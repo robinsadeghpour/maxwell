@@ -155,6 +155,10 @@ private func phoneStateTests() {
     check(msg["body"] as? String == "Run npm run db:migrate -- --env staging?" && msg["categoryId"] as? String == "permission" && msg["threadId"] as? String == "perm",
           "a permission push asks the question the prompt asks")
 
+    check(Config.parse("").phoneRelayURL == Config.defaultPhoneRelay && Config.parse("").phoneRelay == nil, "Maxwell's relay unless the config names one")
+    check(Config.parse("phone-relay = off\n").phoneRelayURL == nil && Config.parse("phone-relay =\n").phoneRelayURL == nil, "phone-relay = off turns the phone off")
+    check(Config.parse("phone-relay = ws://127.0.0.1:8787\n").phoneRelayURL == "ws://127.0.0.1:8787", "a config's relay wins")
+
     let usage = #"{"ts":1800000000000,"configDir":"/Users/me/.claude","usage":{"session_id":"perm","context_window":{"total_input_tokens":90000,"used_percentage":45}}}"#
     let folded = reduce(st, EventParser.parse(line: Substring(usage))!)
     check(folded.sessions["perm"]?.contextPercent == 45, "the status line's used_percentage is the session's context")

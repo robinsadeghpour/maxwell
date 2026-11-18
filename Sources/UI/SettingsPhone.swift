@@ -23,8 +23,8 @@ extension SettingsView {
         switch p.relay {
         case .notSet:
             let open = MXButton("Open config", small: true) { [weak self] in self?.onRunAction?("open-config") }
-            form.row("Not set up", [(open, open.intrinsicContentSize.width)],
-                     note: "Add a line phone-relay = wss://… to your config. Until then your phone can't reach this Mac.", icon: StatusSquare(.off))
+            form.row("Off", [(open, open.intrinsicContentSize.width)],
+                     note: "Your config turns the phone off (phone-relay = off). Remove that line to turn it on.", icon: StatusSquare(.off))
         case .connecting:
             form.row("Connecting…", [], note: address, icon: StatusSquare(.off))
         case .connected:
@@ -36,7 +36,7 @@ extension SettingsView {
 
     private func pairRows(_ p: PhoneStatus) {
         guard p.relay == .connected else {
-            let why = p.relay == .notSet ? "Pairing works once the relay is set up." : "Pairing works once the relay answers."
+            let why = p.relay == .notSet ? "Pairing works once the phone is on." : "Pairing works once the relay answers."
             return form.row("", [], note: why, enabled: false)
         }
         guard let link = p.pairLink, let expires = p.pairExpires else {

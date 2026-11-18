@@ -59,9 +59,10 @@ final class PhoneBridge {
 
     // MARK: settings
 
-    /// Connects to `phone-relay`, or stays off while it is unset.
+    /// Connects to the relay (`phone-relay`, else Maxwell's own), or stays off with `phone-relay = off`.
+    /// A quiet run connects only to a relay its config names: test runs don't make rooms on the real one.
     func reload(_ config: Config) {
-        let url = config.phoneRelay
+        let url = quietTest && config.phoneRelay == nil ? nil : config.phoneRelayURL
         guard url != relayURL || (url != nil && relay == nil) else { return }
         relay?.stop()
         relay = nil
