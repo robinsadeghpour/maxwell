@@ -235,8 +235,8 @@ struct KnownBrowser {
 
 /// Every artifact one transcript published, opened or named, read line by line in order (the viewer's
 /// reading, `ArtifactTranscript`). The newest sighting sets `at`; a later one without a title keeps the title.
-struct ArtifactLedger: Equatable {
-    struct Entry: Equatable { var title: String?; var at: Date }
+struct ArtifactLedger: Equatable, Codable {
+    struct Entry: Equatable, Codable { var title: String?; var at: Date }
     private(set) var entries: [String: Entry] = [:]
 
     mutating func read(_ line: Substring) {

@@ -5,7 +5,11 @@ import SystemConfiguration
 struct PhoneStatus: Equatable {
     /// `off`: `phone-relay` turns it off. `idle`: not connected, because no phone is paired and no code shows.
     enum Relay: Equatable { case off, idle, connecting, connected, cantReach(String) }
-    struct Phone: Equatable { var id: String; var name: String; var lastSeen: Date?; var online: Bool }
+    struct Phone: Equatable {
+        var id: String; var name: String; var lastSeen: Date?; var online: Bool
+        /// Accounts whose claude.ai sign-in this phone was given, and when.
+        var shares: [String: Date] = [:]
+    }
     var relay: Relay = .off
     var relayURL: String?
     var pairLink: String?
@@ -139,7 +143,8 @@ final class PhoneBridge {
             s.pairExpires = c.expires
         }
         s.phones = registry.phones.values.sorted { $0.pairedAt < $1.pairedAt }.map {
-            PhoneStatus.Phone(id: $0.id, name: $0.name, lastSeen: links[$0.id]?.online == true ? Date() : $0.lastSeen, online: links[$0.id]?.online == true)
+            PhoneStatus.Phone(id: $0.id, name: $0.name, lastSeen: links[$0.id]?.online == true ? Date() : $0.lastSeen, online: links[$0.id]?.online == true,
+                              shares: $0.artifactShares ?? [:])
         }
         return s
     }
@@ -195,16 +200,26 @@ final class PhoneBridge {
         }
         guard let from = f["from"] as? String, let box = f["box"] as? String else { return }
         if let phone = registry.phones[from], let m = PhoneBox.open(box, key: phone.keys.phoneToMac) {
+            switch ReplayGuard.check(m, lastSeen: phone.seenN ?? 0, now: Date()) {
+            case .fresh: break
+            case .replayed(let n, let last): return mark("phone: dropped a replayed message from \(phone.name) (n \(n), last \(last))")
+            case .stale(let s): return mark("phone: dropped a message from \(phone.name) sent \(s) s away from now")
+            case .missing: return mark("phone: dropped a message from \(phone.name) without n and ts")
+            }
+            registry.seen(from, n: (m["n"] as? NSNumber)?.intValue ?? 0, now: m["t"] as? String == "cmd")
             links[from, default: PhoneLink()].online = true
             registry.touch(from, at: Date())
             return message(m, from: from)
         }
         // An unknown phone, or a known one pairing again with a new code.
-        if let (key, m) = codes.spend(box: box, from: from, now: Date()) { paired(from, key: key, m) }
+        guard let (key, m) = codes.spend(box: box, from: from, now: Date()) else { return }
+        guard ReplayGuard.checkPair(m, now: Date()) == .fresh else { return mark("phone: dropped a pair message without a recent ts") }
+        paired(from, key: key, m)
     }
 
     private func paired(_ id: String, key: Data, _ m: [String: Any]) {
         let name = (m["name"] as? String).map { String($0.prefix(60)) } ?? "iPhone"
+        // Pairing (again) starts both counters over.
         registry.save(PairedPhone(id: id, name: name, key: key, push: nil, app: m["app"] as? String, pairedAt: Date(), lastSeen: Date()))
         links[id] = PhoneLink(online: true)
         mark("phone: paired \(name)")
@@ -238,6 +253,7 @@ final class PhoneBridge {
     private func hello(_ m: [String: Any], from id: String) {
         guard var p = registry.phones[id] else { return }
         p.push = (m["push"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        p.pushDetail = m["pushDetail"] as? String == "full" ? .full : .hidden
         p.app = m["app"] as? String
         p.lastSeen = Date()
         registry.save(p)
@@ -262,6 +278,7 @@ final class PhoneBridge {
 
     /// Phones gone for over 2 minutes let go of their terminals and transcripts.
     private func releaseOffline() {
+        registry.persistIfChanged()
         let now = Date()
         for (id, l) in links where !l.online && l.focus != nil {
             if let since = l.offlineSince, now.timeIntervalSince(since) > Self.releaseAfter { unfocus(id) }
@@ -273,7 +290,11 @@ final class PhoneBridge {
     /// Seals a message for one phone and hands it to the relay; false when it couldn't go.
     @discardableResult
     func send(_ m: [String: Any], to id: String, then sent: (() -> Void)? = nil) -> Bool {
-        guard let phone = registry.phones[id], let relay, let box = PhoneBox.seal(m, key: phone.keys.macToPhone) else { return false }
+        guard let phone = registry.phones[id], let relay, relay.status == .connected else { return false }
+        var m = m
+        m["n"] = registry.nextSent(id)
+        m["ts"] = Int(Date().timeIntervalSince1970 * 1000)
+        guard let box = PhoneBox.seal(m, key: phone.keys.macToPhone) else { return false }
         return relay.send(["to": id, "box": box], then: sent)
     }
 
@@ -364,11 +385,13 @@ final class PhoneBridge {
     private func pushNews() {
         let st = store.state, now = Date()
         let news = pushes.news(st, rules: store.config.rules, now: now)
-        let tokens = registry.phones.values.compactMap(\.push)
-        guard !news.isEmpty, !tokens.isEmpty else { return }
+        let phones = registry.phones.values.filter { $0.push != nil }
+        guard !news.isEmpty, !phones.isEmpty else { return }
         if PhonePushSender.macInUse() { return mark("phone: \(news.count) Needs you not pushed, the Mac is in use") }
         let counts = PhoneState.counts(st, rules: store.config.rules, now: now)
-        let messages = news.flatMap { s, ask in tokens.map { PushPlanner.message(to: $0, session: s, ask: ask, counts: counts, now: now) } }
+        let messages = news.flatMap { s, ask in
+            phones.compactMap { p in p.push.map { PushPlanner.message(to: $0, session: s, ask: ask, counts: counts, now: now, detail: p.pushDetail ?? .hidden) } }
+        }
         PhonePushSender.send(messages) { [weak self] gone in
             guard let self else { return }
             for (id, p) in self.registry.phones where p.push.map(gone.contains) == true {

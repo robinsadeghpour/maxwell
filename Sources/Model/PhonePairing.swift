@@ -39,6 +39,33 @@ struct PairingCodes {
     func current(now: Date) -> Code? { codes.filter { $0.expires > now }.max { $0.expires < $1.expires } }
 }
 
+/// Replay protection (docs/phone.md, "Order and freshness"): every boxed message carries `n`, a counter
+/// that only rises per sender, and `ts`, the sender's clock in ms. A box seen before, or from too long ago,
+/// is dropped even though it opens.
+enum ReplayGuard {
+    enum Verdict: Equatable { case fresh, replayed(n: Int, last: Int), stale(seconds: Int), missing }
+    static let window: TimeInterval = 300
+    static let pairWindow: TimeInterval = 600
+
+    /// A message after pairing: `n` above the last one seen from this phone, `ts` within 5 minutes.
+    static func check(_ m: [String: Any], lastSeen: Int, now: Date) -> Verdict {
+        guard let n = (m["n"] as? NSNumber)?.intValue, let ts = (m["ts"] as? NSNumber)?.doubleValue else { return .missing }
+        if let late = late(ts, now: now, window: window) { return .stale(seconds: late) }
+        return n > lastSeen ? .fresh : .replayed(n: n, last: lastSeen)
+    }
+
+    /// `pair` has no counter yet; only its time counts, within the code's 10 minutes.
+    static func checkPair(_ m: [String: Any], now: Date) -> Verdict {
+        guard let ts = (m["ts"] as? NSNumber)?.doubleValue else { return .missing }
+        return late(ts, now: now, window: pairWindow).map { .stale(seconds: $0) } ?? .fresh
+    }
+
+    private static func late(_ ts: Double, now: Date, window: TimeInterval) -> Int? {
+        let off = abs(now.timeIntervalSince1970 - ts / 1000)
+        return off > window ? Int(off) : nil
+    }
+}
+
 /// Whether the bridge keeps a connection to the relay. Maxwell is public and the relay is shared, so
 /// only while it has a reason: a paired phone, or a pairing code on screen. Never with the phone off.
 enum PhoneConnection {

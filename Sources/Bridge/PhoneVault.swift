@@ -51,6 +51,16 @@ struct PairedPhone: Codable, Equatable {
     var app: String?
     var pairedAt: Date
     var lastSeen: Date?
+    /// The highest `n` seen from this phone; a box at or below it is a replay. Reset by pairing.
+    var seenN: Int?
+    /// The last `n` this Mac sent it, and how far ahead that is written down: after a restart the Mac
+    /// goes on from `sentReserved`, so its counter never repeats without a Keychain write per message.
+    var sentN: Int?
+    var sentReserved: Int?
+    /// What its pushes may say on the lock screen; hidden until the phone asks for full.
+    var pushDetail: PushPlanner.Detail?
+    /// When this Mac handed it each account's claude.ai sign-in (`artifactLogin`), by account name.
+    var artifactShares: [String: Date]?
 
     var keys: PhoneKeys { PhoneKeys(pairingKey: key) }
 }
@@ -67,7 +77,11 @@ final class PhoneRegistry {
         macId = Self.secret(vault, "mac-id", bytes: 16)
         macToken = Self.secret(vault, "mac-token", bytes: 32)
         let list = vault.read("phones").flatMap { try? JSONDecoder().decode([PairedPhone].self, from: $0) } ?? []
-        phones = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        phones = Dictionary(list.map { p in
+            var p = p
+            p.sentN = p.sentReserved ?? p.sentN
+            return (p.id, p)
+        }, uniquingKeysWith: { a, _ in a })
     }
 
     /// Made once and kept: the room is claimed by the first token that connects to it.
@@ -88,10 +102,34 @@ final class PhoneRegistry {
         persist()
     }
 
-    /// Last seen and push tokens change often; they're written with the next save, not each time.
-    func touch(_ id: String, at: Date) { phones[id]?.lastSeen = at }
+    private var dirty = false
+
+    /// Last seen changes often; it's written with the next save, not each time.
+    func touch(_ id: String, at: Date) { phones[id]?.lastSeen = at; dirty = true }
+
+    /// The `n` for the next message to this phone, written ahead in blocks of 1000.
+    func nextSent(_ id: String) -> Int {
+        guard var p = phones[id] else { return 0 }
+        let n = (p.sentN ?? 0) + 1
+        p.sentN = n
+        let reserve = n > (p.sentReserved ?? 0)
+        if reserve { p.sentReserved = n + 999 }
+        phones[id] = p
+        if reserve { persist() }
+        return n
+    }
+
+    /// A message from the phone passed the replay check. `now`: write it down at once (commands).
+    func seen(_ id: String, n: Int, now: Bool) {
+        phones[id]?.seenN = n
+        dirty = true
+        if now { persist() }
+    }
+
+    func persistIfChanged() { if dirty { persist() } }
 
     func persist() {
+        dirty = false
         let list = phones.values.sorted { $0.pairedAt < $1.pairedAt }
         vault.write("phones", try? JSONEncoder().encode(list))
     }

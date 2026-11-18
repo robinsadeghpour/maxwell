@@ -55,6 +55,17 @@ private func phonePairingTests(_ dir: URL) {
     check(late.spend(box: box, from: "UGhvbmVJZEZpeHR1cmUx", now: now.addingTimeInterval(601)) == nil && late.current(now: now.addingTimeInterval(601)) == nil,
           "a code expires after 10 minutes")
 
+    // Replay protection: n only rises per phone, ts within 5 minutes (10 for pair).
+    let ms = { (d: Date) in Int(d.timeIntervalSince1970 * 1000) }
+    check(ReplayGuard.check(["t": "cmd", "n": 8, "ts": ms(now)], lastSeen: 7, now: now) == .fresh, "a fresh message is accepted")
+    check(ReplayGuard.check(["t": "cmd", "n": 7, "ts": ms(now)], lastSeen: 7, now: now) == .replayed(n: 7, last: 7), "a replayed box is dropped")
+    check(ReplayGuard.check(["t": "cmd", "n": 3, "ts": ms(now)], lastSeen: 7, now: now) == .replayed(n: 3, last: 7), "an older n is dropped")
+    check(ReplayGuard.check(["t": "cmd", "n": 9, "ts": ms(now.addingTimeInterval(-301))], lastSeen: 7, now: now) == .stale(seconds: 301), "a stale ts is dropped")
+    check(ReplayGuard.check(["t": "cmd", "n": 9, "ts": ms(now.addingTimeInterval(400))], lastSeen: 7, now: now) == .stale(seconds: 400), "a ts from the future too")
+    check(ReplayGuard.check(["t": "cmd"], lastSeen: 0, now: now) == .missing, "a message without n and ts is dropped")
+    check(ReplayGuard.checkPair(["t": "pair", "ts": ms(now.addingTimeInterval(-540))], now: now) == .fresh
+            && ReplayGuard.checkPair(["t": "pair", "ts": ms(now.addingTimeInterval(-660))], now: now) == .stale(seconds: 660), "pair: no n, ts within 10 minutes")
+
     let relay = Config.defaultPhoneRelay
     check(!PhoneConnection.wanted(relay: relay, pairedPhones: 0, codeShowing: false), "no phone and no code: no connection")
     check(PhoneConnection.wanted(relay: relay, pairedPhones: 0, codeShowing: true), "a code on screen connects")
@@ -164,9 +175,11 @@ private func phoneStateTests() {
     let news = planner.news(st, rules: GroupRules(idleAfter: 86400), now: now)
     check(news.map(\.0.id) == ["new"], "a new Needs you is news")
     check(planner.news(st, rules: GroupRules(idleAfter: 86400), now: now).isEmpty, "the same question isn't pushed twice")
-    let msg = PushPlanner.message(to: "ExponentPushToken[x]", session: st.sessions["perm"]!, ask: PhoneAsk.of(st.sessions["perm"]!)!, counts: counts, now: now)
+    let msg = PushPlanner.message(to: "ExponentPushToken[x]", session: st.sessions["perm"]!, ask: PhoneAsk.of(st.sessions["perm"]!)!, counts: counts, now: now, detail: .full)
     check(msg["body"] as? String == "Run npm run db:migrate -- --env staging?" && msg["categoryId"] as? String == "permission" && msg["threadId"] as? String == "perm",
-          "a permission push asks the question the prompt asks")
+          "a permission push asks the question the prompt asks (full detail)")
+    let hidden = PushPlanner.message(to: "ExponentPushToken[x]", session: st.sessions["perm"]!, ask: PhoneAsk.of(st.sessions["perm"]!)!, counts: counts, now: now)
+    check(hidden["title"] as? String == "Maxwell" && hidden["body"] as? String == "A session needs you", "pushes say nothing about the session until the phone asks for full detail")
 
     check(Config.parse("").phoneRelayURL == Config.defaultPhoneRelay && Config.parse("").phoneRelay == nil, "Maxwell's relay unless the config names one")
     check(Config.parse("phone-relay = off\n").phoneRelayURL == nil && Config.parse("phone-relay =\n").phoneRelayURL == nil, "phone-relay = off, or empty, turns the phone off")

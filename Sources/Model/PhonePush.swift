@@ -21,19 +21,25 @@ struct PushPlanner {
         return out.sorted { $0.0.lastEventAt < $1.0.lastEventAt }
     }
 
+    /// What a push says on the lock screen (`hello`'s `pushDetail`). Hidden until the phone asks for full:
+    /// titles and bodies pass through Expo and Apple readable.
+    enum Detail: String, Codable { case full, hidden }
+
     /// One Expo push message for one phone.
-    static func message(to token: String, session s: Session, ask: PhoneAsk, counts: [String: Int], now: Date) -> [String: Any] {
-        let body: String, category: String
+    static func message(to token: String, session s: Session, ask: PhoneAsk, counts: [String: Int], now: Date, detail: Detail = .hidden) -> [String: Any] {
+        var body: String, category: String
         switch ask {
-        case .permission(let tool, let detail):
+        case .permission(let tool, let command):
             category = "permission"
-            body = tool == "Bash" && !detail.isEmpty ? "Run \(detail)?" : detail.isEmpty ? "Allow \(tool.isEmpty ? "a tool" : tool)?" : "Allow \(tool): \(detail)?"
+            body = tool == "Bash" && !command.isEmpty ? "Run \(command)?" : command.isEmpty ? "Allow \(tool.isEmpty ? "a tool" : tool)?" : "Allow \(tool): \(command)?"
         case .question(let text, _):
             category = "question"
             body = text
         }
+        var title = "\(s.title) needs you"
+        if detail == .hidden { title = "Maxwell"; body = "A session needs you" }
         return [
-            "to": token, "title": "\(s.title) needs you", "body": String(body.prefix(240)),
+            "to": token, "title": title, "body": String(body.prefix(240)),
             "categoryId": category, "mutableContent": true, "threadId": s.id, "sound": "default",
             "data": ["session": s.id, "counts": counts, "at": PhoneState.iso.string(from: now)] as [String: Any],
         ]

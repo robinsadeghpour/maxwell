@@ -45,6 +45,15 @@ phoneToMac = HKDF-SHA256(ikm: k, salt: "maxwell-phone-1", info: "phone→mac", l
 
 A box is `base64url(nonce ‖ ciphertext ‖ tag)` with a random 12-byte nonce. The plaintext is one JSON object (UTF-8). On the Mac this is CryptoKit's `ChaChaPoly.SealedBox.combined`; on the phone `@noble/ciphers` `chacha20poly1305`.
 
+### Order and freshness
+
+Every message inside a box, in both directions, carries two more fields:
+
+- `n`: the sender's counter for this pairing, starting at 1 and strictly rising with each message it sends.
+- `ts`: the sender's clock when it sent it, milliseconds since 1970.
+
+The receiver drops a message whose `n` is not above the last one it took from that sender, or whose `ts` is more than 5 minutes from its own clock. That stops a box recorded on the way from being played again, even though it still opens. `pair` has no `n` (there is no counter yet) and needs `ts` within 10 minutes. Pairing, also pairing again, starts both counters over: the Mac's first message to a phone is `paired` with `n: 1`. The Mac keeps the highest `n` it has taken from each phone, and its own, in the Keychain with the phone's key; it logs each message it drops and why (replayed, stale, missing).
+
 ## The relay
 
 `wss://<relay>/room/<mac id>?role=mac&token=<mac token>` or `?role=phone&phone=<phone id>`.
@@ -67,7 +76,7 @@ Every message is `{"t": "<type>", …}` inside a box.
 | `t` | Fields | Answer |
 |---|---|---|
 | `pair` | `phone` (id), `name` (e.g. "Robin's iPhone"), `app` (version) | `paired` |
-| `hello` | `app`, `push` (Expo push token or null), `focus` (session id or null) | `state`, then `transcript` for `focus` |
+| `hello` | `app`, `push` (Expo push token or null), `pushDetail` (`full` or `hidden`, below), `focus` (session id or null) | `state`, then `transcript` for `focus` |
 | `focus` | `session` (id or null), `terminal` (`{cols, rows}` or null) | `transcript` with `reset: true`; with `terminal`, `term` data too. `hello`'s `focus` is a focus without `terminal`. |
 | `cmd` | `id` (unique, made by the phone), `op`, op fields (below) | `ack` with the same `id` |
 | `input` | `session`, `data` (UTF-8 text typed in the Terminal tab, including control characters) | none |
@@ -87,7 +96,7 @@ Every message is `{"t": "<type>", …}` inside a box.
 | `move` | `session`, `account` (id or null for most room) | Moves a limited session to another account with a handover prompt. `result`: `{"session": new id}`. |
 | `resumeAtReset` | `session` | Sends "continue" when the account's limit resets. `result`: `{"at": ISO}`, when it will. |
 | `rename` | `session`, `title` | Renames, like the Mac's Rename. |
-| `artifactLogin` | `account` | `result`: `{"cookies": [cookie…]}`, the account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone. Fails with `signed-out` when that account isn't signed in on the Mac. |
+| `artifactLogin` | `account` | `result`: `{"cookies": [cookie…]}`, the account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone. Fails with `signed-out` when that account isn't signed in on the Mac, and with `not-ready` unless the phone is online and has sent `hello` on this connection. The Mac writes down each handover (account, phone, time; never the cookies) and Settings › Phone shows it under the phone. |
 
 The Mac remembers the last 500 command ids. A repeated id gets the first answer again and does nothing twice, so the phone can safely resend anything not yet acknowledged. A resend while the first is still running gets no second answer; the first answer comes when it is done.
 
@@ -102,6 +111,7 @@ Error codes in `ack.error.code`:
 | `untrusted` | `start` in a folder Claude Code hasn't been allowed to work in yet. Start one there on the Mac once. |
 | `no-room` | `start` or `move` with no account that has room. |
 | `signed-out` | `artifactLogin` for an account not signed in to claude.ai on the Mac. |
+| `not-ready` | `artifactLogin` from a phone that hasn't sent `hello` since it last connected. |
 | `bad-request` | A field is missing or wrong (no text, unknown decision, a folder that isn't on the Mac). |
 | `unknown-op` | An op this Maxwell doesn't know (an older Mac). |
 | `failed` | Anything else; `message` says what, in words for the user. |
@@ -166,7 +176,10 @@ The bridge sends a push for each new Needs you to every paired phone with a push
 
 Categories: `permission` (Allow, Allow for this folder, Deny, Reply), `question` (Reply, plus up to three options), `turn` (Reply, Go on). `counts` keeps the phone's widgets current even while the app isn't running.
 
-Note: the title and body pass through Expo and Apple in readable form, like any notification. Everything else stays end-to-end encrypted.
+Note: the title and body pass through Expo and Apple in readable form, like any notification. Everything else stays end-to-end encrypted. So what they say is the phone's choice, sent in `hello` as `pushDetail`:
+
+- `hidden` (the default, until a phone says otherwise): title `Maxwell`, body `A session needs you`. No session name, no command. `data.session` (an opaque id) and `counts` still come, so a tap opens the session and widgets stay current.
+- `full`: the session's title and what it asks, as above.
 
 ## Checking the bridge
 
@@ -182,4 +195,4 @@ Against the live relay, write `phone-relay = wss://maxwell-relay.maxwell-relay.w
 
 ## Changelog
 
-- **1** (Nov 2026): first version.
+- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`.

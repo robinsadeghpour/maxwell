@@ -13,8 +13,11 @@ extension SettingsView {
         if p.phones.isEmpty { form.paragraph("No phones yet.") }
         for ph in p.phones {
             let remove = MXButton("Remove", small: true) { [weak self] in self?.confirmRemove(ph) }
-            let seen = ph.online ? "Online" : ph.lastSeen.map { "Offline · last seen \(Format.ago($0))" } ?? "Offline · not connected since pairing"
-            form.row(ph.name, [(remove, remove.intrinsicContentSize.width)], note: seen, icon: StatusSquare(ph.online ? .on : .off))
+            var note = ph.online ? "Online" : ph.lastSeen.map { "Offline · last seen \(Format.ago($0))" } ?? "Offline · not connected since pairing"
+            for (account, at) in ph.shares.sorted(by: { $0.value > $1.value }) {
+                note += "\nclaude.ai sign-in for \(account) shared \(Format.reset(at))"
+            }
+            form.row(ph.name, [(remove, remove.intrinsicContentSize.width)], note: note, icon: StatusSquare(ph.online ? .on : .off))
         }
     }
 

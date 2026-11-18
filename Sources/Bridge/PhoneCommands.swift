@@ -25,7 +25,7 @@ extension PhoneBridge {
         }
         commands.start(id)
         let op = m["op"] as? String ?? ""
-        run(op, m) { [weak self] reply in
+        run(op, m, from: phone) { [weak self] reply in
             guard let self else { return }
             let ack = reply.ack(id)
             self.commands.finish(id, ack: ack)
@@ -34,11 +34,11 @@ extension PhoneBridge {
         }
     }
 
-    private func run(_ op: String, _ m: [String: Any], _ reply: @escaping (PhoneReply) -> Void) {
+    private func run(_ op: String, _ m: [String: Any], from phone: String, _ reply: @escaping (PhoneReply) -> Void) {
         let st = store.state
         if op == "start" { return start(m, reply) }
         if op == "closeSafe" { return closeSafe(m["sessions"] as? [String] ?? [], reply) }
-        if op == "artifactLogin" { return artifactLogin(m["account"] as? String, reply) }
+        if op == "artifactLogin" { return artifactLogin(m["account"] as? String, for: phone, reply) }
         guard let sid = m["session"] as? String, let s = st.sessions[sid] else {
             return reply(.failed(code: "unknown-session", message: "Maxwell doesn't know that session any more."))
         }
@@ -201,18 +201,32 @@ extension PhoneBridge {
     // MARK: artifacts
 
     /// The account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone.
-    private func artifactLogin(_ id: String?, _ reply: @escaping (PhoneReply) -> Void) {
+    /// Only to a phone that is online and said hello on this connection; each handover is written down
+    /// (account, phone, time; never the cookies) and shows in Settings › Phone.
+    private func artifactLogin(_ id: String?, for phone: String, _ reply: @escaping (PhoneReply) -> Void) {
         guard let a = id.flatMap(store.state.account) else { return reply(.failed(code: "bad-request", message: "Unknown account.")) }
-        ClaudeWeb.shared.store(a).httpCookieStore.getAllCookies { cookies in
+        guard links[phone]?.online == true, links[phone]?.ready == true else {
+            return reply(.failed(code: "not-ready", message: "Open Maxwell on your phone and try again."))
+        }
+        ClaudeWeb.shared.store(a).httpCookieStore.getAllCookies { [weak self] cookies in
             let now = Date()
             let mine = cookies.filter { $0.domain.hasSuffix("claude.ai") && ($0.expiresDate.map { $0 > now } ?? true) }
             guard mine.contains(where: { $0.name == "sessionKey" }) else {
                 return reply(.failed(code: "signed-out", message: "\(a.name) isn't signed in to claude.ai on your Mac. Sign in under Settings › Accounts."))
             }
+            self?.shared(a, with: phone)
             reply(.ok(["cookies": mine.map { c in
                 ["name": c.name, "value": c.value, "domain": c.domain, "path": c.path, "expires": c.expiresDate.map { PhoneState.iso.string(from: $0) } ?? NSNull(),
                  "secure": c.isSecure, "httpOnly": c.isHTTPOnly] as [String: Any]
             }]))
         }
+    }
+
+    private func shared(_ a: Account, with phone: String) {
+        guard var p = registry.phones[phone] else { return }
+        p.artifactShares = (p.artifactShares ?? [:]).merging([a.name: Date()]) { _, new in new }
+        registry.save(p)
+        mark("phone: shared the claude.ai sign-in for \(a.name) with \(p.name)")
+        onStatus?()
     }
 }
