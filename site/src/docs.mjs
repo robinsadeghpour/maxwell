@@ -157,6 +157,7 @@ export const pages = {
 <p>Claude Code titles some sessions with only a slug (<code>acme-75</code>), something generic ("Continue Previous Task") or the first words of the prompt ("hi, do I need to do"). For those, Haiku reads the start of the session and names the task. It happens once per session and costs about $0.0003.</p>
 <h2>Rename a session</h2>
 <p>Right-click the row and choose <strong>Rename</strong>. Your name always wins. Maxwell never renames a session you named.</p>
+<p>A name you give with <code>/rename</code> in Claude Code shows in Maxwell within seconds, and Haiku never replaces it. A name set with Rename in Maxwell comes first.</p>
 <h2>Name every session yourself</h2>
 <p>If you name your sessions yourself, turn off <strong>Settings › General › Sessions › Name sessions automatically</strong>, or add this line to the config:</p>
 <pre><code>auto-titles = off</code></pre>
