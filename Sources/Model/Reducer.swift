@@ -155,6 +155,7 @@ private func reduce(agents snap: AgentsSnapshot, into s: inout AppState) {
             id: e.sessionId, name: e.name, accountId: snap.accountId, cwd: e.cwd, at: e.startedAt,
             origin: s.startedByMaxwell.contains(e.sessionId) ? .maxwell : .external, reach: e.reach)
         session.name = e.name
+        if let yours = e.nameIsYours { session.nameIsYours = yours }
         session.cwd = e.cwd
         session.reach = e.reach
         session.accountId = snap.accountId

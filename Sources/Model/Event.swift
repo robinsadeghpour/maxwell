@@ -98,6 +98,9 @@ struct AgentsSnapshot: Equatable {
         /// Set when Claude Code's own files for this session could not be read: its group then rests
         /// on the listing and the reply alone. Says which file.
         var unverified: String? = nil
+        /// True when `name` is one you gave the session in Claude Code (`/rename`, `claude --name`);
+        /// nil when its sessions/<pid>.json was not read.
+        var nameIsYours: Bool? = nil
     }
 
     /// What the Claude Code process is doing, as it writes it in sessions/<pid>.json.
@@ -228,6 +231,14 @@ enum EventParser {
               let status = parseStatus(p["status"] as? String, waitingFor: p["waitingFor"] as? String) else { return nil }
         let at = (p["statusUpdatedAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) }
         return (status, at)
+    }
+
+    /// Whether one sessions/<pid>.json says you named the session (`/rename`, `claude --name`), if it
+    /// runs `sessionId`. Other sources ("derived", "peer") are names Claude Code or a launcher made up.
+    static func parseNameIsYours(_ data: Data, sessionId: SessionID) -> Bool? {
+        guard let p = try? JSONSerialization.jsonObject(with: data) as? [String: Any], p["sessionId"] as? String == sessionId,
+              let source = p["nameSource"] as? String else { return nil }
+        return source == "user"
     }
 
     /// One jobs/<id>/state.json.

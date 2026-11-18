@@ -156,6 +156,8 @@ struct Session: Equatable {
     var accountId: AccountID
     var cwd: String
     var branch: String?
+    /// `name` is one you gave it in Claude Code (`/rename`, `claude --name`), not a generated one.
+    var nameIsYours = false
     var hookTitle: String?      // Claude Code's session_title
     var tabTitle: String?       // ~/.claude/tab-titles (an optional hook)
     var firstPrompt: String?    // the first prompt, up to 400 characters
@@ -201,11 +203,13 @@ struct Session: Equatable {
 }
 
 extension Session {
-    /// What the session is about. Yours wins; a model's shows only while the session's own
-    /// title is weak, so a later `/rename` in Claude takes over again. With `Titles.auto` off,
-    /// what Claude Code itself shows (its title, `/rename` included) or the name you gave it here.
+    /// What the session is about. Yours wins: the name you gave it here, then the one you gave it
+    /// in Claude Code (`/rename`), whatever `Titles.auto` says. A model's shows only while the
+    /// session's own title is weak. With `Titles.auto` off, what Claude Code itself shows.
     var title: String {
-        if let n = named, n.byYou || (Titles.auto && ownTitleWeak) { return n.text }
+        if let n = named, n.byYou { return n.text }
+        if nameIsYours { return name }
+        if let n = named, Titles.auto && ownTitleWeak { return n.text }
         return Titles.auto ? ownTitle : hookTitle ?? name
     }
     /// Claude's title, the tab title, the first prompt's words, or the generated name.
@@ -213,7 +217,7 @@ extension Session {
     /// First words of the first prompt.
     var promptTitle: String? { firstPrompt.map(Titles.fromPrompt) }
     /// True when the title is only the generated name ("acme-75"), so it says nothing about the work.
-    var untitled: Bool { named == nil && hookTitle == nil && tabTitle == nil && firstPrompt == nil }
+    var untitled: Bool { named == nil && !nameIsYours && hookTitle == nil && tabTitle == nil && firstPrompt == nil }
     /// A background session that leaves Claude Code's listing in one of these phases was stopped
     /// while idle (it never stops a working one), not ended: it stays where it was, parked.
     var parkable: Bool {
@@ -226,7 +230,7 @@ extension Session {
     /// The title says little about the work: none, a generated slug ("acme-75"), only generic
     /// words ("Continue Previous Task"), or the first words of the first prompt ("hi, do I need
     /// to do"). Such sessions get a model-written title.
-    var weakTitle: Bool { named == nil && ownTitleWeak }
+    var weakTitle: Bool { named == nil && !nameIsYours && ownTitleWeak }
     var ownTitleWeak: Bool {
         guard let t = (hookTitle ?? tabTitle)?.trimmingCharacters(in: .whitespaces), !t.isEmpty else { return true }
         return Titles.isSlug(t) || Titles.isGeneric(t) || (firstPrompt.map { Titles.isFragment(t, of: $0) } ?? false)
