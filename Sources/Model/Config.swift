@@ -66,6 +66,15 @@ struct Config: Equatable {
     var projects: [ProjectRule] = []
     var accounts: [Account] = []
     var keybinds: [String: String] = [:]   // action id -> shortcut, e.g. "new-session" -> "cmd+n"
+    /// `phone-relay = wss://…`: the relay Maxwell's phone app reaches this Mac through (docs/phone.md), as
+    /// written in the file; nil when there is no line. `phoneRelayURL` is the one to connect to.
+    var phoneRelay: String?
+    static let defaultPhoneRelay = "wss://maxwell-relay.maxwell-relay.workers.dev"
+    /// The relay to use: the config's, else Maxwell's own; nil when `phone-relay = off`.
+    var phoneRelayURL: String? {
+        guard let v = phoneRelay else { return Self.defaultPhoneRelay }
+        return ["off", "none", "false"].contains(v) ? nil : v
+    }
     /// `<plugin>.<key> = value` lines: each plugin's settings, by plugin id (docs/plugins.md).
     var plugins: [PluginID: [String: String]] = [:]
 
@@ -147,6 +156,7 @@ struct Config: Equatable {
             case "wrap-line": c.wrapLine = !["off", "false"].contains(value)
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
             case "auto-titles": c.autoTitles = !["off", "false"].contains(value)
+            case "phone-relay": c.phoneRelay = value.isEmpty ? "off" : value
             case "crash-reports": c.crashReports = !["off", "false"].contains(value)
             case "project":
                 // project = <name> <path glob>; the name may contain spaces, the glob is the last word.

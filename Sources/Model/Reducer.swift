@@ -20,7 +20,7 @@ func reduce(into s: inout AppState, _ event: Event) {
         if let w = u.fiveHour { s.accounts[i].fiveHour = w }
         if let w = u.week { s.accounts[i].week = w }
         s.accounts[i].sampledAt = u.at
-        if let sid = u.sessionId, let tokens = u.contextTokens, tokens > 0 { s.sessions[sid]?.contextTokens = tokens }
+        if let sid = u.sessionId, let tokens = u.contextTokens, tokens > 0 { s.sessions[sid]?.contextTokens = tokens; s.sessions[sid]?.contextPercent = u.contextPercent }
         // A limit hit often lands before the sample that says when it resets.
         if let reset = s.accounts[i].limitResetsAt(now: u.at) {
             for (id, sess) in s.sessions where sess.accountId == acct && sess.phase == .limited(nil) {

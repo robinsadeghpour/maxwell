@@ -1,0 +1,20 @@
+{
+ "note": "Made by maxwell-mobile relay/tools/protocol.mjs (@noble/ciphers chacha20poly1305, @noble/hashes hkdf). Invented values.",
+ "k": "AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw",
+ "macToPhone": "tZ4YKqWg2Hopj3v9Hb3Oc7Jro-52SPZ74OfziKNLF50",
+ "phoneToMac": "Hf4iIYboBLTtBRpLtUpzijiv4eDy5aNyo1u9EeAtJr0",
+ "phoneToMacBox": "u3PA7DdzCfG3iMYWSgr80SjyTYEIl0eMlJDzGnteB3TA5gKyl2JZRHa2rQ-tUlNz1Rk8nyWf-WyjJN-rVjDB8AsDfoxRXPjNGZX7ctDVjURPh8TuNNYNC0HcD_iBb06fphFpLrwf7aCzJg",
+ "phoneToMacMessage": {
+  "t": "pair",
+  "phone": "UGhvbmVJZEZpeHR1cmUx",
+  "name": "Test iPhone",
+  "app": "1.0.0"
+ },
+ "macToPhoneBox": "kuo5YsTgzz4-QWAx5AWLkVz0DDJvOeUmXDr9dA6oY7TnSB8ITHVTqqFQ-xB1sf5Idqg6_M0amCiH2S9_nz1acOHSd80",
+ "macToPhoneMessage": {
+  "t": "paired",
+  "mac": {
+   "name": "Test Mac"
+  }
+ }
+}

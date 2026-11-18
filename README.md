@@ -234,6 +234,8 @@ Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the w
 | `Sources/UI` | The component set, rail, panels, search, viewer, libghostty embed, themes, motion |
 | `Sources/Install` | Hook installer that edits settings without reordering them |
 | `Sources/Plugins` | Plugin host: discovery, the JSON-RPC wire, restarts, Keychain secrets |
+| `Sources/Bridge` | The phone app's way in: relay connection, pairing, state, commands, pushes ([docs/phone.md](docs/phone.md)) |
+| `Sources/ClaudeCode` | What Maxwell assumes about Claude Code: cloud sessions, `claude attach` on a windowless terminal, following a transcript |
 | `plugins/` | Plugins that ship with Maxwell (Linear, Slack) and the Swift plugin SDK |
 | `examples/plugins/` | A complete plugin in 55 lines of Python |
 | `hook/` | The hook and status-line tap, in C |

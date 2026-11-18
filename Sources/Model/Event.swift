@@ -66,6 +66,8 @@ struct UsageSample: Equatable {
     var fiveHour: UsageWindow?
     var week: UsageWindow?
     var contextTokens: Int?
+    /// How full the session's context window is, 0–100, as the status line reports it.
+    var contextPercent: Int? = nil
 }
 
 /// One `claude agents --json` listing for one account: the live sessions right now.
@@ -181,7 +183,8 @@ enum EventParser {
         let ctx = u["context_window"] as? [String: Any]
         let tokens = (ctx?["total_input_tokens"] as? NSNumber)?.intValue
         return UsageSample(at: at, configDir: configDir, sessionId: u["session_id"] as? String,
-                           fiveHour: window("five_hour"), week: window("seven_day"), contextTokens: tokens)
+                           fiveHour: window("five_hour"), week: window("seven_day"), contextTokens: tokens,
+                           contextPercent: (ctx?["used_percentage"] as? NSNumber)?.intValue)
     }
 
     /// Parses `claude agents --json` output for one account.

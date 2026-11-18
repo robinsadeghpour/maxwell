@@ -19,6 +19,9 @@ Seen in Claude Code 2.1.3xx (2.1.325 on 2026-11-15). Code: `Sources/App/ClaudeCL
 | Either, in an untrusted folder | `Workspace not trusted` |
 | `claude agents --json --all` | The account's sessions. Maps `shell` to `busy`, and drops `needs`, `tempo` and `statusUpdatedAt`, so the state files below win. `--all` adds background sessions with no process (no `pid`): `done` after the idle stop below, `stopped` after `claude stop`, `failed` after a crash. A waiting session the idle stop ended stays in the plain listing without a `pid`. |
 | `claude attach <shortId>` | Run in a terminal pane. Ctrl+Z detaches and the session keeps running. |
+| `claude attach <shortId>`, twice at once | Several attaches share one background session; what one types shows in the others (2.1.327, 18 Nov 2026). The phone bridge relies on it: its windowless attach (`Sources/ClaudeCode/AttachTerminal.swift`) runs beside the Mac's pane. Hanging up the terminal (SIGHUP, closing the pty) ends the attach and leaves the session running, like closing a pane. |
+| Typing into an attached session | Text and Return in one write arrive as a paste and are not sent: the bridge writes the text, waits for it to echo, then writes `\r` (2.1.327). Several lines go in one bracketed paste (`ESC[200~ … ESC[201~`). Esc ends the turn. |
+| A permission prompt | Answered by its number keys without Return: `1` allows, `2` allows from now on (for the folder or command), Esc denies (2.1.327, checked with a Bash `mkdir` in `--permission-mode default`). Auto mode (an account's default) runs many commands without asking, so a test needs `--permission-mode default`. |
 | `claude stop <shortId>` | Ends the process, keeps the conversation. Maxwell never runs `claude rm`. |
 
 ## Files, per account config folder
@@ -29,9 +32,11 @@ Seen in Claude Code 2.1.3xx (2.1.325 on 2026-11-15). Code: `Sources/App/ClaudeCL
 - **`.claude.json`** (`~/.claude.json` for the default account): `projects[<path>].hasTrustDialogAccepted`. Maxwell writes it to trust a folder. Claude Code writes the same file, so Maxwell re-reads and retries; this is a known race (clean-up plan, step 4).
 - **`settings.json`**: Maxwell's hook and status-line tap are merged in by `Sources/Install/HookInstaller.swift`, keeping key order.
 
+**Transcript lines the phone's conversation reads** (`Sources/Model/ChatItems.swift`, 2.1.327): `type` `user` with `message.content` a string (what you typed; `<command-name>/x</command-name>` and `<command-args>` for a slash command; `[Request interrupted by user…]` after Esc) or blocks (`tool_result` with `tool_use_id` and `is_error`, plus a top-level `toolUseResult`); `type` `assistant` with `text`, `thinking` and `tool_use` (`id`, `name`, `input`) blocks, one block per line; `type` `system` with `subtype` `compact_boundary`. `isMeta` and `isSidechain` lines are left out. An Edit's or Write's `toolUseResult.structuredPatch[].lines` start with `+`, `-` or a space; a new file's is `{"type": "create", "content": …}`. A Bash result has `interrupted`.
+
 ## Hook payloads
 
-Hooks (session start, stop, notification, prompt submit) and the status-line tap append to `~/.local/state/maxwell/events.jsonl`. Fields used: `session_id`, `transcript_path`, `cwd`, `notification_type`, `last_assistant_message`, `prompt`, `source`, `rate_limits` (`used_percentage`, `resets_at`), `context_window`. Real recorded payloads are in `fixtures/events/`; the reducer tests replay them.
+Hooks (session start, stop, notification, prompt submit) and the status-line tap append to `~/.local/state/maxwell/events.jsonl`. Fields used: `session_id`, `transcript_path`, `cwd`, `notification_type`, `last_assistant_message`, `prompt`, `source`, `rate_limits` (`used_percentage`, `resets_at`), `context_window` (`total_input_tokens`, and `used_percentage` of `context_window_size`, which is 1,000,000 on 1M-context models; 2.1.327). Real recorded payloads are in `fixtures/events/`; the reducer tests replay them.
 
 ## The background service
 

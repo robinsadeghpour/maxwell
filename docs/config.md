@@ -24,6 +24,7 @@ app-icon = auto               # auto | light | dark | paper | graphite | light-e
 idle-after = 24h              # stopped sessions quiet this long fold into Idle (24h, 90m, 2d)
 judge = on                    # off: no model read, so nothing is ever safe to close
 crash-reports = on            # off: never send crash reports (runmaxwell.com/docs/privacy#crash-reports)
+phone-relay = wss://maxwell-relay.maxwell-relay.workers.dev   # the default; your own relay, or empty/off: no phone
 account = work ~/.claude      # <name> <CLAUDE_CONFIG_DIR>, one line per account
 project = Orbit ~/projects/orbit*     # <name> <path glob>; default: the git repo, worktrees included
 project-pin = Acme            # one line per project kept on the rail, in order; none = all
@@ -103,3 +104,14 @@ linear.writes = live          # live | dry-run: dry run logs moves and comments 
 
 Settings › Keys lists every action. Click a shortcut, press the new keys; ⌫ clears it, Esc cancels.
 It writes `keybind = <keys>=<action>` lines; `none` removes a default shortcut.
+
+## Phone
+
+The phone bridge to Maxwell's iPhone app ([phone.md](phone.md)) uses Maxwell's relay,
+`wss://maxwell-relay.maxwell-relay.workers.dev`, unless `phone-relay` names another
+(`ws://127.0.0.1:8787` for `wrangler dev`). Nothing to set up: Settings › Phone › Show code pairs a phone.
+Maxwell connects to the relay only while a phone is paired or a pairing code is showing; with no phone it
+keeps no connection open, and removing the last phone closes it. `phone-relay =` (empty) or
+`phone-relay = off` turns the phone off. A quiet test run uses only a relay its config names, so scripted
+runs never make rooms on the real relay. Changing it reconnects at once. The Mac's room id, its token and
+each phone's key live in the Keychain (service `Maxwell phone <bundle id>`, so Maxwell Dev has its own room).

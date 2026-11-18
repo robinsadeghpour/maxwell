@@ -42,6 +42,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     let newPanel = NewSessionPanel(frame: .zero)
     let closeSheet = CloseSheet(frame: .zero)
     private lazy var settings = SettingsWindowController()
+    /// The phone app's bridge (docs/phone.md); Settings › Phone shows it.
+    var phone: PhoneBridge?
     private(set) var actions: [Action] = []
     private(set) var tooltips: Tooltips!
     private var ageTimer: Timer?
@@ -1279,6 +1281,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             self?.refreshSettings()
         }
         v.onPluginRestart = { [weak self] in self?.store.plugins.restart($0) }
+        v.onPairPhone = { [weak self] in self?.phone?.makePairingCode() }
+        v.onRemovePhone = { [weak self] id, signOut in self?.removePhone(id, signOut: signOut) }
+        v.onCancelPairing = { [weak self] in self?.phone?.cancelPairingCodes() }
         settings.show(settingsModel, section: section)
     }
 
@@ -1292,7 +1297,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                                      secretsSet: Set(m.settings.filter { $0.type == .secret && store.plugins.secrets.get(m.id, $0.key) != nil }.map(\.key)))
                       },
                       brokenPlugins: store.plugins.broken.map { ($0.dir.lastPathComponent, "\($0.why)") },
-                      pluginsFolder: (store.plugins.paths.user.path as NSString).abbreviatingWithTildeInPath)
+                      pluginsFolder: (store.plugins.paths.user.path as NSString).abbreviatingWithTildeInPath, phone: phone?.status ?? PhoneStatus())
     }
 
     /// Adds `account = <name> <dir>` for a folder that holds a Claude login.

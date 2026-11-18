@@ -6,6 +6,14 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Settings › Phone</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-18-phone-bridge</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-18-phone-bridge</guid>
+<pubDate>Wed, 18 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;p&gt;Maxwell can now pair with a phone. Settings › Phone shows a code to scan; once a phone is paired, it sees the same sessions as the Mac, follows a session's conversation and terminal, answers permission prompts, opens artifacts in the right account, starts, closes and moves sessions, and gets a push when a session needs you while you're away from the Mac.&lt;/p&gt;
+&lt;p&gt;The phone and the Mac meet on a small relay and everything between them is end-to-end encrypted; the relay forwards bytes it can't read. Maxwell connects to it only while a phone is paired or a code is showing, and &lt;code&gt;phone-relay = off&lt;/code&gt; turns it off. The iPhone app is in private testing. &lt;a href=&quot;https://github.com/robinsadeghpour/maxwell/blob/v1/docs/phone.md&quot;&gt;How it works&lt;/a&gt;.&lt;/p&gt;</description>
+</item>
+<item>
 <title>/resume works across folders</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-18-resume-from-any-folder</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-18-resume-from-any-folder</guid>

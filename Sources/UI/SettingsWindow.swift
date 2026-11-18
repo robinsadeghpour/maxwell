@@ -25,6 +25,7 @@ struct SettingsModel {
     var plugins: [PluginInfo] = []
     var brokenPlugins: [(folder: String, why: String)] = []
     var pluginsFolder = ""
+    var phone = PhoneStatus()
 }
 
 /// One plugin as Settings shows it.
@@ -36,7 +37,7 @@ struct PluginInfo {
 }
 
 enum SettingsSection: String, CaseIterable {
-    case general = "General", appearance = "Appearance", accounts = "Accounts", projects = "Projects", plugins = "Plugins", keys = "Keys", advanced = "Advanced"
+    case general = "General", appearance = "Appearance", accounts = "Accounts", projects = "Projects", phone = "Phone", plugins = "Plugins", keys = "Keys", advanced = "Advanced"
 }
 
 // MARK: controls
@@ -515,9 +516,13 @@ final class SettingsView: MXView {
     private var installedBrowsers: [Browsers.Installed]?
     var onPluginSecret: ((PluginID, String, String?) -> Void)?
     var onPluginRestart: ((PluginID) -> Void)?
+    var onPairPhone: (() -> Void)?
+    /// A phone to remove, and whether to sign out the accounts whose claude.ai sign-in it was given.
+    var onRemovePhone: ((String, Bool) -> Void)?
+    var onCancelPairing: (() -> Void)?
     private let sections = SectionList(frame: .zero)
     private let scroll = NSScrollView()
-    private let form = FormView(frame: .zero)
+    let form = FormView(frame: .zero)
     private let title = Label("", font: Fonts.mono(Metrics.fontSize + 1, .semibold))
     /// Keys only: narrows the list as you type. ⌘F focuses it.
     private let filter = InputField(value: "", placeholder: "Filter commands   ⌘F", secure: false)
@@ -563,6 +568,7 @@ final class SettingsView: MXView {
         case .appearance: appearance()
         case .accounts: accounts()
         case .projects: projects()
+        case .phone: phone()
         case .plugins: plugins()
         case .keys: keys()
         case .advanced: advanced()
