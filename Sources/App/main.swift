@@ -70,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             mark("first runloop after window")
             self.store.onNotificationsAnswered = { [weak self] in self?.main.recheckNotifications() }
             self.store.start()
+            self.startPhone()
             self.main.refreshSetup()
             self.runTestHooks()
             self.launched = true
@@ -117,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationWillTerminate(_ n: Notification) {
         main?.saveShellOutputs()
         store?.plugins.shutdownAll()
+        main?.phone?.shutdown()
     }
     /// `open Maxwell.app` while a run of the same bundle is up reopens that instance. A quiet run
     /// stays quiet and still quits on time: a reopened test run once sat in front for an hour.
@@ -167,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard c != store.config || Look.theme.name != c.theme(systemDark: SystemAppearance.isDark) else { return }
         if c.wrapLine != store.config.wrapLine { Wrap.publish(c.wrapLine) }
         store.reloadConfig(c)
+        main.phone?.reload(c)
         main.refreshSetup()
         CrashReports.apply(enabled: c.crashReports)
         main.applyLook(c)

@@ -49,16 +49,22 @@ struct ChatParser {
     /// The newest `limit` items of a run of lines, a tool's result folded into its call.
     static func recent(_ lines: [Substring], cwd: String, limit: Int = 300) -> [ChatItem] {
         var p = ChatParser(cwd: cwd)
+        return p.recent(lines, limit: limit)
+    }
+
+    /// Reads a run of lines and keeps the calls still waiting for results, so later lines fold into them.
+    mutating func recent(_ lines: [Substring], limit: Int = 300) -> [ChatItem] {
         var items: [ChatItem] = []
-        var index: [String: Int] = [:]
-        for line in lines {
-            for item in p.read(line) {
-                if let id = item.id, let i = index[id] { items[i] = item; continue }
-                if let id = item.id { index[id] = items.count }
-                items.append(item)
-            }
-        }
+        for line in lines { Self.merge(read(line), into: &items, limit: .max) }
         return Array(items.suffix(limit))
+    }
+
+    /// Appends items, a tool's newer version replacing the one with its id, keeping the newest `limit`.
+    static func merge(_ new: [ChatItem], into items: inout [ChatItem], limit: Int) {
+        for item in new {
+            if let id = item.id, let i = items.lastIndex(where: { $0.id == id }) { items[i] = item } else { items.append(item) }
+        }
+        if items.count > limit { items.removeFirst(items.count - limit) }
     }
 
     mutating func read(_ line: Substring) -> [ChatItem] {

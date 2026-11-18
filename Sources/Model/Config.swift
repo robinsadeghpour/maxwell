@@ -66,6 +66,9 @@ struct Config: Equatable {
     var projects: [ProjectRule] = []
     var accounts: [Account] = []
     var keybinds: [String: String] = [:]   // action id -> shortcut, e.g. "new-session" -> "cmd+n"
+    /// `phone-relay = wss://…`: the relay Maxwell's phone app reaches this Mac through (docs/phone.md).
+    /// Unset: the phone bridge is off.
+    var phoneRelay: String?
     /// `<plugin>.<key> = value` lines: each plugin's settings, by plugin id (docs/plugins.md).
     var plugins: [PluginID: [String: String]] = [:]
 
@@ -147,6 +150,7 @@ struct Config: Equatable {
             case "wrap-line": c.wrapLine = !["off", "false"].contains(value)
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
             case "auto-titles": c.autoTitles = !["off", "false"].contains(value)
+            case "phone-relay": c.phoneRelay = value.isEmpty ? nil : value
             case "crash-reports": c.crashReports = !["off", "false"].contains(value)
             case "project":
                 // project = <name> <path glob>; the name may contain spaces, the glob is the last word.
