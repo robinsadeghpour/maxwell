@@ -166,6 +166,8 @@ struct Session: Equatable {
     var phase: Phase
     var lastMessage: String?
     var contextTokens: Int?
+    /// How full the context window is, 0–100, from the status line; nil until one reports it.
+    var contextPercent: Int?
     var lastEventAt: Date
     var startedAt: Date
     var origin: Origin
