@@ -34,7 +34,18 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-16-cloud-sessions">
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-18-resume-from-any-folder">
+  <aside><div><time datetime="2026-11-18">Nov 18, 2026</time><span class="ver">v0.1.62</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-18-resume-from-any-folder">/resume works across folders</a></h2>
+    
+    <div class="prose"><p>Type <code>/resume</code> in a session and pick a conversation from another folder, and Maxwell now opens it. Claude Code can't switch folders inside a running session, so it only prints a <code>cd … &amp;&amp; claude --resume …</code> command to paste into a terminal. Maxwell reads that command off the session and runs it: the conversation resumes in its own folder as a background session and opens in the pane.</p>
+<p>If the session you typed <code>/resume</code> in has no reply yet, Maxwell closes it, since it was only opened to get to the other one. A conversation Maxwell already lists is opened instead of started twice.</p></div>
+    
+    
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-16-cloud-sessions">
   <aside><div><time datetime="2026-11-16">Nov 16, 2026</time><span class="ver">v0.1.50 – v0.1.61</span></div></aside>
   <article>
     <h2><a href="/changelog/2026-11-16-cloud-sessions">Cloud sessions</a></h2>

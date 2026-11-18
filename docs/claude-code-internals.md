@@ -15,6 +15,7 @@ Seen in Claude Code 2.1.3xx (2.1.325 on 2026-11-15). Code: `Sources/App/ClaudeCL
 |---|---|
 | `claude --bg --name <n> [--model m] [prompt]` | The line containing `backgrounded`: `backgrounded · <shortId> · <name> (…)`. Field 2 is the short id. |
 | `claude --bg --resume <id> --name <n>` | Same line. `started a copy` in the output means Claude still saw the old process and made a copy. |
+| `/resume` in a session, picking a conversation from another folder | Claude Code doesn't switch folders. It prints `This session is from a different directory.`, `To resume, run:` and `cd <folder> && claude --resume <session id>` on the session's screen, and copies the command (2.1.327). `ResumeElsewhere.parse` reads it off the screen; a narrow pane breaks the line. |
 | Either, in an untrusted folder | `Workspace not trusted` |
 | `claude agents --json --all` | The account's sessions. Maps `shell` to `busy`, and drops `needs`, `tempo` and `statusUpdatedAt`, so the state files below win. `--all` adds background sessions with no process (no `pid`): `done` after the idle stop below, `stopped` after `claude stop`, `failed` after a crash. A waiting session the idle stop ended stays in the plain listing without a `pid`. |
 | `claude attach <shortId>` | Run in a terminal pane. Ctrl+Z detaches and the session keeps running. |
