@@ -3,9 +3,10 @@ import SystemConfiguration
 
 /// What Settings › Phone shows.
 struct PhoneStatus: Equatable {
-    enum Relay: Equatable { case notSet, connecting, connected, cantReach(String) }
+    /// `off`: `phone-relay` turns it off. `idle`: not connected, because no phone is paired and no code shows.
+    enum Relay: Equatable { case off, idle, connecting, connected, cantReach(String) }
     struct Phone: Equatable { var id: String; var name: String; var lastSeen: Date?; var online: Bool }
-    var relay: Relay = .notSet
+    var relay: Relay = .off
     var relayURL: String?
     var pairLink: String?
     var pairExpires: Date?
@@ -43,9 +44,11 @@ final class PhoneBridge {
     private var sweep: Timer?
     private lazy var stateSend = Debounce(0.3, .atMost) { [weak self] in self?.stateTick() }
     /// Settings drops the QR code when it expires.
-    private lazy var codeExpiry = Debounce(PairingCodes.lifetime + 1) { [weak self] in self?.onStatus?() }
+    private lazy var codeExpiry = Debounce(PairingCodes.lifetime + 1) { [weak self] in self?.syncConnection() }
     /// Settings shows the status: redraw it.
     var onStatus: (() -> Void)?
+    /// A phone paired (the harness removes it again to check the connection closes).
+    var onPaired: ((String) -> Void)?
     /// A phone closed a session: the Mac's window lets go of its terminal, as its own Close does.
     var onClosed: ((SessionID) -> Void)?
     static let releaseAfter: TimeInterval = 120
@@ -59,18 +62,34 @@ final class PhoneBridge {
 
     // MARK: settings
 
-    /// Connects to the relay (`phone-relay`, else Maxwell's own), or stays off with `phone-relay = off`.
-    /// A quiet run connects only to a relay its config names: test runs don't make rooms on the real one.
+    /// Picks the relay (`phone-relay`, else Maxwell's own; none with `phone-relay = off` or empty).
+    /// A quiet run uses only a relay its config names: test runs don't make rooms on the real one.
     func reload(_ config: Config) {
         let url = quietTest && config.phoneRelay == nil ? nil : config.phoneRelayURL
-        guard url != relayURL || (url != nil && relay == nil) else { return }
-        relay?.stop()
-        relay = nil
-        relayURL = url
-        for id in links.keys { wentOffline(id) }
-        defer { onStatus?() }
-        guard let url, let room = roomURL(url) else {
-            if let url { mark("phone relay: \(url) is not a ws:// or wss:// address") }
+        if url != relayURL {
+            relayURL = url
+            disconnect()
+        }
+        syncConnection()
+    }
+
+    /// Connected only while a phone is paired or a pairing code shows: Maxwell is public and the relay
+    /// is shared, so an install with no phone keeps no socket open.
+    private var wantsRelay: Bool {
+        relayURL != nil && (!registry.phones.isEmpty || codes.current(now: Date()) != nil)
+    }
+
+    func syncConnection() {
+        if wantsRelay, relay == nil { connect() } else if !wantsRelay, relay != nil {
+            disconnect()
+            mark("phone relay: disconnected, no phone paired and no code showing")
+        }
+        onStatus?()
+    }
+
+    private func connect() {
+        guard let url = relayURL, let room = roomURL(url) else {
+            if let relayURL { mark("phone relay: \(relayURL) is not a ws:// or wss:// address") }
             return
         }
         let r = RelayConnection(url: room)
@@ -90,6 +109,12 @@ final class PhoneBridge {
         }
     }
 
+    private func disconnect() {
+        relay?.stop()
+        relay = nil
+        for id in links.keys { wentOffline(id) }
+    }
+
     private func roomURL(_ relay: String) -> URL? {
         guard var c = URLComponents(string: relay), ["ws", "wss"].contains(c.scheme ?? "") else { return nil }
         c.path = (c.path.hasSuffix("/") ? String(c.path.dropLast()) : c.path) + "/room/\(registry.macId)"
@@ -100,7 +125,7 @@ final class PhoneBridge {
     var status: PhoneStatus {
         var s = PhoneStatus(relayURL: relayURL)
         switch relay?.status {
-        case nil: s.relay = .notSet
+        case nil: s.relay = relayURL == nil ? .off : .idle
         case .connecting?: s.relay = .connecting
         case .connected?: s.relay = .connected
         case .cantReach(let why)?: s.relay = .cantReach(why)
@@ -118,9 +143,10 @@ final class PhoneBridge {
     /// Settings › Phone › Pair a phone: a new code, valid for 10 minutes or one pairing.
     @discardableResult
     func makePairingCode() -> String? {
+        guard relayURL != nil else { return nil }
         _ = codes.make(now: Date())
         codeExpiry.poke()
-        onStatus?()
+        syncConnection()
         return status.pairLink
     }
 
@@ -128,17 +154,18 @@ final class PhoneBridge {
     func cancelPairingCodes() {
         codes.cancelAll()
         codeExpiry.cancel()
-        onStatus?()
+        syncConnection()
     }
 
     /// Settings › Phone › Remove: the phone hears `bye`, then its key is gone and its boxes no longer open.
     func remove(_ phone: String) {
-        send(["t": "bye", "reason": "removed"], to: phone)
+        let told = send(["t": "bye", "reason": "removed"], to: phone) { [weak self] in self?.syncConnection() }
         unfocus(phone)
         links[phone] = nil
         registry.remove(phone)
         mark("phone: removed a paired phone")
-        onStatus?()
+        // The last phone gone: the connection closes once `bye` is out.
+        if !told { syncConnection() } else { onStatus?() }
     }
 
     /// Maxwell quits: terminals hang up (the sessions keep running) and the room goes quiet.
@@ -179,6 +206,7 @@ final class PhoneBridge {
         mark("phone: paired \(name)")
         send(["t": "paired", "mac": ["name": Self.macName]], to: id)
         onStatus?()
+        onPaired?(id)
     }
 
     private func message(_ m: [String: Any], from id: String) {
@@ -240,9 +268,9 @@ final class PhoneBridge {
 
     /// Seals a message for one phone and hands it to the relay; false when it couldn't go.
     @discardableResult
-    func send(_ m: [String: Any], to id: String) -> Bool {
+    func send(_ m: [String: Any], to id: String, then sent: (() -> Void)? = nil) -> Bool {
         guard let phone = registry.phones[id], let relay, let box = PhoneBox.seal(m, key: phone.keys.macToPhone) else { return false }
-        return relay.send(["to": id, "box": box])
+        return relay.send(["to": id, "box": box], then: sent)
     }
 
     /// Phones that said hello and are online now.

@@ -21,10 +21,12 @@ extension SettingsView {
     private func relayRow(_ p: PhoneStatus) {
         let address = p.relayURL.flatMap { URL(string: $0) }.map { u in (u.host ?? "") + (u.port.map { ":\($0)" } ?? "") } ?? p.relayURL ?? ""
         switch p.relay {
-        case .notSet:
+        case .off:
             let open = MXButton("Open config", small: true) { [weak self] in self?.onRunAction?("open-config") }
             form.row("Off", [(open, open.intrinsicContentSize.width)],
-                     note: "Your config turns the phone off (phone-relay = off). Remove that line to turn it on.", icon: StatusSquare(.off))
+                     note: "Your config turns the phone off with its phone-relay line. Remove that line to turn it on.", icon: StatusSquare(.off))
+        case .idle:
+            form.row("Not connected", [], note: "Maxwell connects only while a phone is paired or a code is showing.", icon: StatusSquare(.off))
         case .connecting:
             form.row("Connecting…", [], note: address, icon: StatusSquare(.off))
         case .connected:
@@ -35,9 +37,8 @@ extension SettingsView {
     }
 
     private func pairRows(_ p: PhoneStatus) {
-        guard p.relay == .connected else {
-            let why = p.relay == .notSet ? "Pairing works once the phone is on." : "Pairing works once the relay answers."
-            return form.row("", [], note: why, enabled: false)
+        guard p.relay != .off else {
+            return form.row("", [], note: "Pairing works once the phone is on.", enabled: false)
         }
         guard let link = p.pairLink, let expires = p.pairExpires else {
             let show = MXButton("Show code", primary: true, small: true) { [weak self] in self?.onPairPhone?() }

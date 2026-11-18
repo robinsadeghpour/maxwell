@@ -68,7 +68,7 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
     }
 
     @discardableResult
-    func send(_ frame: [String: Any]) -> Bool {
+    func send(_ frame: [String: Any], then sent: (() -> Void)? = nil) -> Bool {
         guard status == .connected, let task, let data = try? JSONSerialization.data(withJSONObject: frame, options: [.withoutEscapingSlashes]),
               let text = String(data: data, encoding: .utf8) else { return false }
         guard text.utf8.count <= 1_000_000 else {
@@ -76,8 +76,10 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
             return false
         }
         task.send(.string(text)) { [weak self] e in
-            guard let e else { return }
-            DispatchQueue.main.async { self?.dropped("send failed: \(e.localizedDescription)") }
+            DispatchQueue.main.async {
+                if let e { self?.dropped("send failed: \(e.localizedDescription)") }
+                sent?()
+            }
         }
         return true
     }

@@ -15,7 +15,8 @@ iPhone app  ⇄  relay (Cloudflare Worker, one room per Mac)  ⇄  bridge in Max
 - The relay keeps no messages. When either side is offline, the other side's commands wait in its own outbox and are sent again on reconnect. State is a snapshot, so a missed update never matters: the next one replaces it.
 - Pushes go from the Mac straight to Expo's push service with the phone's push token. They do not pass through the relay.
 
-Maxwell's relay is `wss://maxwell-relay.maxwell-relay.workers.dev`, the default for `phone-relay` in the config (`docs/config.md`); a config can name another, or turn the phone off with `phone-relay = off`. Settings › Phone shows the pairing code, the paired phones and a Remove button for each.
+Maxwell's relay is `wss://maxwell-relay.maxwell-relay.workers.dev`, the default for `phone-relay` in the config (`docs/config.md`); a config can name another, or turn the phone off with an empty `phone-relay =` (or `off`).
+- The Mac connects to the relay only while at least one phone is paired or a pairing code is showing. With no phone it keeps no socket open, and removing the last phone closes the connection once its `bye` is sent. Settings › Phone shows the pairing code, the paired phones and a Remove button for each.
 
 ## Pairing
 
