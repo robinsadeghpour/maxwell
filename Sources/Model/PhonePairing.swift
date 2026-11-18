@@ -39,6 +39,14 @@ struct PairingCodes {
     func current(now: Date) -> Code? { codes.filter { $0.expires > now }.max { $0.expires < $1.expires } }
 }
 
+/// Whether the bridge keeps a connection to the relay. Maxwell is public and the relay is shared, so
+/// only while it has a reason: a paired phone, or a pairing code on screen. Never with the phone off.
+enum PhoneConnection {
+    static func wanted(relay: String?, pairedPhones: Int, codeShowing: Bool) -> Bool {
+        relay != nil && (pairedPhones > 0 || codeShowing)
+    }
+}
+
 /// The last 500 command ids and their answers: a resent command gets the first answer again and
 /// does nothing twice (docs/phone.md, `cmd`).
 struct CommandLog {

@@ -76,7 +76,7 @@ final class PhoneBridge {
     /// Connected only while a phone is paired or a pairing code shows: Maxwell is public and the relay
     /// is shared, so an install with no phone keeps no socket open.
     private var wantsRelay: Bool {
-        relayURL != nil && (!registry.phones.isEmpty || codes.current(now: Date()) != nil)
+        PhoneConnection.wanted(relay: relayURL, pairedPhones: registry.phones.count, codeShowing: codes.current(now: Date()) != nil)
     }
 
     func syncConnection() {

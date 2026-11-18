@@ -45,6 +45,13 @@ extension SettingsView {
             return form.row("", [(show, show.intrinsicContentSize.width)],
                             note: "Scan the code with Maxwell on your iPhone. Each code works once, for 10 minutes.")
         }
+        // The code works only once this Mac is in its room on the relay.
+        guard p.relay == .connected else {
+            if case .cantReach = p.relay {
+                return form.row("", [], note: "The code shows once the relay answers.", enabled: false)
+            }
+            return form.row("Connecting…", [], note: "The code shows in a moment.")
+        }
         form.wide("Scan with Maxwell on your iPhone", note: "Works once, until \(Format.clock.string(from: expires)).", QRCodeView(text: link), height: 160)
         let copy = MXButton("Copy link", small: true) {
             NSPasteboard.general.clearContents()

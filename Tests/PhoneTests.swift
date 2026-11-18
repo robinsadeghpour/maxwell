@@ -55,6 +55,12 @@ private func phonePairingTests(_ dir: URL) {
     check(late.spend(box: box, from: "UGhvbmVJZEZpeHR1cmUx", now: now.addingTimeInterval(601)) == nil && late.current(now: now.addingTimeInterval(601)) == nil,
           "a code expires after 10 minutes")
 
+    let relay = Config.defaultPhoneRelay
+    check(!PhoneConnection.wanted(relay: relay, pairedPhones: 0, codeShowing: false), "no phone and no code: no connection")
+    check(PhoneConnection.wanted(relay: relay, pairedPhones: 0, codeShowing: true), "a code on screen connects")
+    check(PhoneConnection.wanted(relay: relay, pairedPhones: 1, codeShowing: false), "a paired phone keeps it connected")
+    check(!PhoneConnection.wanted(relay: nil, pairedPhones: 2, codeShowing: true), "phone-relay = off never connects")
+
     var log = CommandLog()
     if case .new = log.seen("c1") {} else { check(false, "an unknown command id is new") }
     log.start("c1")
