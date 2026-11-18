@@ -70,7 +70,9 @@ final class AgentsProbe {
             // them, and the groups fall back to weaker evidence: say so instead of guessing quietly.
             if let pid = e.pid {
                 let file = account.configDir.appendingPathComponent("sessions/\(pid).json")
-                if let data = FileManager.default.contents(atPath: file.path), let own = EventParser.parsePidFile(data, sessionId: e.sessionId) {
+                let data = FileManager.default.contents(atPath: file.path)
+                snap.entries[i].nameIsYours = data.flatMap { EventParser.parseNameIsYours($0, sessionId: e.sessionId) }
+                if let data, let own = EventParser.parsePidFile(data, sessionId: e.sessionId) {
                     snap.entries[i].status = own.status
                     snap.entries[i].statusAt = own.at
                 } else {

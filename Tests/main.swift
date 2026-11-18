@@ -402,7 +402,30 @@ do {
     var bare = reduce(AppState(accounts: accounts), prompt("fix the login bug please", title: nil, at: 0))
     bare.sessions["n1"]!.name = "joschua-login"
     check(bare.sessions["n1"]!.title == "joschua-login", "auto-titles off: the session's name, not the prompt's words")
+    // A /rename in Claude Code shows at the next listing, before any prompt hands over a new session_title.
+    func listed(_ st: AppState, name: String, yours: Bool?, at dt: Double) -> AppState {
+        var e = AgentsSnapshot.Entry(sessionId: "n1", name: name, cwd: "/tmp/x", startedAt: t0, reach: .elsewhere(pid: 7), status: .idle)
+        e.nameIsYours = yours
+        return reduce(st, .agents(AgentsSnapshot(at: t0.addingTimeInterval(dt), accountId: st.sessions["n1"]!.accountId, entries: [e])))
+    }
+    var renamed = reduce(AppState(accounts: accounts), prompt("fix the login bug please", title: "Login Bug Fix", at: 0))
+    renamed = listed(renamed, name: "tmp-4c", yours: false, at: 1)
+    check(renamed.sessions["n1"]!.title == "Login Bug Fix", "auto-titles off: a generated name does not replace Claude's title")
+    renamed = listed(renamed, name: "billing", yours: true, at: 2)
+    check(renamed.sessions["n1"]!.title == "billing", "auto-titles off: /rename in Claude Code shows at once, over the old session_title")
+    renamed = listed(renamed, name: "billing", yours: nil, at: 3)
+    check(renamed.sessions["n1"]!.title == "billing", "a listing that could not read the pid file keeps what was known")
     Titles.auto = true
+    check(renamed.sessions["n1"]!.title == "billing" && !renamed.sessions["n1"]!.weakTitle, "auto-titles on: a one-word /rename is yours, not a weak slug to retitle")
+    renamed = reduce(renamed, .titled("n1", SessionTitle(text: "Model Title", byYou: false, replaced: "Login Bug Fix")))
+    check(renamed.sessions["n1"]!.title == "billing", "a model's title never replaces a /rename")
+    renamed = reduce(renamed, .titled("n1", SessionTitle(text: "Invoices", byYou: true, replaced: nil)))
+    check(renamed.sessions["n1"]!.title == "Invoices", "Rename… in Maxwell still wins over /rename")
+    let userPid = #"{"sessionId":"s","status":"idle","name":"billing","nameSource":"user"}"#, peerPid = #"{"sessionId":"s","name":"tmp-4c","nameSource":"peer"}"#
+    check(EventParser.parseNameIsYours(Data(userPid.utf8), sessionId: "s") == true, "pid file: nameSource user is a name you gave")
+    check(EventParser.parseNameIsYours(Data(peerPid.utf8), sessionId: "s") == false, "pid file: a launcher's name is not yours")
+    check(EventParser.parseNameIsYours(Data(userPid.utf8), sessionId: "other") == nil && EventParser.parseNameIsYours(Data(#"{"sessionId":"s"}"#.utf8), sessionId: "s") == nil,
+          "pid file: another session's, or no nameSource, says nothing")
     st = reduce(AppState(accounts: accounts), prompt("fix ACM-56 in the billing page", title: "Billing Page ACM-56", at: 0))
     check(!st.sessions["n1"]!.weakTitle, "Claude's own title is kept")
     check(Titles.isSlug("mx-slack") && !Titles.isSlug("Find File Tree Panel"), "a lowercase slug is a generated name")

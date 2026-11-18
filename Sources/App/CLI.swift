@@ -30,7 +30,7 @@ func runCLI(_ args: [String]) -> Int32? {
             for a in config.accounts { if let snap = AgentsProbe.snapshot(a) { state = reduce(state, .agents(snap)) } }
             let now = Date()
             for s in state.sessions.values.filter({ $0.phase != .ended && now.timeIntervalSince($0.lastEventAt) < 7 * 86400 }).sorted(by: { $0.lastEventAt > $1.lastEventAt }) {
-                let source = s.named.flatMap { s.title == $0.text ? ($0.byYou ? "yours" : "model") : nil } ?? (s.hookTitle != nil ? "claude" : s.tabTitle != nil ? "tab" : s.firstPrompt != nil ? "prompt" : "name")
+                let source = s.named.flatMap { s.title == $0.text ? ($0.byYou ? "yours" : "model") : nil } ?? (s.nameIsYours ? "rename" : s.hookTitle != nil ? "claude" : s.tabTitle != nil ? "tab" : s.firstPrompt != nil ? "prompt" : "name")
                 var line = "  \(s.id.prefix(8))  \(s.weakTitle ? "weak " : "     ") \(source.padding(toLength: 6, withPad: " ", startingAt: 0))  \(s.title)"
                 if args.contains("--suggest"), s.weakTitle, s.firstPrompt != nil, let a = state.most5hRoom(now: now) {
                     line += "  →  " + (Titler.title(s, account: a).title ?? "(no answer)")
