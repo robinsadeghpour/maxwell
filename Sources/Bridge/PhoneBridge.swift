@@ -50,10 +50,15 @@ final class PhoneBridge {
     private var emails: [AccountID: String] = [:]
     private var sweep: Timer?
     private lazy var stateSend = Debounce(0.3, .atMost) { [weak self] in self?.stateTick() }
+    private lazy var seenSave = Debounce(1, .atMost) { [weak self] in self?.registry.persistIfChanged() }
     /// Settings drops the QR code when it expires.
     private lazy var codeExpiry = Debounce(PairingCodes.lifetime + 1) { [weak self] in self?.sendControl(); self?.syncConnection() }
     /// Settings shows the status: redraw it.
     var onStatus: (() -> Void)?
+    /// A phone that opened a pairing code and waits for you to allow it.
+    private var pendingPair: (id: String, key: Data, message: [String: Any])?
+    /// Asks you on the Mac whether to pair the phone; `decide(true)` pairs it. Unset: never paired.
+    var onConfirmPair: ((_ name: String, _ decide: @escaping (Bool) -> Void) -> Void)?
     /// A phone paired (the harness removes it again to check the connection closes).
     var onPaired: ((String) -> Void)?
     /// A phone closed a session: the Mac's window lets go of its terminal, as its own Close does.
@@ -83,7 +88,7 @@ final class PhoneBridge {
     /// Connected only while a phone is paired or a pairing code shows: Maxwell is public and the relay
     /// is shared, so an install with no phone keeps no socket open.
     private var wantsRelay: Bool {
-        PhoneConnection.wanted(relay: relayURL, pairedPhones: registry.phones.count, codeShowing: codes.current(now: Date()) != nil)
+        PhoneConnection.wanted(relay: relayURL, pairedPhones: registry.phones.count, codeShowing: pairingOpen)
     }
 
     func syncConnection() {
@@ -168,11 +173,14 @@ final class PhoneBridge {
         sendControl { [weak self] in self?.syncConnection() }
     }
 
+    /// A code shows, or a phone that used one waits for your answer (it must stay in the room till then).
+    private var pairingOpen: Bool { codes.current(now: Date()) != nil || pendingPair != nil }
+
     /// Tells the relay which phones may join this Mac's room (hashes of their ids) and whether a code is
     /// showing (then any phone may, to pair). The relay closes a removed phone's connection at once.
     /// `then` runs once it is out, or at once when the relay isn't connected.
     func sendControl(then done: (() -> Void)? = nil) {
-        let frame = PhoneConnection.control(phones: Array(registry.phones.keys), pairing: codes.current(now: Date()) != nil)
+        let frame = PhoneConnection.control(phones: Array(registry.phones.keys), pairing: pairingOpen)
         guard relay?.send(frame, then: done) == true else { done?(); return }
     }
 
@@ -191,6 +199,7 @@ final class PhoneBridge {
 
     /// Maxwell quits: terminals hang up (the sessions keep running) and the room goes quiet.
     func shutdown() {
+        registry.persistIfChanged()
         for sid in terminals.sessions { terminals.release(sid) }
         for t in transcripts.values { t.tail.stop() }
         relay?.stop()
@@ -212,27 +221,53 @@ final class PhoneBridge {
         }
         guard let from = f["from"] as? String, let box = f["box"] as? String else { return }
         if let phone = registry.phones[from], let m = PhoneBox.open(box, key: phone.keys.phoneToMac) {
-            switch ReplayGuard.check(m, lastSeen: phone.seenN ?? 0, now: Date()) {
+            switch ReplayGuard.check(m, lastSeen: phone.seenN ?? 0, now: Date(), notBefore: Date(timeIntervalSince1970: launchStart - 30)) {
             case .fresh: break
             case .replayed(let n, let last): return mark("phone: dropped a replayed message from \(phone.name) (n \(n), last \(last))")
             case .stale(let s): return mark("phone: dropped a message from \(phone.name) sent \(s) s away from now")
+            case .beforeLaunch: return mark("phone: dropped a message from \(phone.name) sent before Maxwell started")
             case .missing: return mark("phone: dropped a message from \(phone.name) without n and ts")
             }
             registry.seen(from, n: (m["n"] as? NSNumber)?.intValue ?? 0, now: m["t"] as? String == "cmd")
+            // Keys typed in the Terminal tab are written down within a second, not each one.
+            if m["t"] as? String == "input" { seenSave.poke() }
             links[from, default: PhoneLink()].online = true
             registry.touch(from, at: Date())
             return message(m, from: from)
         }
         // An unknown phone, or a known one pairing again with a new code.
-        guard let (key, m) = codes.spend(box: box, from: from, now: Date()) else { return }
+        guard pendingPair == nil, let (key, m) = codes.spend(box: box, from: from, now: Date()) else { return }
         guard ReplayGuard.checkPair(m, now: Date()) == .fresh else { return mark("phone: dropped a pair message without a recent ts") }
-        paired(from, key: key, m)
+        // One phone per showing: every other code goes, and you allow this one on the Mac first.
+        codes.cancelAll()
+        codeExpiry.cancel()
+        let name = (m["name"] as? String).map { String($0.prefix(60)) } ?? "iPhone"
+        pendingPair = (from, key, m)
+        onStatus?()
+        guard let ask = onConfirmPair else { return decidePair(from, allow: false) }
+        ask(name) { [weak self] allow in self?.decidePair(from, allow: allow) }
+    }
+
+    /// Your answer to "Pair <name>?". Deny: the phone hears `pairDenied` and nothing is kept.
+    private func decidePair(_ id: String, allow: Bool) {
+        guard let p = pendingPair, p.id == id else { return }
+        if allow { return paired(id, key: p.key, p.message) }
+        let box = PhoneBox.seal(["t": "pairDenied", "n": 1, "ts": Int(Date().timeIntervalSince1970 * 1000)], key: PhoneKeys(pairingKey: p.key).macToPhone)
+        mark("phone: pairing denied")
+        let finish = { [weak self] in
+            self?.pendingPair = nil
+            self?.sendControl { self?.syncConnection() }
+        }
+        guard let box, relay?.send(["to": id, "box": box], then: finish) == true else { return finish() }
     }
 
     private func paired(_ id: String, key: Data, _ m: [String: Any]) {
         let name = (m["name"] as? String).map { String($0.prefix(60)) } ?? "iPhone"
-        // Pairing (again) starts both counters over.
-        registry.save(PairedPhone(id: id, name: name, key: key, push: nil, app: m["app"] as? String, pairedAt: Date(), lastSeen: Date()))
+        // Pairing (again) starts both counters over; what was shared with it stays on record.
+        var phone = PairedPhone(id: id, name: name, key: key, push: nil, app: m["app"] as? String, pairedAt: Date(), lastSeen: Date())
+        phone.artifactShares = registry.phones[id]?.artifactShares
+        registry.save(phone)
+        pendingPair = nil
         links[id] = PhoneLink(online: true)
         mark("phone: paired \(name)")
         send(["t": "paired", "mac": ["name": Self.macName]], to: id)
@@ -296,6 +331,11 @@ final class PhoneBridge {
         let now = Date()
         for (id, l) in links where !l.online && l.focus != nil {
             if let since = l.offlineSince, now.timeIntervalSince(since) > Self.releaseAfter { unfocus(id) }
+        }
+        // An attach a command opened on a session no phone has open goes once unused for a minute,
+        // so Claude Code can stop the session when it idles, as it would without the phone.
+        for sid in terminals.sessions where !links.values.contains(where: { $0.focus == sid }) {
+            if terminals.idle(sid, now: now) > 60 { terminals.release(sid) }
         }
     }
 

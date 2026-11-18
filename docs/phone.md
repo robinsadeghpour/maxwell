@@ -29,7 +29,8 @@ Maxwell's relay is `wss://maxwell-relay.maxwell-relay.workers.dev`, the default 
    - `mac`: this Mac's room id, 16 random bytes, base64url without padding. Made once and kept in the Keychain.
    - `k`: 32 random bytes, base64url. A new one for each code shown. The code expires after 10 minutes or the first pairing, whichever is first.
 2. The phone scans it, makes its own phone id (16 random bytes, base64url), joins the room as that phone and sends `pair` (below), encrypted with `k` like every later message: `phoneToMac` from `k` (see Encryption). The `phone` field must be the id it joined with.
-3. The bridge tries `k` of every unexpired code. When one opens the message, `k` becomes that phone's key, stored in the Keychain under the phone id, and the code is spent. It answers `paired`, sealed with `macToPhone` from `k`. A known phone may pair again with a new code; the new key replaces the old.
+3. The bridge tries `k` of every unexpired code. When one opens the message, every code is cancelled (one phone per showing) and the Mac asks you: "Pair “<name>”? It will be able to read and control your sessions." Allow: `k` becomes that phone's key, stored in the Keychain under the phone id, and the Mac answers `paired`, sealed with `macToPhone` from `k`. Deny: it answers `{"t": "pairDenied"}` (same key) and keeps nothing. A known phone may pair again with a new code; the new key replaces the old, and the record of claude.ai sign-ins it was given stays.
+   The link is shown only as a QR code on the Mac, never copied: a copied link would reach every device on the same Apple account through Universal Clipboard.
 4. From then on the phone sends `hello` on every connect.
 
 Removing a phone deletes its key. Its messages no longer open, and the bridge ignores them.
@@ -52,7 +53,7 @@ Every message inside a box, in both directions, carries two more fields:
 - `n`: the sender's counter for this pairing, starting at 1 and strictly rising with each message it sends.
 - `ts`: the sender's clock when it sent it, milliseconds since 1970.
 
-The receiver drops a message whose `n` is not above the last one it took from that sender, or whose `ts` is more than 5 minutes from its own clock. That stops a box recorded on the way from being played again, even though it still opens. `pair` has no `n` (there is no counter yet) and needs `ts` within 10 minutes. Pairing, also pairing again, starts both counters over: the Mac's first message to a phone is `paired` with `n: 1`. The Mac keeps the highest `n` it has taken from each phone, and its own, in the Keychain with the phone's key; it logs each message it drops and why (replayed, stale, missing).
+The receiver drops a message whose `n` is not above the last one it took from that sender, or whose `ts` is more than 5 minutes from its own clock. The Mac also drops any message (but `pair`) sent before it started, less 30 seconds: the last `n` it took may not have been written down when it last quit. It writes that `n` down at once for `cmd`, within a second for `input`, every 30 seconds otherwise, and when it quits. That stops a box recorded on the way from being played again, even though it still opens. `pair` has no `n` (there is no counter yet) and needs `ts` within 10 minutes. Pairing, also pairing again, starts both counters over: the Mac's first message to a phone is `paired` with `n: 1`. The Mac keeps the highest `n` it has taken from each phone, and its own, in the Keychain with the phone's key; it logs each message it drops and why (replayed, stale, missing).
 
 ## The relay
 
@@ -62,7 +63,7 @@ The receiver drops a message whose `n` is not above the last one it took from th
 - **Frames** are JSON text:
   - Mac → relay: `{"to": "<phone id>", "box": "…"}`. Only the phone with that id gets it.
   - Phone → relay: `{"box": "…"}`. The relay delivers `{"from": "<phone id>", "box": "…"}` to the Mac; it sets `from` from the connection, so a phone can't pretend to be another.
-  - Mac → relay, control: `{"allow": ["<hex SHA-256 of a phone id>", …], "pairing": true|false}`. Which phones may join the room, and whether any phone may (a pairing code is showing; the relay keeps it open for at most 15 minutes). A phone not allowed gets 403 and, when the Mac takes it off the list, its connection is closed. The Mac sends it when it connects, when a code is made, used, cancelled or expires, and after the `bye` to a removed phone. The relay sees only the hashes.
+  - Mac → relay, control (plain, not boxed): `{"allow": ["<lowercase hex SHA-256 of the phone id, UTF-8>", …], "pairing": true|false}`; the relay takes either field alone too. At most 64 ids, 8 phones in a room, 300 messages per connection per 10 seconds. Which phones may join the room, and whether any phone may (a pairing code is showing; the relay keeps it open for at most 15 minutes). A phone not allowed gets 403 and, when the Mac takes it off the list, its connection is closed. The Mac sends it right after it connects, before anything else, when a code is made, used, cancelled or expires (pairing stays open while you decide whether to allow a phone), after pairing, and after the `bye` to a removed phone. The relay sees only the hashes.
   - Relay → anyone: `{"presence": {"mac": true|false}}` to phones, `{"presence": {"phone": "<id>", "online": true|false}}` to the Mac, sent on connect and on every change.
 - **Keepalive**: either side sends the exact text `{"ping":1}` every 25 s; the relay answers `{"pong":1}` (Cloudflare answers it without waking the room). No pong for 10 s means the connection is dead: close it and reconnect.
 - **Reconnect**: after 0.5 s, then doubling to 15 s at most, with ±20% jitter. On the phone, also at once when the app comes to the foreground or the network changes.
@@ -87,8 +88,8 @@ Every message is `{"t": "<type>", …}` inside a box.
 
 | `op` | Fields | What the Mac does |
 |---|---|---|
-| `send` | `session`, `text` | Types `text` into the session and presses Return. A session that stopped (idle stop, limit) is attached first, which resumes it. |
-| `permission` | `session`, `decision`: `allow`, `allowAlways` or `deny` | Answers the permission prompt the session shows. Fails with `no-prompt` when it isn't showing one any more. |
+| `send` | `session`, `text` | Types `text` into the session and presses Return. A session that stopped (idle stop, limit) is attached first, which resumes it. Fails with `prompt-showing` while a permission prompt is up (text would answer it). |
+| `permission` | `session`, `decision`: `allow`, `allowAlways` or `deny`, `detail`: the `ask.detail` the phone showed | Answers the permission prompt the session shows, only if it still asks about `detail`, checked again right before the key goes in. Fails with `no-prompt` otherwise, so a newer prompt is never answered by mistake. |
 | `interrupt` | `session` | Presses Esc: Claude stops the current turn. |
 | `start` | `cwd`, `prompt`, `account` (id or null for the one with most room), `name` (or null) | Starts a background session, like ⌘N. `result`: `{"session": id}`. |
 | `close` | `session` | Same as Close Session on the Mac: closes at once when safe, otherwise fails with `not-safe` and `detail` listing what is still open. |
@@ -97,7 +98,7 @@ Every message is `{"t": "<type>", …}` inside a box.
 | `move` | `session`, `account` (id or null for most room) | Moves a limited session to another account with a handover prompt. `result`: `{"session": new id}`. |
 | `resumeAtReset` | `session` | Sends "continue" when the account's limit resets. `result`: `{"at": ISO}`, when it will. |
 | `rename` | `session`, `title` | Renames, like the Mac's Rename. |
-| `artifactLogin` | `account` | `result`: `{"cookies": [cookie…]}`, the account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone. Fails with `signed-out` when that account isn't signed in on the Mac, and with `not-ready` unless the phone is online and has sent `hello` on this connection. The Mac writes down each handover (account, phone, time; never the cookies) and Settings › Phone shows it under the phone. |
+| `artifactLogin` | `account` | `result`: `{"cookies": [cookie…]}`, the account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone: only those for `claude.ai` and its subdomains, and only `sessionKey`, `lastActiveOrg` and Cloudflare's `cf_clearance`, `__cf_bm` and `_cfuvid` (not yet checked against a signed-in artifact page). Removing the phone on the Mac offers to sign that account out, which ends the session the phone holds too. Fails with `signed-out` when that account isn't signed in on the Mac, and with `not-ready` unless the phone is online and has sent `hello` on this connection. The Mac writes down each handover (account, phone, time; never the cookies) and Settings › Phone shows it under the phone. |
 
 The Mac remembers the last 500 command ids. A repeated id gets the first answer again and does nothing twice, so the phone can safely resend anything not yet acknowledged. A resend while the first is still running gets no second answer; the first answer comes when it is done.
 
@@ -107,7 +108,8 @@ Error codes in `ack.error.code`:
 |---|---|
 | `unknown-session` | The Mac doesn't know that session any more. |
 | `read-only` | `send`, `permission`, `interrupt`, `close`, `forceClose` or `resumeAtReset` on a session with `reach` `terminal` or `cloud`. |
-| `no-prompt` | `permission` while the session shows no permission prompt. |
+| `no-prompt` | `permission` while the session shows no permission prompt, or one about something else than `detail`. |
+| `prompt-showing` | `send` while the session shows a permission prompt: answer it with `permission` first. |
 | `not-safe` | `close` on a session that isn't safe now; `detail` is the checks still open, `[{"name", "ok": false, "detail"}]`. |
 | `untrusted` | `start` in a folder Claude Code hasn't been allowed to work in yet. Start one there on the Mac once. |
 | `no-room` | `start` or `move` with no account that has room. |
@@ -122,6 +124,7 @@ Error codes in `ack.error.code`:
 | `t` | Fields |
 |---|---|
 | `paired` | `mac` (`{"name": "Robin's MacBook Pro"}`) |
+| `pairDenied` | none: you said no on the Mac. Forget the key; scan a new code to try again. |
 | `state` | `rev` (rises by one each time), `mac`, `accounts`, `sessions`, `projects`, `artifacts`, `at` (ISO time). The whole picture, sent after `hello` and after every change (at most every 300 ms). |
 | `transcript` | `session`, `reset` (true: replace what you have), `items` (append in order) |
 | `term` | `session`, `data` (base64 of the terminal's output bytes, at most 256 KB a message; a long burst comes as several) |

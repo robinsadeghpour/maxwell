@@ -1282,7 +1282,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
         v.onPluginRestart = { [weak self] in self?.store.plugins.restart($0) }
         v.onPairPhone = { [weak self] in self?.phone?.makePairingCode() }
-        v.onRemovePhone = { [weak self] in self?.phone?.remove($0) }
+        v.onRemovePhone = { [weak self] id, signOut in self?.removePhone(id, signOut: signOut) }
         v.onCancelPairing = { [weak self] in self?.phone?.cancelPairingCodes() }
         settings.show(settingsModel, section: section)
     }

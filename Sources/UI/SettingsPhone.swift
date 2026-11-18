@@ -56,27 +56,33 @@ extension SettingsView {
             return form.row("Connecting…", [], note: "The code shows in a moment.")
         }
         form.wide("Scan with Maxwell on your iPhone", note: "Works once, until \(Format.clock.string(from: expires)).", QRCodeView(text: link), height: 160)
-        let copy = MXButton("Copy link", small: true) {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(link, forType: .string)
-        }
-        copy.tip = Tip("For a phone that can't scan: open the link on it")
         let again = MXButton("New code", small: true) { [weak self] in self?.onPairPhone?() }
         let done = MXButton("Done", small: true) { [weak self] in self?.onCancelPairing?() }
         done.tip = Tip("Hides the code; it stops working")
-        form.row("", [(copy, copy.intrinsicContentSize.width), (again, again.intrinsicContentSize.width), (done, done.intrinsicContentSize.width)],
-                 note: "Anyone with this link can pair. Send it only to yourself.")
+        form.row("", [(again, again.intrinsicContentSize.width), (done, done.intrinsicContentSize.width)],
+                 note: "You allow the phone on this Mac before it can see anything.")
     }
 
+    /// A phone that was given a claude.ai sign-in keeps it after Remove; signing that account out here
+    /// ends the session on claude.ai's side, so the copy on the phone stops working too.
     private func confirmRemove(_ ph: PhoneStatus.Phone) {
-        guard let w = window else { onRemovePhone?(ph.id); return }
+        guard let w = window else { onRemovePhone?(ph.id, false); return }
         let a = NSAlert()
+        let accounts = ph.shares.keys.sorted()
         a.messageText = "Remove \(ph.name)?"
-        a.informativeText = "It can't reach this Mac until you pair it again."
+        a.informativeText = accounts.isEmpty ? "It can't reach this Mac until you pair it again."
+            : "It can't reach this Mac until you pair it again. It keeps the claude.ai sign-in it was given for \(accounts.joined(separator: " and ")) until that account signs out."
+        if !accounts.isEmpty {
+            a.showsSuppressionButton = true
+            a.suppressionButton?.title = "Also sign out of claude.ai for \(accounts.joined(separator: " and "))"
+            a.suppressionButton?.state = .on
+        }
         a.addButton(withTitle: "Remove")
         a.addButton(withTitle: "Cancel")
         a.buttons.first?.hasDestructiveAction = true
-        a.beginSheetModal(for: w) { [weak self] r in if r == .alertFirstButtonReturn { self?.onRemovePhone?(ph.id) } }
+        a.beginSheetModal(for: w) { [weak self, weak a] r in
+            if r == .alertFirstButtonReturn { self?.onRemovePhone?(ph.id, a?.suppressionButton?.state == .on && !accounts.isEmpty) }
+        }
     }
 }
 

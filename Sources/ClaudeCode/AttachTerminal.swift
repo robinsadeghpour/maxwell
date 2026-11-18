@@ -13,6 +13,9 @@ final class AttachTerminal {
     private(set) var pid: pid_t = 0
     private var master: Int32 = -1
     private var reader: DispatchSourceRead?
+    private var writer: DispatchSourceWrite?
+    private var pending = Data()
+    static let maxPending = 1 << 20
     private var exitWatch: DispatchSourceProcess?
     var onOutput: ((Data) -> Void)?
     var onExit: (() -> Void)?
@@ -97,14 +100,35 @@ final class AttachTerminal {
 
     var isRunning: Bool { master >= 0 }
 
-    func write(_ data: Data) {
-        guard master >= 0 else { return }
-        data.withUnsafeBytes { p in
-            var off = 0
-            while off < p.count {
-                let n = Darwin.write(master, p.baseAddress! + off, p.count - off)
-                if n > 0 { off += n } else if errno == EAGAIN { usleep(2000) } else { break }
-            }
+    /// Queues bytes for Claude and writes what the terminal takes now; the rest goes out as it drains,
+    /// never by waiting on the main thread. False (and nothing queued) past 1 MB waiting.
+    @discardableResult
+    func write(_ data: Data) -> Bool {
+        guard master >= 0 else { return false }
+        guard pending.count + data.count <= Self.maxPending else {
+            mark("phone: \(data.count) bytes for the terminal dropped, \(pending.count) still waiting")
+            return false
+        }
+        pending.append(data)
+        flush()
+        return true
+    }
+
+    private func flush() {
+        while !pending.isEmpty, master >= 0 {
+            let n = pending.withUnsafeBytes { p in p.baseAddress.map { Darwin.write(master, $0, p.count) } ?? 0 }
+            if n > 0 { pending.removeFirst(n); continue }
+            if n < 0, errno == EAGAIN || errno == EINTR { break }
+            pending.removeAll()
+        }
+        if pending.isEmpty || master < 0 {
+            writer?.cancel()
+            writer = nil
+        } else if writer == nil {
+            let w = DispatchSource.makeWriteSource(fileDescriptor: master, queue: .main)
+            w.setEventHandler { [weak self] in self?.flush() }
+            w.resume()
+            writer = w
         }
     }
 
@@ -127,6 +151,8 @@ final class AttachTerminal {
 
     private func teardown() {
         reader?.cancel(); reader = nil
+        writer?.cancel(); writer = nil
+        pending.removeAll()
         exitWatch?.cancel(); exitWatch = nil
         if master >= 0 { Darwin.close(master); master = -1 }
     }

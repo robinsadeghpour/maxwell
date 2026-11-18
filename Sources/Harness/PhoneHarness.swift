@@ -1,7 +1,8 @@
 import Foundation
 
 /// Scripted phone checks (docs/phone.md, "Checking the bridge"), quiet runs only:
-/// - MAXWELL_PHONE_PAIR_FILE: Maxwell makes a pairing code at launch and writes its link there, for a test phone.
+/// - MAXWELL_PHONE_PAIR_FILE: Maxwell makes a pairing code at launch and writes its link there, for a test phone,
+///   and answers "Pair …?" itself: allow, or deny with MAXWELL_PHONE_PAIR_ANSWER=deny.
 /// - MAXWELL_PHONE_REMOVE_AFTER=<seconds>: a phone that pairs is removed that long after, as Settings' Remove
 ///   does, to check that the last phone's removal says `bye` and closes the relay connection.
 enum PhoneHarness {
@@ -14,6 +15,9 @@ enum PhoneHarness {
             }
         }
         guard let path = env["MAXWELL_PHONE_PAIR_FILE"], !path.isEmpty else { return }
+        // A scripted phone is allowed (or, with MAXWELL_PHONE_PAIR_ANSWER=deny, denied) without the alert.
+        let allow = env["MAXWELL_PHONE_PAIR_ANSWER"] != "deny"
+        bridge.onConfirmPair = { name, decide in mark("phone harness: \(allow ? "allowed" : "denied") \(name)"); decide(allow) }
         guard let link = bridge.makePairingCode() else { return mark("phone harness: no pair link (is phone-relay set?)") }
         do {
             try link.write(toFile: path, atomically: true, encoding: .utf8)

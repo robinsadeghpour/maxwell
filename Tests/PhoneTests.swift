@@ -63,6 +63,13 @@ private func phonePairingTests(_ dir: URL) {
     check(ReplayGuard.check(["t": "cmd", "n": 9, "ts": ms(now.addingTimeInterval(-301))], lastSeen: 7, now: now) == .stale(seconds: 301), "a stale ts is dropped")
     check(ReplayGuard.check(["t": "cmd", "n": 9, "ts": ms(now.addingTimeInterval(400))], lastSeen: 7, now: now) == .stale(seconds: 400), "a ts from the future too")
     check(ReplayGuard.check(["t": "cmd"], lastSeen: 0, now: now) == .missing, "a message without n and ts is dropped")
+    check(ReplayGuard.check(["t": "input", "n": 9, "ts": ms(now.addingTimeInterval(-60))], lastSeen: 7, now: now, notBefore: now.addingTimeInterval(-30)) == .beforeLaunch,
+          "a box from before this launch is dropped, whatever its n")
+    check(ReplayGuard.check(["t": "input", "n": 9, "ts": ms(now.addingTimeInterval(-10))], lastSeen: 7, now: now, notBefore: now.addingTimeInterval(-30)) == .fresh,
+          "one from after launch is judged by n")
+    var log2 = CommandLog()
+    log2.finish(CommandLog.key(phone: "a", id: "c1"), ack: ["ok": true])
+    if case .new = log2.seen(CommandLog.key(phone: "b", id: "c1")) {} else { check(false, "another phone's command id is its own") }
     check(ReplayGuard.checkPair(["t": "pair", "ts": ms(now.addingTimeInterval(-540))], now: now) == .fresh
             && ReplayGuard.checkPair(["t": "pair", "ts": ms(now.addingTimeInterval(-660))], now: now) == .stale(seconds: 660), "pair: no n, ts within 10 minutes")
 

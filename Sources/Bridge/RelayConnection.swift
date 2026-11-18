@@ -40,7 +40,11 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
 
     func start() {
         stopped = false
-        session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
+        // Frames are read and parsed on this queue; only the parsed frame comes to the main thread.
+        let q = OperationQueue()
+        q.maxConcurrentOperationCount = 1
+        q.qualityOfService = .userInitiated
+        session = URLSession(configuration: .default, delegate: self, delegateQueue: q)
         var first = true
         path.pathUpdateHandler = { [weak self] p in
             // The first update is the network as it is now, not a change.
@@ -109,27 +113,33 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
         open()
     }
 
+    private enum Received { case pong, frame([String: Any]), other }
+
     private func receive(_ t: URLSessionWebSocketTask, _ g: Int) {
         t.receive { [weak self] r in
+            // Off the main thread: parse here, hand over only the result.
+            var got = Received.other
+            if case .success(.string(let text)) = r {
+                if text == Self.pongText { got = .pong } else if let f = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] { got = .frame(f) }
+            }
             DispatchQueue.main.async {
                 guard let self, g == self.generation else { return }
-                switch r {
-                case .failure(let e): self.dropped(self.describe(e, t))
-                case .success(let m):
-                    if case .string(let text) = m { self.got(text) }
-                    self.receive(t, g)
+                if case .failure(let e) = r { return self.dropped(self.describe(e, t)) }
+                switch got {
+                case .pong: self.pongWait.cancel()
+                case .frame(let f): self.onFrame?(f)
+                case .other: break
                 }
+                self.receive(t, g)
             }
         }
     }
 
-    private func got(_ text: String) {
-        if text == Self.pongText { return pongWait.cancel() }
-        guard let frame = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] else { return }
-        onFrame?(frame)
+    func urlSession(_ s: URLSession, webSocketTask t: URLSessionWebSocketTask, didOpenWithProtocol p: String?) {
+        DispatchQueue.main.async { self.opened(t) }
     }
 
-    func urlSession(_ s: URLSession, webSocketTask t: URLSessionWebSocketTask, didOpenWithProtocol p: String?) {
+    private func opened(_ t: URLSessionWebSocketTask) {
         guard t === task else { return }
         backoff = 0.5
         status = .connected
@@ -142,6 +152,10 @@ final class RelayConnection: NSObject, URLSessionWebSocketDelegate {
     }
 
     func urlSession(_ s: URLSession, webSocketTask t: URLSessionWebSocketTask, didCloseWith code: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        DispatchQueue.main.async { self.closed(t, code, reason) }
+    }
+
+    private func closed(_ t: URLSessionWebSocketTask, _ code: URLSessionWebSocketTask.CloseCode, _ reason: Data?) {
         guard t === task else { return }
         dropped("closed by the relay (\(code.rawValue)\(reason.flatMap { String(data: $0, encoding: .utf8) }.map { ": \($0)" } ?? ""))")
     }

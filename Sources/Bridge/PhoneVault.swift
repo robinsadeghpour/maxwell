@@ -24,13 +24,20 @@ final class KeychainVault: PhoneVault {
         if status != errSecSuccess && status != errSecItemNotFound { mark("phone: keychain read \(item) failed (\(status))") }
         return out as? Data
     }
+    /// Updates in place, else adds: never delete-then-add, which would lose the item if the add failed.
     func write(_ item: String, _ value: Data?) {
-        SecItemDelete(query(item) as CFDictionary)
-        guard let value else { return }
-        var q = query(item)
-        q[kSecValueData as String] = value
-        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let status = SecItemAdd(q as CFDictionary, nil)
+        guard let value else {
+            let status = SecItemDelete(query(item) as CFDictionary)
+            if status != errSecSuccess && status != errSecItemNotFound { mark("phone: keychain delete \(item) failed (\(status))") }
+            return
+        }
+        var status = SecItemUpdate(query(item) as CFDictionary, [kSecValueData as String: value] as CFDictionary)
+        if status == errSecItemNotFound {
+            var q = query(item)
+            q[kSecValueData as String] = value
+            q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            status = SecItemAdd(q as CFDictionary, nil)
+        }
         if status != errSecSuccess { mark("phone: keychain write \(item) failed (\(status))") }
     }
 }

@@ -9,6 +9,7 @@ final class PhoneTerminals {
     private final class Entry {
         let term: AttachTerminal
         var ready = false
+        var used = Date()
         var sawOutput = false
         var jobs: [Job] = []
         var busy = false
@@ -20,7 +21,9 @@ final class PhoneTerminals {
         var echoMax: Debounce?
         init(_ t: AttachTerminal) { term = t }
     }
-    enum Job { case type(String, done: (String?) -> Void), keys(Data, done: (String?) -> Void) }
+    enum Job { case type(String, done: (String?) -> Void), keys(Data, still: () -> Bool, done: (String?) -> Void) }
+    /// What `done` gets when a key's precondition no longer held at the moment it would be written.
+    static let gone = "the prompt went away"
 
     private var open: [SessionID: Entry] = [:]
     var onOutput: ((SessionID, Data) -> Void)?
@@ -51,7 +54,11 @@ final class PhoneTerminals {
 
     func resize(_ sid: SessionID, cols: Int, rows: Int) { open[sid]?.term.resize(cols: cols, rows: rows) }
 
-    func write(_ bytes: Data, to sid: SessionID) { open[sid]?.term.write(bytes) }
+    @discardableResult
+    func write(_ bytes: Data, to sid: SessionID) -> Bool {
+        open[sid]?.used = Date()
+        return open[sid]?.term.write(bytes) ?? false
+    }
 
     func release(_ sid: SessionID) {
         guard let e = open.removeValue(forKey: sid) else { return }
@@ -66,15 +73,19 @@ final class PhoneTerminals {
     }
 
     /// Presses keys as they are (`1`, `2`, Esc), once Claude is ready.
-    func press(_ keys: Data, into sid: SessionID, done: @escaping (String?) -> Void) {
-        enqueue(.keys(keys, done: done), sid)
+    /// `still` is asked right before the keys are written (a permission prompt still shows); false: `gone`.
+    func press(_ keys: Data, into sid: SessionID, still: @escaping () -> Bool = { true }, done: @escaping (String?) -> Void) {
+        enqueue(.keys(keys, still: still, done: done), sid)
     }
+
+    /// When the phone last typed into it; a terminal no phone has open is let go a while after.
+    func idle(_ sid: SessionID, now: Date) -> TimeInterval { open[sid].map { now.timeIntervalSince($0.used) } ?? 0 }
 
     // MARK: running jobs
 
     private func enqueue(_ job: Job, _ sid: SessionID) {
         guard let e = open[sid] else {
-            switch job { case .type(_, let done), .keys(_, let done): done("no terminal for this session") }
+            switch job { case .type(_, let done), .keys(_, _, let done): done("no terminal for this session") }
             return
         }
         e.jobs.append(job)
@@ -85,15 +96,16 @@ final class PhoneTerminals {
         guard let e = open[sid], e.ready, !e.busy, !e.jobs.isEmpty else { return }
         let job = e.jobs.removeFirst()
         switch job {
-        case .keys(let bytes, let done):
-            e.term.write(bytes)
-            done(nil)
+        case .keys(let bytes, let still, let done):
+            e.used = Date()
+            if !still() { done(Self.gone) } else { done(e.term.write(bytes) ? nil : "the terminal isn't taking input") }
             next(sid)
         case .type(let text, _):
             e.busy = true
             // Several lines go in as one bracketed paste, so a newline doesn't send the first line alone.
             let body = text.contains("\n") ? "\u{1b}[200~\(text)\u{1b}[201~" : text
             e.echoing = true
+            e.used = Date()
             e.term.write(Data(body.utf8))
             e.echoMax?.poke()
             e.jobs.insert(job, at: 0)
@@ -147,7 +159,7 @@ final class PhoneTerminals {
 
     private func fail(_ e: Entry, _ why: String) {
         for job in e.jobs {
-            switch job { case .type(_, let done), .keys(_, let done): done(why) }
+            switch job { case .type(_, let done), .keys(_, _, let done): done(why) }
         }
         e.jobs = []
         [e.readyQuiet, e.readyMax, e.echoQuiet, e.echoMax].forEach { $0?.cancel() }

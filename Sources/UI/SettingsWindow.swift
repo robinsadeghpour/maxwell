@@ -517,7 +517,8 @@ final class SettingsView: MXView {
     var onPluginSecret: ((PluginID, String, String?) -> Void)?
     var onPluginRestart: ((PluginID) -> Void)?
     var onPairPhone: (() -> Void)?
-    var onRemovePhone: ((String) -> Void)?
+    /// A phone to remove, and whether to sign out the accounts whose claude.ai sign-in it was given.
+    var onRemovePhone: ((String, Bool) -> Void)?
     var onCancelPairing: (() -> Void)?
     private let sections = SectionList(frame: .zero)
     private let scroll = NSScrollView()

@@ -101,7 +101,8 @@ enum ClaudeCLI {
         var args = ["--bg", "--name", name]
         if skipPermissions { args.append("--dangerously-skip-permissions") }
         if let model { args += ["--model", model] }
-        if let prompt { args.append(prompt) }
+        // After `--`, so a prompt that starts with "-" is the prompt, never an option (Claude Code honours it, 2.1.327).
+        if let prompt { args += ["--", prompt] }
         let r = run(claudePath, args, cwd: cwd, env: env(for: account), timeout: 30)
         let text = r.out + r.err
         if text.contains("Workspace not trusted") { return .failure(.untrusted(cwd)) }

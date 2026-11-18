@@ -18,17 +18,18 @@ extension PhoneBridge {
     /// Runs a `cmd` once per id; a resend gets the first answer, and one still running gets none yet.
     func command(_ m: [String: Any], from phone: String) {
         guard let id = m["id"] as? String, !id.isEmpty, id.count <= 128 else { return }
-        switch commands.seen(id) {
+        let key = CommandLog.key(phone: phone, id: id)
+        switch commands.seen(key) {
         case .answered(let ack): send(ack, to: phone); return
         case .running: return
         case .new: break
         }
-        commands.start(id)
+        commands.start(key)
         let op = m["op"] as? String ?? ""
         run(op, m, from: phone) { [weak self] reply in
             guard let self else { return }
             let ack = reply.ack(id)
-            self.commands.finish(id, ack: ack)
+            self.commands.finish(key, ack: ack)
             self.send(ack, to: phone)
             if case .failed(let code, let message, _) = reply { mark("phone: \(op) failed: \(code) (\(message))") } else { mark("phone: \(op) done") }
         }
@@ -45,8 +46,12 @@ extension PhoneBridge {
         switch op {
         case "send":
             guard let text = m["text"] as? String, !text.isEmpty else { return reply(.failed(code: "bad-request", message: "Nothing to send.")) }
+            // Text typed into a permission prompt would answer it: the phone answers with `permission`.
+            if permissionAsked(s) != nil {
+                return reply(.failed(code: "prompt-showing", message: "“\(s.title)” is asking for permission. Answer that first."))
+            }
             typeInto(s, text: text, reply)
-        case "permission": permission(s, m["decision"] as? String, reply)
+        case "permission": permission(s, m["decision"] as? String, detail: m["detail"] as? String, reply)
         case "interrupt": press(s, "\u{1b}", reply)
         case "close": close(s, reply)
         case "forceClose": forceClose(s, reply)
@@ -89,19 +94,32 @@ extension PhoneBridge {
         terminals.type(text, into: s.id) { why in reply(why.map { .failed(code: "failed", message: "Not sent: \($0).") } ?? .ok([:])) }
     }
 
-    private func press(_ s: Session, _ keys: String, _ reply: @escaping (PhoneReply) -> Void) {
+    private func press(_ s: Session, _ keys: String, still: @escaping () -> Bool = { true }, _ reply: @escaping (PhoneReply) -> Void) {
         if let no = attach(s) { return reply(no) }
-        terminals.press(Data(keys.utf8), into: s.id) { why in reply(why.map { .failed(code: "failed", message: "Not sent: \($0).") } ?? .ok([:])) }
+        terminals.press(Data(keys.utf8), into: s.id, still: still) { why in
+            if why == PhoneTerminals.gone { return reply(.failed(code: "no-prompt", message: "“\(s.title)” isn't asking that any more.")) }
+            reply(why.map { .failed(code: "failed", message: "Not sent: \($0).") } ?? .ok([:]))
+        }
     }
 
-    /// The prompt's own keys: 1 allows, 2 allows from now on, Esc denies. Only while it still shows.
-    private func permission(_ s: Session, _ decision: String?, _ reply: @escaping (PhoneReply) -> Void) {
+    /// The command a session's permission prompt asks about now, if one shows.
+    private func permissionAsked(_ s: Session) -> String? {
+        guard let now = store.state.sessions[s.id], store.state.group(now, now: Date(), rules: store.config.rules) == .needsYou,
+              case .permission(_, let detail)? = PhoneAsk.of(now) else { return nil }
+        return detail
+    }
+
+    /// The prompt's own keys: 1 allows, 2 allows from now on, Esc denies. Only for the prompt the phone
+    /// showed (`detail`), checked again right before the key goes in: a newer prompt is never answered.
+    private func permission(_ s: Session, _ decision: String?, detail: String?, _ reply: @escaping (PhoneReply) -> Void) {
         let keys: [String: String] = ["allow": "1", "allowAlways": "2", "deny": "\u{1b}"]
-        guard let decision, let key = keys[decision] else { return reply(.failed(code: "bad-request", message: "Unknown decision.")) }
-        guard store.state.group(s, now: Date(), rules: store.config.rules) == .needsYou, case .permission? = PhoneAsk.of(s) else {
-            return reply(.failed(code: "no-prompt", message: "“\(s.title)” isn't asking for permission any more."))
+        guard let decision, let key = keys[decision], let detail else {
+            return reply(.failed(code: "bad-request", message: "A permission answer needs its decision and the prompt's detail."))
         }
-        press(s, key, reply)
+        guard permissionAsked(s) == detail else {
+            return reply(.failed(code: "no-prompt", message: "“\(s.title)” isn't asking that any more."))
+        }
+        press(s, key, still: { [weak self] in self?.permissionAsked(s) == detail }, reply)
     }
 
     // MARK: sessions
@@ -113,7 +131,8 @@ extension PhoneBridge {
         }
         let account = (m["account"] as? String).flatMap(st.account) ?? st.roomiest(now: Date()) ?? st.accounts.first
         guard let account else { return reply(.failed(code: "no-room", message: "No account has room right now.")) }
-        let base = (m["name"] as? String).map { String($0.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "-" }.prefix(36)) }
+        // Letters, digits and inner dashes only: a name can't turn into an option.
+        let base = (m["name"] as? String).map { String($0.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "-" }.drop { $0 == "-" }.prefix(36)) }
             .flatMap { $0.isEmpty ? nil : $0 } ?? (cwd as NSString).lastPathComponent.lowercased().replacingOccurrences(of: " ", with: "-")
         let name = "\(base)-\(String(format: "%02x", Int.random(in: 0..<256)))"
         let prompt = (m["prompt"] as? String).flatMap { $0.isEmpty ? nil : $0 }
@@ -201,6 +220,11 @@ extension PhoneBridge {
     // MARK: artifacts
 
     /// The account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone.
+    /// The cookies an artifact page needs signed in: the session, the organisation it opens in, and
+    /// Cloudflare's bot-check cookies so the page isn't challenged. Nothing else claude.ai stores
+    /// (analytics, preferences, device ids) leaves the Mac. Not yet checked against a signed-in page.
+    static let artifactCookies: Set<String> = ["sessionKey", "lastActiveOrg", "cf_clearance", "__cf_bm", "_cfuvid"]
+
     /// Only to a phone that is online and said hello on this connection; each handover is written down
     /// (account, phone, time; never the cookies) and shows in Settings › Phone.
     private func artifactLogin(_ id: String?, for phone: String, _ reply: @escaping (PhoneReply) -> Void) {
@@ -210,7 +234,10 @@ extension PhoneBridge {
         }
         ClaudeWeb.shared.store(a).httpCookieStore.getAllCookies { [weak self] cookies in
             let now = Date()
-            let mine = cookies.filter { $0.domain.hasSuffix("claude.ai") && ($0.expiresDate.map { $0 > now } ?? true) }
+            let mine = cookies.filter { c in
+                (c.domain == "claude.ai" || c.domain == ".claude.ai" || c.domain.hasSuffix(".claude.ai"))
+                    && Self.artifactCookies.contains(c.name) && (c.expiresDate.map { $0 > now } ?? true)
+            }
             guard mine.contains(where: { $0.name == "sessionKey" }) else {
                 return reply(.failed(code: "signed-out", message: "\(a.name) isn't signed in to claude.ai on your Mac. Sign in under Settings › Accounts."))
             }

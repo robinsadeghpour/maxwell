@@ -126,11 +126,13 @@ extension PhoneBridge {
 
     /// `input`: keys typed in the Terminal tab, as they are.
     func input(_ bytes: Data, session sid: SessionID, from phone: String) {
+        // Only into the session this phone has open, so the attach goes when the focus does.
+        guard links[phone]?.focus == sid else { return mark("phone: input for a session the phone hasn't open, dropped") }
         guard let s = store.state.sessions[sid], case .background(let short) = s.reach, let a = store.state.account(s.accountId) else { return }
         let size = links[phone]?.terminal ?? (100, 30)
         if let why = terminals.ensure(sid, shortId: short, account: a, cwd: s.cwd, cols: size.cols, rows: size.rows) {
             return mark("phone: terminal for \(s.title): \(why)")
         }
-        terminals.write(bytes, to: sid)
+        if !terminals.write(bytes, to: sid) { mark("phone: Terminal tab input dropped, the terminal isn't taking it") }
     }
 }

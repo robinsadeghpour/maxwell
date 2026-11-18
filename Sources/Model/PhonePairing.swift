@@ -44,14 +44,17 @@ struct PairingCodes {
 /// that only rises per sender, and `ts`, the sender's clock in ms. A box seen before, or from too long ago,
 /// is dropped even though it opens.
 enum ReplayGuard {
-    enum Verdict: Equatable { case fresh, replayed(n: Int, last: Int), stale(seconds: Int), missing }
+    enum Verdict: Equatable { case fresh, replayed(n: Int, last: Int), stale(seconds: Int), beforeLaunch, missing }
     static let window: TimeInterval = 300
     static let pairWindow: TimeInterval = 600
 
-    /// A message after pairing: `n` above the last one seen from this phone, `ts` within 5 minutes.
-    static func check(_ m: [String: Any], lastSeen: Int, now: Date) -> Verdict {
+    /// A message after pairing: `n` above the last one seen from this phone, `ts` within 5 minutes, and
+    /// not from before this run of Maxwell began (`notBefore`, launch minus 30 s): the last `n` seen may not
+    /// have been written down when Maxwell last quit, so a box from before can't be judged by it.
+    static func check(_ m: [String: Any], lastSeen: Int, now: Date, notBefore: Date? = nil) -> Verdict {
         guard let n = (m["n"] as? NSNumber)?.intValue, let ts = (m["ts"] as? NSNumber)?.doubleValue else { return .missing }
         if let late = late(ts, now: now, window: window) { return .stale(seconds: late) }
+        if let notBefore, ts / 1000 < notBefore.timeIntervalSince1970 { return .beforeLaunch }
         return n > lastSeen ? .fresh : .replayed(n: n, last: lastSeen)
     }
 
@@ -87,7 +90,8 @@ enum PhoneConnection {
 }
 
 /// The last 500 command ids and their answers: a resent command gets the first answer again and
-/// does nothing twice (docs/phone.md, `cmd`).
+/// does nothing twice (docs/phone.md, `cmd`). Keys are per phone (`key(phone:id:)`), so one phone's ids
+/// never answer for another's.
 struct CommandLog {
     static let size = 500
     private var order: [String] = []
@@ -96,6 +100,8 @@ struct CommandLog {
     private(set) var running: Set<String> = []
 
     enum Seen { case new, running, answered([String: Any]) }
+
+    static func key(phone: String, id: String) -> String { "\(phone)\u{0}\(id)" }
 
     func seen(_ id: String) -> Seen {
         if let a = answers[id] { return .answered(a) }
