@@ -227,7 +227,7 @@ The relay takes it only for a phone on the room's allow-list.
 - **Mac gone**: a Mac that doesn't reconnect within a minute (or stops answering pings for 90 s) shows offline, stale at once.
 - **End** (`event: end`, `dismissal-date` now): after 30 minutes with nothing needing you and nothing working, after the Mac has been gone 30 minutes, when the phone turns it off, or when the Mac removes the phone (the relay then forgets its tokens). A token Apple calls gone (410, or 400 `BadDeviceToken`) is dropped.
 
-The relay keeps, per phone, its two tokens and the last frame and push, in the room's storage, and nothing once the phone is removed. Without the key (`APNS_DRY_RUN=1`, as `npm run dev` runs it) it sends nothing and lists what it would have sent at `/room/<mac id>/live-log`.
+The relay keeps, per phone, its two tokens and the last frame and push, in the room's storage. A phone with no token left (turned off, unpaired) or removed from the allow-list leaves nothing there. Without the key (`APNS_DRY_RUN=1`, as `npm run dev` runs it) it sends nothing and lists what it would have sent at `/room/<mac id>/live-log`.
 
 ## Checking the bridge
 
