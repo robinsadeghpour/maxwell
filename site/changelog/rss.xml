@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Resume works after a worktree is removed</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-19-resume-deleted-folder</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-19-resume-deleted-folder</guid>
+<pubDate>Thu, 19 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Fixed Resume on a stopped session whose folder was deleted, such as a worktree removed after its work merged. Claude Code refuses to wake it there, so Maxwell continues the conversation as a copy in the repository and opens it&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Settings › Phone</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-18-phone-bridge</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-18-phone-bridge</guid>

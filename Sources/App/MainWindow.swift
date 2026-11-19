@@ -621,7 +621,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         // so moving through the list doesn't wake every session it passes.
         let resume = resuming.remove(id) != nil
         if case .background(let short) = s.reach, terminals[id] == nil, s.parkedAt == nil || resume, let a = store.state.account(s.accountId) {
-            attach(s, short: short, account: a)
+            if s.parkedAt != nil || s.phase == .ended, !s.cwd.isEmpty, !FileManager.default.fileExists(atPath: s.cwd) {
+                continueFromGoneFolder(s, account: a)
+            } else {
+                attach(s, short: short, account: a)
+            }
         }
         viewerForced = nil
         render(store.state)
