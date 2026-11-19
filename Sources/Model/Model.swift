@@ -342,6 +342,13 @@ struct AppState: Equatable {
         accounts.filter { $0.limitResetsAt(now: now) == nil }.min { ($0.fiveHour?.usedPercent ?? 50) < ($1.fiveHour?.usedPercent ?? 50) }
     }
 
+    /// When "continue" goes to a limited session: at its reset, else its account's, else now (the
+    /// limit may be over already). Nil when it isn't limited: "continue" would start a turn nobody asked for.
+    func resumeAt(_ s: Session, now: Date) -> Date? {
+        guard case .limited(let reset) = s.phase else { return nil }
+        return reset ?? account(s.accountId)?.limitResetsAt(now: now) ?? now
+    }
+
     /// The account with the most room left now, preferring ones with fresh samples.
     func roomiest(now: Date, excluding: AccountID? = nil) -> Account? {
         accounts.filter { $0.id != excluding && $0.limitResetsAt(now: now) == nil }

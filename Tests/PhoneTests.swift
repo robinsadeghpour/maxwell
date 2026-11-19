@@ -9,6 +9,31 @@ func phoneTests() {
     phonePairingTests(dir)
     chatItemTests(dir)
     phoneStateTests()
+    phoneCommandTests()
+}
+
+/// What the bridge decides before it types or schedules: an emptied prompt first (Claude Code puts an
+/// interrupted prompt back, and the phone's text was added to it), and "continue" only for a limited session.
+private func phoneCommandTests() {
+    check(PromptInput.clear.count < PromptInput.pasteBytes && PromptInput.clear.allSatisfy { $0 == 0x15 },
+          "the prompt is emptied with Ctrl-U, in one write short enough not to read as a paste")
+    check(PromptInput.clear.count >= 20, "enough presses to empty a prompt of ten lines")
+    check(PromptInput.text("go on") == Data("go on".utf8), "one line goes in as typed")
+    check(PromptInput.text("a\nb") == Data("\u{1b}[200~a\nb\u{1b}[201~".utf8), "several lines go in as one bracketed paste")
+
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    var st = AppState(accounts: accounts)
+    st.accounts[1].fiveHour = UsageWindow(usedPercent: 100, resetsAt: now.addingTimeInterval(1800))
+    func session(_ phase: Phase, on account: AccountID = "work") -> Session {
+        var s = Session(id: "s", name: "s", accountId: account, cwd: "/Users/me/projects/lumen", at: now, origin: .maxwell, reach: .background(shortId: "ab12"))
+        s.phase = phase
+        return s
+    }
+    check(st.resumeAt(session(.limited(now.addingTimeInterval(600))), now: now) == now.addingTimeInterval(600), "a limited session resumes at its reset")
+    check(st.resumeAt(session(.limited(nil), on: "work2"), now: now) == now.addingTimeInterval(1800), "without its own, at its account's reset")
+    check(st.resumeAt(session(.limited(nil)), now: now) == now, "with neither known, now: the limit may be over already")
+    check(st.resumeAt(session(.yourTurn), now: now) == nil && st.resumeAt(session(.working), now: now) == nil,
+          "a session that isn't limited gets no \"continue\"")
 }
 
 private func phoneBoxTests(_ dir: URL) {

@@ -3,8 +3,9 @@ import Foundation
 /// The phone's way into background sessions: one windowless `claude attach` per session it types
 /// into or watches, alongside any terminal the Mac has open on it. Main thread only.
 ///
-/// Typing waits for Claude to draw before writing, and for the text to echo before pressing Return:
-/// text and Return in one write reach Claude as a paste and are not sent.
+/// Typing waits for Claude to draw before writing, empties the prompt (`PromptInput.clear`), then waits
+/// for the text to echo before pressing Return: text and Return in one write reach Claude as a paste
+/// and are not sent.
 final class PhoneTerminals {
     private final class Entry {
         let term: AttachTerminal
@@ -13,6 +14,10 @@ final class PhoneTerminals {
         var sawOutput = false
         var jobs: [Job] = []
         var busy = false
+        /// Waiting for the prompt to empty: the next output pokes `clearQuiet`. An empty prompt draws nothing.
+        var clearing = false
+        var clearQuiet: Debounce?
+        var clearMax: Debounce?
         /// Waiting for the typed text to echo: the next output pokes `echoQuiet`.
         var echoing = false
         var readyQuiet: Debounce?
@@ -44,6 +49,8 @@ final class PhoneTerminals {
         e.readyQuiet = Debounce(0.6) { [weak self] in self?.becameReady(sid) }
         e.readyMax = Debounce(Self.attachTimeout) { [weak self] in self?.attachTimedOut(sid) }
         e.readyMax?.poke()
+        e.clearQuiet = Debounce(0.15) { [weak self] in self?.cleared(sid) }
+        e.clearMax = Debounce(0.5) { [weak self] in self?.cleared(sid) }
         e.echoQuiet = Debounce(0.15) { [weak self] in self?.echoed(sid) }
         e.echoMax = Debounce(1.5) { [weak self] in self?.echoed(sid) }
         t.onOutput = { [weak self] data in self?.output(sid, data) }
@@ -100,16 +107,25 @@ final class PhoneTerminals {
             e.used = Date()
             if !still() { done(Self.gone) } else { done(e.term.write(bytes) ? nil : "the terminal isn't taking input") }
             next(sid)
-        case .type(let text, _):
+        case .type:
             e.busy = true
-            // Several lines go in as one bracketed paste, so a newline doesn't send the first line alone.
-            let body = text.contains("\n") ? "\u{1b}[200~\(text)\u{1b}[201~" : text
-            e.echoing = true
+            e.clearing = true
             e.used = Date()
-            e.term.write(Data(body.utf8))
-            e.echoMax?.poke()
+            e.term.write(PromptInput.clear)
+            e.clearMax?.poke()
             e.jobs.insert(job, at: 0)
         }
+    }
+
+    /// The prompt is empty (it redrew and went quiet, or drew nothing): write the text.
+    private func cleared(_ sid: SessionID) {
+        guard let e = open[sid], e.clearing, case .type(let text, _)? = e.jobs.first else { return }
+        e.clearing = false
+        e.clearQuiet?.cancel()
+        e.clearMax?.cancel()
+        e.echoing = true
+        e.term.write(PromptInput.text(text))
+        e.echoMax?.poke()
     }
 
     /// The typed text has drawn (or 1.5 s passed): press Return and finish the job.
@@ -133,6 +149,7 @@ final class PhoneTerminals {
             }
             e.readyQuiet?.poke()
         }
+        if e.clearing { e.clearQuiet?.poke() }
         if e.echoing { e.echoQuiet?.poke() }
         onOutput?(sid, data)
     }
@@ -162,6 +179,6 @@ final class PhoneTerminals {
             switch job { case .type(_, let done), .keys(_, _, let done): done(why) }
         }
         e.jobs = []
-        [e.readyQuiet, e.readyMax, e.echoQuiet, e.echoMax].forEach { $0?.cancel() }
+        [e.readyQuiet, e.readyMax, e.clearQuiet, e.clearMax, e.echoQuiet, e.echoMax].forEach { $0?.cancel() }
     }
 }
