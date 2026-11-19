@@ -7,12 +7,13 @@ export default [
   {
     slug: "2026-11-19-phone-commands",
     date: "2026-11-19",
-    versions: "0.1.65",
+    versions: "0.1.65 – 0.1.66",
     title: "Messages from the phone after Stop",
     figure: "",
     body: "",
     fixes: [
       "A message sent from the phone right after stopping a turn now goes in on its own. Before, Claude Code had put the stopped prompt back and the message was added to it",
+      "A plugin that crashes now always shows why: its last error line no longer goes missing when the Mac is busy",
       "Continue at reset from the phone now only applies to a limited session, and waits for the account's reset when the session's own isn't known. Before, it typed “continue” into any session a few seconds later",
     ],
   },
