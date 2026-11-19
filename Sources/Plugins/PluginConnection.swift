@@ -8,6 +8,8 @@ final class PluginConnection {
     let manifest: PluginManifest
     private let process = Process()
     private let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
+    /// Serial queue that stderr reads and the exit handler share; see `start`.
+    private let stderrTurns = DispatchQueue(label: "maxwell.plugin.stderr")
     private var buffer = Data()
     private var nextId = 1
     private var pending: [Int: (Result<Any, RPCError>) -> Void] = [:]
@@ -63,14 +65,26 @@ final class PluginConnection {
             if d.isEmpty { h.readabilityHandler = nil; return }
             DispatchQueue.main.async { self?.received(d) }
         }
-        stderr.fileHandleForReading.readabilityHandler = { [weak self] h in
-            let d = h.availableData
-            guard !d.isEmpty else { h.readabilityHandler = nil; return }
-            DispatchQueue.main.async { self?.stderrData(d) }
+        // Reading stderr and handling the exit take turns on one queue, so the last lines a plugin
+        // wrote before it died always reach `stderrData` before `finish` reports why it stopped.
+        let errors = stderr.fileHandleForReading, turns = stderrTurns
+        errors.readabilityHandler = { [weak self] h in
+            turns.sync {
+                let d = h.availableData
+                guard !d.isEmpty else { h.readabilityHandler = nil; return }
+                DispatchQueue.main.async { self?.stderrData(d) }
+            }
         }
         process.terminationHandler = { [weak self] p in
             let why = p.terminationReason == .uncaughtSignal ? "killed by signal \(p.terminationStatus)" : "exited with status \(p.terminationStatus)"
-            DispatchQueue.main.async { self?.finish(why) }
+            turns.sync {
+                errors.readabilityHandler = nil
+                let rest = Self.readWaiting(errors)
+                DispatchQueue.main.async {
+                    if !rest.isEmpty { self?.stderrData(rest) }
+                    self?.finish(why)
+                }
+            }
         }
         try process.run()
     }
@@ -165,6 +179,18 @@ final class PluginConnection {
             } else {
                 reply(.success(m["result"] ?? NSNull()))
             }
+        }
+    }
+
+    /// What the pipe holds right now, without waiting for more: a process that exited has written everything.
+    private static func readWaiting(_ h: FileHandle) -> Data {
+        let fd = h.fileDescriptor
+        _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+        var out = Data(), buf = [UInt8](repeating: 0, count: 65_536)
+        while true {
+            let n = read(fd, &buf, buf.count)
+            guard n > 0 else { return out }
+            out.append(buf, count: n)
         }
     }
 
