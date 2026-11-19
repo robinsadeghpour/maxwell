@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-19-resume-deleted-folder",
+    date: "2026-11-19",
+    versions: "0.1.64",
+    title: "Resume works after a worktree is removed",
+    figure: "",
+    body: "",
+    fixes: [
+      "Fixed Resume on a stopped session whose folder was deleted, such as a worktree removed after its work merged. Claude Code refuses to wake it there, so Maxwell continues the conversation as a copy in the repository and opens it",
+    ],
+  },
+  {
     slug: "2026-11-18-phone-bridge",
     date: "2026-11-18",
     versions: "0.1.63",

@@ -352,10 +352,11 @@ final class Store {
 
     /// A conversation `/resume` named from another folder: resumed there as a background session,
     /// under its own id. Claude Code starts a copy when it still sees the old process; then the copy's id.
-    func resume(_ id: SessionID, in cwd: String, account: Account, done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
+    /// A `name` always makes a copy (Claude Code keeps a background session's saved options).
+    func resume(_ id: SessionID, in cwd: String, account: Account, name: String? = nil, done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
         let skip = config.skipPermissions
         DispatchQueue.global().async { [weak self] in
-            let r = ClaudeCLI.resumeBackground(account: account, cwd: cwd, sessionId: id, name: nil, skipPermissions: skip)
+            let r = ClaudeCLI.resumeBackground(account: account, cwd: cwd, sessionId: id, name: name, skipPermissions: skip)
             DispatchQueue.main.async {
                 guard let self else { return }
                 switch r {

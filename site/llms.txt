@@ -38,6 +38,7 @@
 
 ## Changelog
 
+- [Resume works after a worktree is removed](https://www.runmaxwell.com/changelog/2026-11-19-resume-deleted-folder) (2026-11-19, v0.1.64)
 - [Settings › Phone](https://www.runmaxwell.com/changelog/2026-11-18-phone-bridge) (2026-11-18, v0.1.63)
 - [/resume works across folders](https://www.runmaxwell.com/changelog/2026-11-18-resume-from-any-folder) (2026-11-18, v0.1.62)
 - [Cloud sessions](https://www.runmaxwell.com/changelog/2026-11-16-cloud-sessions) (2026-11-16, v0.1.50 – 0.1.61)
