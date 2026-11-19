@@ -1,6 +1,6 @@
 # Privacy: Maxwell for iPhone
 
-Last updated: 19 November 2026
+Last updated: 19 November 2026 (Live Activity)
 
 This covers the iPhone app "Maxwell for Claude Code". It works with Maxwell on your Mac and shows your Claude Code sessions on your phone. The app is made by Robin Sadeghpour. How it talks to the Mac is described in [phone.md](phone.md).
 
@@ -8,7 +8,7 @@ This covers the iPhone app "Maxwell for Claude Code". It works with Maxwell on y
 
 - The developer collects nothing. No account, no analytics, no crash reporting, no ads, no tracking.
 - Your sessions go only between your phone and your own Mac, end-to-end encrypted.
-- The relay that connects them can't read what passes through it.
+- The relay that connects them can't read what passes through it, except what your Live Activity shows, if you keep it on.
 
 ## What goes where
 
@@ -20,7 +20,9 @@ This covers the iPhone app "Maxwell for Claude Code". It works with Maxwell on y
 - your Mac's room id, and SHA-256 hashes of your paired phones' ids, so it knows which phones may join,
 - IP addresses, connection times and message sizes, as any server does.
 
-The relay doesn't store messages. It keeps the room's allow-list of hashes and nothing else.
+The relay doesn't store messages. It keeps the room's allow-list of hashes and, for the Live Activity, the few things below.
+
+**Live Activity.** With the Live Activity on (Settings › Live Activity, on by default), your lock screen and Dynamic Island show how many sessions need you, are your turn, are working and are at a usage limit, your Mac's name and when the next limit resets, with which account. To update it while the app isn't running, Apple needs a push, and the key for those pushes can't sit in Maxwell on your Mac, because Maxwell is open source. So your Mac sends these numbers to the relay unencrypted, and the relay sends them to Apple. If you also turned on "Show details in notifications", the newest session that needs you, its name and what it asks, go the same way. Otherwise no session name or question is sent. The relay keeps only the latest of these per phone, with the two push tokens iOS gives the Live Activity, and no history; when you turn the Live Activity off, unpair or remove the phone, it deletes them. Turn the Live Activity off and your Mac stops sending them, and the relay forgets the tokens.
 
 **Notifications.** When a session needs you, your Mac sends a push through Expo's push service and Apple's notification service. The title and text of a notification pass through them readable, like any notification. By default they say only "Maxwell" and "A session needs you". You can choose in the app to show the session's name and question instead. The push token that lets your Mac reach your phone goes to your Mac, encrypted, and never to the developer.
 
@@ -36,7 +38,7 @@ The relay doesn't store messages. It keeps the room's allow-list of hashes and n
 
 The pairing key and claude.ai cookies are in the Keychain, on this device only. The last state your Mac sent and any replies waiting to be sent are in the app's storage, so the app opens fast and works through a dropped connection.
 
-**Unpair this phone** in the app's settings deletes all of it: the key, the saved state, waiting replies and the cookies. Removing the phone in Maxwell › Settings › Phone on your Mac does the same the next time the phone connects. iOS can keep an app's Keychain items after the app is deleted, so unpair before you delete the app.
+**Unpair this phone** in the app's settings deletes all of it: the key, the saved state, waiting replies and the cookies, and it ends the Live Activity and tells the relay to forget its tokens. Removing the phone in Maxwell › Settings › Phone on your Mac does the same the next time the phone connects. iOS can keep an app's Keychain items after the app is deleted, so unpair before you delete the app.
 
 ## Children
 

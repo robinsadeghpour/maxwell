@@ -217,6 +217,35 @@ private func phoneStateTests() {
     let hidden = PushPlanner.message(to: "ExponentPushToken[x]", session: st.sessions["perm"]!, ask: PhoneAsk.of(st.sessions["perm"]!)!, counts: counts, now: now)
     check(hidden["title"] as? String == "Maxwell" && hidden["body"] as? String == "A session needs you", "pushes say nothing about the session until the phone asks for full detail")
 
+    // The Live Activity's frame: counts, the next reset, and the newest Needs you only with full details.
+    var liveSt = st
+    liveSt.sessions["new"]?.lastEventAt = now
+    let rules = GroupRules(idleAfter: 86400)
+    let full = PhoneLive.payload(liveSt, rules: rules, now: now, macName: "Test Mac", detail: .full)
+    check(full["counts"] as? [String: Int] == ["needsYou": 4, "yourTurn": 0, "working": 1, "limited": 1], "the Live Activity counts four groups")
+    let top = full["top"] as? [String: Any]
+    check(top?["session"] as? String == "new" && top?["title"] as? String == "new" && top?["ask"] as? String == "Deploy to staging now?",
+          "the Live Activity's top session is the newest that needs you, in a push's words")
+    let reset = full["nextReset"] as? [String: Any]
+    check(reset?["at"] as? Int == Int(now.addingTimeInterval(1800).timeIntervalSince1970 * 1000) && reset?["account"] as? String == liveSt.account("work2")?.name,
+          "the next limit reset, with its account")
+    let hiddenLive = PhoneLive.payload(liveSt, rules: rules, now: now, macName: "Test Mac", detail: .hidden)
+    check(hiddenLive["top"] is NSNull, "no session title or ask goes to the relay without full details")
+    check(JSONSerialization.isValidJSONObject(full) && full["at"] as? Int == Int(now.timeIntervalSince1970 * 1000), "the live frame is plain JSON with ms times")
+    let phones = [PhoneLive.Phone(id: "a", live: true, detail: .hidden), PhoneLive.Phone(id: "b", live: false, detail: .full)]
+    let first = PhoneLive.frames(phones, state: liveSt, rules: rules, now: now, macName: "Test Mac", sent: [:])
+    check(first.map(\.phone) == ["a"], "frames only for phones that turned the Live Activity on")
+    let sent = Dictionary(uniqueKeysWithValues: first.map { ($0.phone, $0.key) })
+    check(PhoneLive.frames(phones, state: liveSt, rules: rules, now: now.addingTimeInterval(5), macName: "Test Mac", sent: sent).isEmpty,
+          "the same picture later is nothing new")
+    var busier = liveSt
+    busier.sessions["more"] = session("more", .working)
+    check(PhoneLive.frames(phones, state: busier, rules: rules, now: now, macName: "Test Mac", sent: sent).map(\.phone) == ["a"], "a count change goes out")
+    let off = PhoneLive.frames([PhoneLive.Phone(id: "a", live: false, detail: .hidden)], state: liveSt, rules: rules, now: now, macName: "Test Mac", sent: sent)
+    check(off.count == 1 && off[0].frame["live"] is NSNull && off[0].key == PhoneLive.offKey, "turning it off sends null once")
+    check(PhoneLive.frames([PhoneLive.Phone(id: "a", live: false, detail: .hidden)], state: liveSt, rules: rules, now: now, macName: "Test Mac", sent: ["a": PhoneLive.offKey]).isEmpty,
+          "and only once")
+
     check(Config.parse("").phoneRelayURL == Config.defaultPhoneRelay && Config.parse("").phoneRelay == nil, "Maxwell's relay unless the config names one")
     check(Config.parse("phone-relay = off\n").phoneRelayURL == nil && Config.parse("phone-relay =\n").phoneRelayURL == nil, "phone-relay = off, or empty, turns the phone off")
     check(Config.parse("phone-relay = ws://127.0.0.1:8787\n").phoneRelayURL == "ws://127.0.0.1:8787", "a config's relay wins")
