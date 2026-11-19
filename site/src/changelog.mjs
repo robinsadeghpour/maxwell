@@ -5,6 +5,15 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-19-phone-live-activity",
+    date: "2026-11-19",
+    versions: "0.1.67",
+    title: "Needs you on the iPhone's lock screen",
+    figure: "",
+    body: "Maxwell now keeps the iPhone app's Live Activity current: how many sessions need you, are your turn, are working and are limited, and when the next limit resets, on the lock screen and in the Dynamic Island, even while the app is closed. The counts go to Maxwell's relay unencrypted so it can push them to Apple; session names go too only if you show them in notifications. Turn it off in the phone's settings.",
+    fixes: [],
+  },
+  {
     slug: "2026-11-19-phone-commands",
     date: "2026-11-19",
     versions: "0.1.65 – 0.1.66",

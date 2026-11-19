@@ -26,16 +26,18 @@ struct PushPlanner {
     enum Detail: String, Codable { case full, hidden }
 
     /// One Expo push message for one phone.
-    static func message(to token: String, session s: Session, ask: PhoneAsk, counts: [String: Int], now: Date, detail: Detail = .hidden) -> [String: Any] {
-        var body: String, category: String
+    /// What a session asks, in a push's words, and the push's category.
+    static func line(_ ask: PhoneAsk) -> (category: String, body: String) {
         switch ask {
         case .permission(let tool, let command):
-            category = "permission"
-            body = tool == "Bash" && !command.isEmpty ? "Run \(command)?" : command.isEmpty ? "Allow \(tool.isEmpty ? "a tool" : tool)?" : "Allow \(tool): \(command)?"
+            return ("permission", tool == "Bash" && !command.isEmpty ? "Run \(command)?" : command.isEmpty ? "Allow \(tool.isEmpty ? "a tool" : tool)?" : "Allow \(tool): \(command)?")
         case .question(let text, _):
-            category = "question"
-            body = text
+            return ("question", text)
         }
+    }
+
+    static func message(to token: String, session s: Session, ask: PhoneAsk, counts: [String: Int], now: Date, detail: Detail = .hidden) -> [String: Any] {
+        var (category, body) = line(ask)
         var title = "\(s.title) needs you"
         if detail == .hidden { title = "Maxwell"; body = "A session needs you" }
         return [

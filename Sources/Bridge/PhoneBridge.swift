@@ -51,6 +51,9 @@ final class PhoneBridge {
     private var sweep: Timer?
     private lazy var stateSend = Debounce(0.3, .atMost) { [weak self] in self?.stateTick() }
     private lazy var seenSave = Debounce(1, .atMost) { [weak self] in self?.registry.persistIfChanged() }
+    /// Each Live Activity phone's last frame on the relay, and the at-most-every-2-s send of the next.
+    var liveSent: [String: String] = [:]
+    lazy var liveSend = Debounce(2, .atMost) { [weak self] in self?.sendLive() }
     /// Settings drops the QR code when it expires.
     private lazy var codeExpiry = Debounce(PairingCodes.lifetime + 1) { [weak self] in self?.sendControl(); self?.syncConnection() }
     /// Settings shows the status: redraw it.
@@ -106,7 +109,7 @@ final class PhoneBridge {
         }
         let r = RelayConnection(url: room)
         r.onFrame = { [weak self] in self?.frame($0) }
-        r.onOpen = { [weak self] in self?.sendControl() }
+        r.onOpen = { [weak self] in self?.sendControl(); self?.liveSent = [:]; self?.sendLive() }
         r.onStatus = { [weak self] st in
             if st != .connected, let self { for id in self.links.keys { self.wentOffline(id) } }
             self?.onStatus?()
@@ -193,6 +196,7 @@ final class PhoneBridge {
         unfocus(phone)
         links[phone] = nil
         registry.remove(phone)
+        liveSent[phone] = nil
         mark("phone: removed a paired phone")
         if !told { after() } else { onStatus?() }
     }
@@ -302,6 +306,7 @@ final class PhoneBridge {
         guard var p = registry.phones[id] else { return }
         p.push = (m["push"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         p.pushDetail = m["pushDetail"] as? String == "full" ? .full : .hidden
+        p.live = m["live"] as? Bool == true
         p.app = m["app"] as? String
         p.lastSeen = Date()
         registry.save(p)
@@ -311,6 +316,7 @@ final class PhoneBridge {
         // Folders and emails are looked up when the relay connects; a hello before they land gets state
         // now and again when they do (`refreshLookups` sends state on change).
         if let payload = statePayload() { send(payload, to: id) }
+        liveSend.poke()
         focus(id, session: m["focus"] as? String, terminal: nil)
         onStatus?()
     }
@@ -361,6 +367,7 @@ final class PhoneBridge {
     func stateChanged() {
         guard relay != nil else { return }
         stateSend.poke()
+        liveSend.poke()
         for t in transcripts.values { t.tail.check() }
     }
 

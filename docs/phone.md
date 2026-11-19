@@ -16,6 +16,7 @@ iPhone app  ⇄  relay (Cloudflare Worker, one room per Mac)  ⇄  bridge in Max
 - Every message is encrypted on the Mac or the phone before it leaves. The relay forwards bytes it can't read.
 - The relay keeps no messages. When either side is offline, the other side's commands wait in its own outbox and are sent again on reconnect. State is a snapshot, so a missed update never matters: the next one replaces it.
 - Pushes go from the Mac straight to Expo's push service with the phone's push token. They do not pass through the relay.
+- The one exception is the iPhone's Live Activity, if the phone turns it on: the relay holds Apple's push key, so the Mac sends it the counts in plain form and the relay pushes them to Apple ([Live Activity](#live-activity)).
 
 Maxwell's relay is `wss://maxwell-relay.maxwell-relay.workers.dev`, the default for `phone-relay` in the config (`docs/config.md`); a config can name another, or turn the phone off with an empty `phone-relay =` (or `off`).
 - The Mac connects to the relay only while at least one phone is paired or a pairing code is showing. With no phone it keeps no socket open, and removing the last phone closes the connection once its `bye` is sent. Settings › Phone shows the pairing code, the paired phones and a Remove button for each.
@@ -70,6 +71,7 @@ The iPhone app answers Allow, Deny, Go on and Reply from a notification without 
   - Mac → relay: `{"to": "<phone id>", "box": "…"}`. Only the phone with that id gets it.
   - Phone → relay: `{"box": "…"}`. The relay delivers `{"from": "<phone id>", "box": "…"}` to the Mac; it sets `from` from the connection, so a phone can't pretend to be another.
   - Mac → relay, control (plain, not boxed): `{"allow": ["<lowercase hex SHA-256 of the phone id, UTF-8>", …], "pairing": true|false}`; the relay takes either field alone too. At most 64 ids, 8 phones in a room, 300 messages per connection per 10 seconds. Which phones may join the room, and whether any phone may (a pairing code is showing; the relay keeps it open for at most 15 minutes). A phone not allowed gets 403 and, when the Mac takes it off the list, its connection is closed. The Mac sends it right after it connects, before anything else, when a code is made, used, cancelled or expires (pairing stays open while you decide whether to allow a phone), after pairing, and after the `bye` to a removed phone. The relay sees only the hashes.
+  - Mac → relay, Live Activity (plain): `{"to": "<phone id>", "live": {…} | null}`, see [Live Activity](#live-activity).
   - Relay → anyone: `{"presence": {"mac": true|false}}` to phones, `{"presence": {"phone": "<id>", "online": true|false}}` to the Mac, sent on connect and on every change.
 - **Keepalive**: either side sends the exact text `{"ping":1}` every 25 s; the relay answers `{"pong":1}` (Cloudflare answers it without waking the room). No pong for 10 s means the connection is dead: close it and reconnect.
 - **Reconnect**: after 0.5 s, then doubling to 15 s at most, with ±20% jitter. On the phone, also at once when the app comes to the foreground or the network changes.
@@ -84,7 +86,7 @@ Every message is `{"t": "<type>", …}` inside a box.
 | `t` | Fields | Answer |
 |---|---|---|
 | `pair` | `phone` (id), `name` (e.g. "Robin's iPhone"), `app` (version) | `paired` |
-| `hello` | `app`, `push` (Expo push token or null), `pushDetail` (`full` or `hidden`, below), `focus` (session id or null) | `state`, then `transcript` for `focus` |
+| `hello` | `app`, `push` (Expo push token or null), `pushDetail` (`full` or `hidden`, below), `focus` (session id or null), `live` (bool: the phone shows a Live Activity; absent means false) | `state`, then `transcript` for `focus` |
 | `focus` | `session` (id or null), `terminal` (`{cols, rows}` or null) | `transcript` with `reset: true`; with `terminal`, `term` data too. `hello`'s `focus` is a focus without `terminal`. |
 | `cmd` | `id` (unique, made by the phone), `op`, op fields (below) | `ack` with the same `id` |
 | `input` | `session`, `data` (UTF-8 text typed in the Terminal tab, including control characters) | none |
@@ -192,6 +194,41 @@ Note: the title and body pass through Expo and Apple in readable form, like any 
 - `hidden` (the default, until a phone says otherwise): title `Maxwell`, body `A session needs you`. No session name, no command. `data.session` (an opaque id) and `counts` still come, so a tap opens the session and widgets stay current.
 - `full`: the session's title and what it asks, as above.
 
+## Live Activity
+
+The iPhone shows Maxwell's counts on the lock screen and in the Dynamic Island while something needs you: Needs you, Your turn, Working and Limited, the Mac's name, the next usage-limit reset, and, with full details, the newest session that needs you and what it asks. Its updates come as pushes from Apple even while the app isn't running. Maxwell is public and can't hold Apple's push key, so the relay holds it and sends those pushes. That means the relay reads what the Live Activity shows. It is the only thing it can read, and only for a phone that turned the Live Activity on (Settings › Live Activity, on by default).
+
+**Mac → relay**, plain (not boxed), for each paired phone whose last `hello` said `live: true`, when what it shows changes (at most every 2 s) and right after the Mac connects:
+
+```json
+{"to": "<phone id>", "live": {"counts": {"needsYou": 2, "yourTurn": 3, "working": 3, "limited": 1},
+  "nextReset": {"at": 1795120200000, "account": "work2"},
+  "top": {"session": "<id>", "title": "web-auth", "ask": "Run npm run db:migrate?"},
+  "mac": "Studio Mac", "at": 1795118623573}}
+```
+
+- `nextReset`: the earliest usage-limit reset among Limited sessions and that session's account, or null. Times are ms since 1970.
+- `top`: the newest session that needs you, its title and what it asks in a push's words, **only for a phone whose `pushDetail` is `full`**; null otherwise. The frame is per phone, so each gets what it allowed.
+- `{"to": "<phone id>", "live": null}` once a phone's `hello` says `live: false`: the relay ends its activity.
+
+The relay takes it only for a phone on the room's allow-list.
+
+**Phone → relay**: `POST https://<relay>/room/<mac id>/live` with `{"phone": "<phone id>", "pushToStart": "<hex>" | null, "activity": "<hex>" | null}`. Either field may be left out (unchanged); null forgets it. `pushToStart` is the app's ActivityKit push-to-start token (iOS 17.2+), `activity` the running activity's push token. The relay takes it only from a phone on the allow-list (403 otherwise) and answers `{"pushToStart": bool, "activity": bool}`, what it now holds. The app sends it from native code, which also runs when iOS wakes the app in the background to hand over a new activity's token; a WebSocket from there would replace the app's own connection.
+
+**Relay → Apple**: `POST https://api.push.apple.com/3/device/<token>`, `apns-push-type: liveactivity`, `apns-topic: com.robinfaraj.maxwell.push-type.liveactivity`, an ES256 provider token signed with the team's APNs key (kept in the Worker's secrets; reused for 50 minutes). The `content-state`:
+
+```json
+{"needsYou": 2, "yourTurn": 3, "working": 3, "limited": 1, "mac": "Studio Mac", "online": true, "at": 1795118623573,
+ "resetAt": 1795120200000, "resetAccount": "work2", "topSession": "<id>", "topTitle": "web-auth", "topAsk": "Run npm run db:migrate?"}
+```
+
+- **Start**: when Needs you rises from 0 and no activity runs, with the push-to-start token (`event: start`, `attributes-type: MaxwellActivityAttributes`, an alert saying only "Maxwell" and how many sessions need you, `input-push-token: 1`). The app also starts one itself when it goes to the background with something needing you.
+- **Update**: on every change, at most one per 15 s per activity, at priority 5; at once and priority 10 when Needs you goes up. While the Mac stays connected, the same content again every 15 minutes, because each push says it is current only for 20 (`stale-date`), and a stale activity looks muted on the phone.
+- **Mac gone**: a Mac that doesn't reconnect within a minute (or stops answering pings for 90 s) shows offline, stale at once.
+- **End** (`event: end`, `dismissal-date` now): after 30 minutes with nothing needing you and nothing working, after the Mac has been gone 30 minutes, when the phone turns it off, or when the Mac removes the phone (the relay then forgets its tokens). A token Apple calls gone (410, or 400 `BadDeviceToken`) is dropped.
+
+The relay keeps, per phone, its two tokens and the last frame and push, in the room's storage, and nothing once the phone is removed. Without the key (`APNS_DRY_RUN=1`, as `npm run dev` runs it) it sends nothing and lists what it would have sent at `/room/<mac id>/live-log`.
+
 ## Checking the bridge
 
 End to end against a local relay (`npx wrangler dev --port 8787` in the relay's folder), with a test phone made from the relay's `tools/protocol.mjs`:
@@ -208,8 +245,14 @@ The session commands (`start`, `rename`, `interrupt`, `resumeAtReset`, `close`, 
 node tools/test-phone-ops.mjs /tmp/mx-pair-link --config /tmp/mx-phone.config --cwd <trusted folder>
 ```
 
+The Live Activity has its own test phone: it registers a made-up token with a local relay in dry run, checks the first push carries the Mac's counts (and a session title only with `--full`), starts and closes one throwaway session to see a coalesced update follow, and ends the activity with `live: false`:
+
+```sh
+node tools/test-phone-live.mjs /tmp/mx-pair-link --cwd <trusted folder> [--full]
+```
+
 Against the live relay, write `phone-relay = wss://maxwell-relay.maxwell-relay.workers.dev` instead: a quiet run uses only a relay its config names. `MAXWELL_PHONE_PAIR_FILE` works only in a quiet run (`Sources/Harness/PhoneHarness.swift`): Maxwell makes a code at launch and writes its link there. Quiet runs keep keys in memory, so each run is a new room.
 
 ## Changelog
 
-- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.65; an older Mac answers `ok` and types "continue" into any session). The phone's lock-screen extension and its clock-floored `n` need no Mac change.
+- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.65; an older Mac answers `ok` and types "continue" into any session). The phone's lock-screen extension and its clock-floored `n` need no Mac change. Then the Live Activity: `live` in `hello`, the Mac's `live` frame to the relay and the phone's token `POST` (Maxwell 0.1.67; an older Mac sends no frames, and the phone's activity shows only what the app gives it while it runs).

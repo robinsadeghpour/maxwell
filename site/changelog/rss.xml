@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Needs you on the iPhone's lock screen</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-19-phone-live-activity</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-19-phone-live-activity</guid>
+<pubDate>Thu, 19 Nov 2026 12:00:00 GMT</pubDate>
+<description>Maxwell now keeps the iPhone app's Live Activity current: how many sessions need you, are your turn, are working and are limited, and when the next limit resets, on the lock screen and in the Dynamic Island, even while the app is closed. The counts go to Maxwell's relay unencrypted so it can push them to Apple; session names go too only if you show them in notifications. Turn it off in the phone's settings.</description>
+</item>
+<item>
 <title>Messages from the phone after Stop</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-19-phone-commands</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-19-phone-commands</guid>

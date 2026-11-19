@@ -66,6 +66,8 @@ struct PairedPhone: Codable, Equatable {
     var sentReserved: Int?
     /// What its pushes may say on the lock screen; hidden until the phone asks for full.
     var pushDetail: PushPlanner.Detail?
+    /// The phone shows a Live Activity: the relay gets its counts (docs/phone.md, "Live Activity").
+    var live: Bool?
     /// When this Mac handed it each account's claude.ai sign-in (`artifactLogin`), by account name.
     var artifactShares: [String: Date]?
 

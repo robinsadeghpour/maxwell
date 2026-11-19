@@ -38,6 +38,7 @@
 
 ## Changelog
 
+- [Needs you on the iPhone's lock screen](https://www.runmaxwell.com/changelog/2026-11-19-phone-live-activity) (2026-11-19, v0.1.67)
 - [Messages from the phone after Stop](https://www.runmaxwell.com/changelog/2026-11-19-phone-commands) (2026-11-19, v0.1.65 – 0.1.66)
 - [Resume works after a worktree is removed](https://www.runmaxwell.com/changelog/2026-11-19-resume-deleted-folder) (2026-11-19, v0.1.64)
 - [Settings › Phone](https://www.runmaxwell.com/changelog/2026-11-18-phone-bridge) (2026-11-18, v0.1.63)
