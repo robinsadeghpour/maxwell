@@ -32,16 +32,16 @@
     <header class="nav"><a href="/"><svg aria-hidden="true"><use href="#demon"/></svg>Maxwell</a><nav><a class="hide-s" href="/#features">Features</a><a href="/docs">Docs</a><a href="/changelog" aria-current="page">Changelog</a><a class="hide-s" href="https://github.com/robinsadeghpour/maxwell">GitHub</a></nav></header>
   </div></div>
 <div class="band" style="border-top:0"><div class="frame"><i class="x l"></i><i class="x r"></i><div class="crumb" style="padding:28px clamp(20px,5vw,64px) 0;margin:0"><a href="/changelog">Changelog</a><span>/</span><span>Nov 18, 2026</span></div></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-18-phone-bridge">
-  <aside><div><time datetime="2026-11-18">Nov 18, 2026</time><span class="ver">v0.1.63 – v0.1.64</span></div></aside>
+  <aside><div><time datetime="2026-11-18">Nov 18, 2026</time><span class="ver">v0.1.63</span></div></aside>
   <article>
     <h2>Settings › Phone</h2>
     
     <div class="prose"><p>Maxwell can now pair with a phone. Settings › Phone shows a code to scan; once a phone is paired, it sees the same sessions as the Mac, follows a session's conversation and terminal, answers permission prompts, opens artifacts in the right account, starts, closes and moves sessions, and gets a push when a session needs you while you're away from the Mac.</p>
 <p>The phone and the Mac meet on a small relay and everything between them is end-to-end encrypted; the relay forwards bytes it can't read. Maxwell connects to it only while a phone is paired or a code is showing, and <code>phone-relay = off</code> turns it off. The iPhone app is in private testing. <a href="https://github.com/robinsadeghpour/maxwell/blob/v1/docs/phone.md">How it works</a>.</p></div>
     
-    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>A message sent from the phone right after stopping a turn now goes in on its own. Before, Claude Code had put the stopped prompt back and the message was added to it</span></li><li><span>Continue at reset from the phone now only applies to a limited session, and waits for the account's reset when the session's own isn't known. Before, it typed “continue” into any session a few seconds later</span></li></ul></div>
+    
   </article>
-</section></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><nav class="pager"><a href="/changelog/2026-11-18-resume-from-any-folder"><small>Older</small>/resume works across folders</a><a class="nx" href="/changelog"><small>All updates</small>Changelog</a></nav></div></div>
+</section></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><nav class="pager"><a href="/changelog/2026-11-18-resume-from-any-folder"><small>Older</small>/resume works across folders</a><a class="nx" href="/changelog/2026-11-19-resume-deleted-folder"><small>Newer</small>Resume works after a worktree is removed</a></nav></div></div>
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><footer class="foot"><span>Maxwell is free and open source under the MIT licence. Named after Maxwell's demon.</span><nav><a href="/docs">Docs</a><a href="/changelog">Changelog</a><a href="https://github.com/robinsadeghpour/maxwell">GitHub</a><a href="https://github.com/robinsadeghpour/maxwell/releases">Releases</a></nav></footer></div></div>
 </main>
 

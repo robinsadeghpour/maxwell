@@ -208,4 +208,4 @@ Against the live relay, write `phone-relay = wss://maxwell-relay.maxwell-relay.w
 
 ## Changelog
 
-- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.64; an older Mac answers `ok` and types "continue" into any session).
+- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.65; an older Mac answers `ok` and types "continue" into any session).
