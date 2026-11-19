@@ -209,8 +209,9 @@ extension PhoneBridge {
 
     private func resumeAtReset(_ s: Session, _ reply: @escaping (PhoneReply) -> Void) {
         if let no = readOnly(s) { return reply(no) }
-        var when = Date()
-        if case .limited(let reset?) = s.phase { when = reset }
+        guard let when = store.state.resumeAt(s, now: Date()) else {
+            return reply(.failed(code: "not-limited", message: "“\(s.title)” isn't at a usage limit. Send it a message instead."))
+        }
         store.scheduleResume(s, at: when) { [weak self] s in
             self?.typeInto(s, text: "continue") { r in if case .failed(_, let m, _) = r { mark("phone: resume at reset: \(m)") } }
         }

@@ -7,13 +7,16 @@ export default [
   {
     slug: "2026-11-18-phone-bridge",
     date: "2026-11-18",
-    versions: "0.1.63",
+    versions: "0.1.63 – 0.1.64",
     title: "Settings › Phone",
     figure: "",
     body: `
 <p>Maxwell can now pair with a phone. Settings › Phone shows a code to scan; once a phone is paired, it sees the same sessions as the Mac, follows a session's conversation and terminal, answers permission prompts, opens artifacts in the right account, starts, closes and moves sessions, and gets a push when a session needs you while you're away from the Mac.</p>
 <p>The phone and the Mac meet on a small relay and everything between them is end-to-end encrypted; the relay forwards bytes it can't read. Maxwell connects to it only while a phone is paired or a code is showing, and <code>phone-relay = off</code> turns it off. The iPhone app is in private testing. <a href="https://github.com/robinsadeghpour/maxwell/blob/v1/docs/phone.md">How it works</a>.</p>`,
-    fixes: [],
+    fixes: [
+      "A message sent from the phone right after stopping a turn now goes in on its own. Before, Claude Code had put the stopped prompt back and the message was added to it",
+      "Continue at reset from the phone now only applies to a limited session, and waits for the account's reset when the session's own isn't known. Before, it typed “continue” into any session a few seconds later",
+    ],
   },
   {
     slug: "2026-11-18-resume-from-any-folder",

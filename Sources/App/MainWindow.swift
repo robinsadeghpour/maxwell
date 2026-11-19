@@ -775,10 +775,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     func resume(_ id: SessionID) {
-        guard let s = store.state.sessions[id] else { return }
-        var reset: Date?
-        if case .limited(let d) = s.phase { reset = d }
-        let when = reset ?? Date()
+        guard let s = store.state.sessions[id], let when = store.state.resumeAt(s, now: Date()) else { return }
         store.scheduleResume(s, at: when) { [weak self] s in self?.send("continue", to: s.id) }
         toast(when > Date() ? "Will send \"continue\" at \(Format.clock.string(from: when))." : "Sent \"continue\".")
     }

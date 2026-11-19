@@ -90,15 +90,15 @@ Every message is `{"t": "<type>", …}` inside a box.
 
 | `op` | Fields | What the Mac does |
 |---|---|---|
-| `send` | `session`, `text` | Types `text` into the session and presses Return. A session that stopped (idle stop, limit) is attached first, which resumes it. Fails with `prompt-showing` while a permission prompt is up (text would answer it). |
+| `send` | `session`, `text` | Empties the session's prompt, types `text` and presses Return: Claude Code puts a prompt stopped early back in the input, and a draft typed on the Mac sits there too, and the phone's text would be added to it. A session that stopped (idle stop, limit) is attached first, which resumes it. Fails with `prompt-showing` while a permission prompt is up (text would answer it). |
 | `permission` | `session`, `decision`: `allow`, `allowAlways` or `deny`, `detail`: the `ask.detail` the phone showed | Answers the permission prompt the session shows, only if it still asks about `detail`, checked again right before the key goes in. Fails with `no-prompt` otherwise, so a newer prompt is never answered by mistake. |
-| `interrupt` | `session` | Presses Esc: Claude stops the current turn. |
+| `interrupt` | `session` | Presses Esc: Claude stops the current turn. A turn stopped before Claude wrote anything puts its prompt back in the input; the next `send` replaces it. |
 | `start` | `cwd`, `prompt`, `account` (id or null for the one with most room), `name` (or null) | Starts a background session, like ⌘N. `result`: `{"session": id}`. |
 | `close` | `session` | Same as Close Session on the Mac: closes at once when safe, otherwise fails with `not-safe` and `detail` listing what is still open. |
 | `closeSafe` | `sessions` (ids the phone showed as safe) | Close all safe, re-checked on the Mac. `result`: `{"closed": [ids], "skipped": [ids]}`. |
 | `forceClose` | `session` | Closes even when not safe (the phone asked "Close anyway?" first). |
-| `move` | `session`, `account` (id or null for most room) | Moves a limited session to another account with a handover prompt. `result`: `{"session": new id}`. |
-| `resumeAtReset` | `session` | Sends "continue" when the account's limit resets. `result`: `{"at": ISO}`, when it will. |
+| `move` | `session`, `account` (id or null for most room) | Moves a limited session to another account with a handover prompt: a new background session there, in the same folder, reads the old transcript and carries on. The old session is left as it is. Works on any session; the phone offers it for limited ones. `result`: `{"session": new id}`. |
+| `resumeAtReset` | `session` | Sends "continue" when the limit resets: the session's reset, else its account's, else now. `result`: `{"at": ISO}`, when it will. Fails with `not-limited` for a session that isn't limited. |
 | `rename` | `session`, `title` | Renames, like the Mac's Rename. |
 | `artifactLogin` | `account` | `result`: `{"cookies": [cookie…]}`, the account's claude.ai cookies from the Mac's sign-in, so artifacts open signed in on the phone: only those for `claude.ai` and its subdomains, and only `sessionKey`, `lastActiveOrg` and Cloudflare's `cf_clearance`, `__cf_bm` and `_cfuvid` (not yet checked against a signed-in artifact page). Removing the phone on the Mac offers to sign that account out, which ends the session the phone holds too. Fails with `signed-out` when that account isn't signed in on the Mac, and with `not-ready` unless the phone is online and has sent `hello` on this connection. The Mac writes down each handover (account, phone, time; never the cookies) and Settings › Phone shows it under the phone. |
 
@@ -115,6 +115,7 @@ Error codes in `ack.error.code`:
 | `not-safe` | `close` on a session that isn't safe now; `detail` is the checks still open, `[{"name", "ok": false, "detail"}]`. |
 | `untrusted` | `start` in a folder Claude Code hasn't been allowed to work in yet. Start one there on the Mac once. |
 | `no-room` | `start` or `move` with no account that has room. |
+| `not-limited` | `resumeAtReset` on a session that isn't at a usage limit. |
 | `signed-out` | `artifactLogin` for an account not signed in to claude.ai on the Mac. |
 | `not-ready` | `artifactLogin` from a phone that hasn't sent `hello` since it last connected. |
 | `bad-request` | A field is missing or wrong (no text, unknown decision, a folder that isn't on the Mac). |
@@ -197,8 +198,14 @@ MAXWELL_CONFIG=/tmp/mx-phone.config MAXWELL_PHONE_PAIR_FILE=/tmp/mx-pair-link bu
 node tools/test-phone.mjs /tmp/mx-pair-link <session name prefix> [message] [--permission]
 ```
 
+The session commands (`start`, `rename`, `interrupt`, `resumeAtReset`, `close`, `closeSafe`, `forceClose`, `move`, `artifactLogin`) have their own test phone. It makes throwaway Haiku sessions named `mxops-…` in a trusted folder, checks each op's ack, its effect in the next `state` and a resend of the same id, and stops every session it made, on its own account:
+
+```sh
+node tools/test-phone-ops.mjs /tmp/mx-pair-link --config /tmp/mx-phone.config --cwd <trusted folder>
+```
+
 Against the live relay, write `phone-relay = wss://maxwell-relay.maxwell-relay.workers.dev` instead: a quiet run uses only a relay its config names. `MAXWELL_PHONE_PAIR_FILE` works only in a quiet run (`Sources/Harness/PhoneHarness.swift`): Maxwell makes a code at launch and writes its link there. Quiet runs keep keys in memory, so each run is a new room.
 
 ## Changelog
 
-- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`.
+- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.64; an older Mac answers `ok` and types "continue" into any session).
