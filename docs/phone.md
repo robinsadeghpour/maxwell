@@ -55,7 +55,11 @@ Every message inside a box, in both directions, carries two more fields:
 - `n`: the sender's counter for this pairing, starting at 1 and strictly rising with each message it sends.
 - `ts`: the sender's clock when it sent it, milliseconds since 1970.
 
-The receiver drops a message whose `n` is not above the last one it took from that sender, or whose `ts` is more than 5 minutes from its own clock. The Mac also drops any message (but `pair`) sent before it started, less 30 seconds: the last `n` it took may not have been written down when it last quit. It writes that `n` down at once for `cmd`, within a second for `input`, every 30 seconds otherwise, and when it quits. That stops a box recorded on the way from being played again, even though it still opens. `pair` has no `n` (there is no counter yet) and needs `ts` within 10 minutes. Pairing, also pairing again, starts both counters over: the Mac's first message to a phone is `paired` with `n: 1`. The Mac keeps the highest `n` it has taken from each phone, and its own, in the Keychain with the phone's key; it logs each message it drops and why (replayed, stale, missing).
+The receiver drops a message whose `n` is not above the last one it took from that sender, or whose `ts` is more than 5 minutes from its own clock. The Mac also drops any message (but `pair`) sent before it started, less 30 seconds: the last `n` it took may not have been written down when it last quit. It writes that `n` down at once for `cmd`, within a second for `input`, every 30 seconds otherwise, and when it quits. That stops a box recorded on the way from being played again, even though it still opens. `pair` has no `n` (there is no counter yet) and needs `ts` within 10 minutes. Pairing, also pairing again, starts both counters over: the Mac's first message to a phone is `paired` with `n: 1`. The phone's `n` doesn't have to rise by exactly one: it sends `max(last + 1, its clock in ms)`, because two processes on the phone share the counter (the app, and the lock-screen extension that answers a notification while the app isn't running), and a clock floor keeps them from reusing a number when one of them didn't see the other's last write. The Mac only checks that `n` rises. The Mac keeps the highest `n` it has taken from each phone, and its own, in the Keychain with the phone's key; it logs each message it drops and why (replayed, stale, missing).
+
+### The lock-screen extension
+
+The iPhone app answers Allow, Deny, Go on and Reply from a notification without opening, in a notification content extension. It joins the room as the same phone id, briefly: it sends its own `hello` with `focus: null` when it needs the prompt's detail (to show what it is about to allow, and to send the `permission` command's `detail`), then one `cmd` with a command id that is the same for that notification and action, waits for the `ack`, and leaves. Because the relay replaces a phone's older connection, the app re-sends its `hello` when it reconnects.
 
 ## The relay
 
@@ -208,4 +212,4 @@ Against the live relay, write `phone-relay = wss://maxwell-relay.maxwell-relay.w
 
 ## Changelog
 
-- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.65; an older Mac answers `ok` and types "continue" into any session).
+- **1** (Nov 2026): first version. Before release it gained `n` and `ts` on every message, `pushDetail` in `hello`, and `not-ready` for `artifactLogin`. Then `not-limited` for `resumeAtReset` (Maxwell 0.1.65; an older Mac answers `ok` and types "continue" into any session). The phone's lock-screen extension and its clock-floored `n` need no Mac change.
