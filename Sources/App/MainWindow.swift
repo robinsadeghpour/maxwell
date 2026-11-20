@@ -302,7 +302,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                               blockers: s.map { state.checks($0, now: now, rules: rules).filter { $0.outcome != .pass }.map { "\($0.title): \($0.detail)" } } ?? [],
                               project: s.map { state.project($0, in: projects) },
                               account: s.flatMap { state.account($0.accountId) },
-                              terminal: current.flatMap { detached.contains($0) ? nil : terminal(for: $0) },
+                              // A plain terminal too: a pane told to show none hides the one being typed
+                              // in, and AppKit takes keyboard focus from a hidden view for good.
+                              terminal: current.flatMap { detached.contains($0) ? nil : terminal(for: $0) ?? shell($0) },
                               summary: PhaseGroup.allCases.filter { !$0.folds }.map { g in (g, (scope == nil ? all : shown).first { $0.0 == g }?.1.count ?? 0) })
         if let t = shell(current) {
             let row = shellRows().first { $0.id == current }

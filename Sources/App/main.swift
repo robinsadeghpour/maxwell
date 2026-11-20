@@ -315,7 +315,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             DispatchQueue.main.asyncAfter(deadline: .now() + (Double(arg("--type-after") ?? "4") ?? 4)) {
                 let shell = self.main.shownShell
                 shell?.sendLine(text)
-                mark(shell == nil ? "no terminal on screen" : "typed in terminal")
+                // Focus is said too: a terminal that lost it shows what a script types, but not what you type.
+                let focused = shell != nil && self.main.window?.firstResponder === shell
+                mark(shell == nil ? "no terminal on screen" : "typed in terminal (\(focused ? "has" : "lost") keyboard focus)")
             }
         }
         if let spec = arg("--start") {
