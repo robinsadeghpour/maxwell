@@ -60,6 +60,9 @@ struct Config: Equatable {
     /// Maxwell titles sessions from the conversation and names the ones it brings in.
     /// Off: a session shows the name it has in Claude Code (`/rename`), and Maxwell never changes it.
     var autoTitles = true
+    /// Closing a session that isn't safe to close asks first and says what is still open.
+    /// Off: it closes at once, with the same Undo.
+    var confirmClose = true
     /// Crash and hang reports from the released app (runmaxwell.com/docs/privacy#crash-reports).
     var crashReports = true
     /// `project = <name> <path glob>` lines, checked before the git-derived project.
@@ -156,6 +159,7 @@ struct Config: Equatable {
             case "wrap-line": c.wrapLine = !["off", "false"].contains(value)
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
             case "auto-titles": c.autoTitles = !["off", "false"].contains(value)
+            case "confirm-close": c.confirmClose = !["off", "false"].contains(value)
             case "phone-relay": c.phoneRelay = value.isEmpty ? "off" : value
             case "crash-reports": c.crashReports = !["off", "false"].contains(value)
             case "project":
@@ -283,6 +287,9 @@ struct Config: Equatable {
     # Maxwell titles sessions from what they work on, and names the ones it brings in.
     # off = sessions keep the name you give them (/rename in Claude Code, or Rename… in Maxwell).
     auto-titles = on
+    # Closing a session that isn't safe to close asks first and says what is still open.
+    # off = it closes at once; Undo and Recently closed still bring it back.
+    confirm-close = on
     # Crash and hang reports from the released app, scrubbed of paths, prompts and names.
     # What is sent: runmaxwell.com/docs/privacy#crash-reports
     # crash-reports = off

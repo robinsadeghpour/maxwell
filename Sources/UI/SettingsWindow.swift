@@ -601,6 +601,7 @@ final class SettingsView: MXView {
         form.toggle("Show the folder tree", c.showTree, note: "The session's folder, above the open file. ⇧⌘T") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
         form.header("Sessions")
         form.toggle("Name sessions automatically", c.autoTitles, note: "Titles each session after what it's working on, with Haiku when Claude's own title says little. Off: a session keeps the name you give it (/rename or Rename…).") { [weak self] in self?.set("auto-titles", $0 ? "on" : "off") }
+        form.toggle("Ask before closing unfinished sessions", c.confirmClose, note: "Closing a session that isn't safe to close says what is still open first. Off: it closes at once. Undo and Recently closed bring it back either way.") { [weak self] in self?.set("confirm-close", $0 ? "on" : "off") }
         form.toggle("Skip permission prompts", c.skipPermissions, note: "Sessions Maxwell starts or brings in run with --dangerously-skip-permissions, so Claude edits files and runs commands without asking. Off: Claude asks as usual.") { [weak self] in self?.set("skip-permissions", $0 ? "on" : "off") }
         form.choice("Move quiet sessions to Idle after", [("12h", "12h"), ("24h", "24h"), ("2d", "2d"), ("7d", "7d")], current: hours(c.idleAfter),
                     note: "Idle is folded away at the bottom of the list. Nothing is stopped.") { [weak self] in self?.set("idle-after", $0) }

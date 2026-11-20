@@ -821,22 +821,27 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// ⇧⌘⌫ (⌘⌫ itself belongs to the terminal: delete to line start), the row menu and the banner button. Safe sessions close at once; any other asks
-    /// first and says what is still open. Either way it is `claude stop`, with Undo.
+    /// first and says what is still open, unless `confirm-close` is off. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
         if shell(id) != nil { return requestCloseShell(id) }
         guard let s = store.state.sessions[id], s.phase != .ended else { return }
         if case .elsewhere = s.reach { return toast("“\(s.title)” runs in another terminal. Bring it into Maxwell first, or close it there.") }
         if s.isCloud { return closeCloud(id) }
         let open = store.checks(s).filter { $0.outcome != .pass }
-        guard !open.isEmpty, let w = window else { return closeNow(s) }
+        guard !open.isEmpty, store.config.confirmClose, let w = window else { return closeNow(s) }
         let a = NSAlert()
+        a.showsSuppressionButton = true
+        a.suppressionButton?.title = "Don't ask again"
         a.messageText = s.phase == .working ? "“\(s.title)” is still working. Close it anyway?" : "Close “\(s.title)”?"
         let reasons = open.prefix(4).map { "• \($0.title): \($0.detail)" }.joined(separator: "\n")
         a.informativeText = "Not safe to close yet:\n\(reasons)\n\nClaude stops, and the conversation is kept. Undo right after, or reopen it from Recently closed for 7 days."
         a.addButton(withTitle: "Close Session")
         a.addButton(withTitle: "Cancel")
-        a.beginSheetModal(for: w) { [weak self] r in
-            guard r == .alertFirstButtonReturn, let self, let fresh = self.store.state.sessions[id] else { return }
+        a.beginSheetModal(for: w) { [weak self, weak a] r in
+            guard r == .alertFirstButtonReturn, let self else { return }
+            // Only a close you went through with turns the question off; Settings › General turns it back on.
+            if a?.suppressionButton?.state == .on { self.onConfigEdit?("confirm-close", "off") }
+            guard let fresh = self.store.state.sessions[id] else { return }
             self.closeNow(fresh)
         }
     }
