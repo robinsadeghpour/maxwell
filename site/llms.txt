@@ -38,6 +38,7 @@
 
 ## Changelog
 
+- [Usage without a status line](https://www.runmaxwell.com/changelog/2026-11-20-usage-without-status-line) (2026-11-20, v0.1.68)
 - [Needs you on the iPhone's lock screen](https://www.runmaxwell.com/changelog/2026-11-19-phone-live-activity) (2026-11-19, v0.1.67)
 - [Messages from the phone after Stop](https://www.runmaxwell.com/changelog/2026-11-19-phone-commands) (2026-11-19, v0.1.65 – 0.1.66)
 - [Resume works after a worktree is removed](https://www.runmaxwell.com/changelog/2026-11-19-resume-deleted-folder) (2026-11-19, v0.1.64)
