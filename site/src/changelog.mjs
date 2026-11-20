@@ -8,9 +8,9 @@ export default [
     slug: "2026-11-20-terminal-keeps-focus",
     date: "2026-11-20",
     versions: "0.1.69",
-    title: "A terminal keeps the keyboard",
+    title: "Close without being asked",
     figure: "",
-    body: "",
+    body: "The question Maxwell asks before it closes a session that isn't safe to close now has a Don't ask again box. Tick it and close, and from then on every session closes at once, with the same Undo and the same seven days in Recently closed. Settings › General › Ask before closing unfinished sessions turns the question back on, as does <code>confirm-close = on</code> in the config file.",
     fixes: [
       "A plain terminal now keeps the keyboard while you type. Before, it lost it every time another session reported something, and you had to click into the terminal again",
     ],

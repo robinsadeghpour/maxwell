@@ -452,6 +452,7 @@ idle-after = 24h              <span class="c"># quiet time before a stopped sess
 judge = on                    <span class="c"># off skips the model read, so nothing is ever safe</span>
 skip-permissions = on         <span class="c"># off keeps Claude's own permission mode</span>
 auto-titles = on              <span class="c"># off: sessions keep the names you give them</span>
+confirm-close = on            <span class="c"># off: an unfinished session closes without asking</span>
 wrap-line = on                <span class="c"># off: replies don't end with a status line</span>
 notify = true                 <span class="c"># a notification when a session needs you</span>
 notify-sound = Funk           <span class="c"># none, or a macOS sound: Glass, Ping, Submarine…</span>

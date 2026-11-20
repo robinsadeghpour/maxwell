@@ -318,6 +318,10 @@ for handBack in [
 ] { check(Reply.classify(handBack) != .statement, "hand-back is not a finished report: \(handBack.prefix(40))") }
 check(Config.parse("project = Orbit ~/projects/orbit*").projects == [ProjectRule(name: "Orbit", glob: "~/projects/orbit*")], "project rules parse")
 check(Config.parse("safe-after = 90m\nidle-after = 2d").idleAfter == 2 * 86400, "an old safe-after line is ignored")
+check(Config().confirmClose && Config.parse(Config.starter).confirmClose && !Config.parse("confirm-close = off").confirmClose, "confirm-close defaults on, off turns the close question off")
+check(!Config.parse(Config.setting("confirm-close", to: "off", in: Config.starter)).confirmClose
+      && Config.parse(Config.setting("confirm-close", to: "on", in: Config.setting("confirm-close", to: "off", in: "theme = dark\n"))).confirmClose,
+      "Don't ask again writes confirm-close = off, with or without the line in the file, and Settings turns it back on")
 check(Config().skipPermissions && Config.parse(Config.starter).skipPermissions && !Config.parse("skip-permissions = off").skipPermissions, "skip-permissions defaults on, off turns it off")
 check({ let c = Config.parse("notify-sound = Glass\nnotify-done = true\nnotify-done-sound = none"); return c.notifySound == "Glass" && c.notifyDone && c.notifyDoneSound == "none" }()
       && Config.parse("notify-sound = Nope").notifySound == "Funk" && !Config.parse(Config.starter).notifyDone, "notification sounds parse; unknown sounds and the starter keep the defaults")
