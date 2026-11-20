@@ -63,6 +63,14 @@ struct Config: Equatable {
     /// Closing a session that isn't safe to close asks first and says what is still open.
     /// Off: it closes at once, with the same Undo.
     var confirmClose = true
+    /// Voice mode (docs/voice.md): its shortcuts work, and it says which session needs you.
+    var voice = false
+    /// What voice mode calls you: "Hey Ada." Empty: no greeting by name.
+    var voiceName = ""
+    /// The language voice mode hears and speaks, as a locale: en-US, de-DE.
+    var voiceLanguage = "en-US"
+    /// The ElevenLabs voice, by its id. Empty: Maxwell's pick.
+    var voiceId = ""
     /// Crash and hang reports from the released app (runmaxwell.com/docs/privacy#crash-reports).
     var crashReports = true
     /// `project = <name> <path glob>` lines, checked before the git-derived project.
@@ -160,6 +168,10 @@ struct Config: Equatable {
             case "skip-permissions": c.skipPermissions = !["off", "false"].contains(value)
             case "auto-titles": c.autoTitles = !["off", "false"].contains(value)
             case "confirm-close": c.confirmClose = !["off", "false"].contains(value)
+            case "voice": c.voice = ["on", "true"].contains(value)
+            case "voice-name": c.voiceName = value
+            case "voice-language": if !value.isEmpty { c.voiceLanguage = value }
+            case "voice-id": c.voiceId = value
             case "phone-relay": c.phoneRelay = value.isEmpty ? "off" : value
             case "crash-reports": c.crashReports = !["off", "false"].contains(value)
             case "project":
@@ -290,6 +302,11 @@ struct Config: Equatable {
     # Closing a session that isn't safe to close asks first and says what is still open.
     # off = it closes at once; Undo and Recently closed still bring it back.
     confirm-close = on
+    # Voice mode: Maxwell says which session needs you and types your spoken reply into it.
+    # Hearing happens on this Mac. Settings › Voice has the rest, and the ElevenLabs key.
+    # voice = on
+    # voice-name = Ada
+    # voice-language = en-US
     # Crash and hang reports from the released app, scrubbed of paths, prompts and names.
     # What is sent: runmaxwell.com/docs/privacy#crash-reports
     # crash-reports = off

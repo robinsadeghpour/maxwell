@@ -11,7 +11,7 @@ export const sections = [
   { title: "Sessions", blurb: "How Maxwell sorts sessions, names them, and decides what's safe to close.",
     pages: ["groups", "safe-to-close", "cloud", "session-names", "projects", "search"] },
   { title: "Workspace", blurb: "Panels, the viewer, artifacts, accounts and themes.",
-    pages: ["panels", "viewer", "accounts", "appearance"] },
+    pages: ["panels", "viewer", "accounts", "appearance", "voice"] },
   { title: "Plugins", blurb: "Linear and Slack ship with Maxwell. Anyone can write another.",
     pages: ["linear", "slack", "write-a-plugin"] },
   { title: "Reference", blurb: "Every key, every config line, and what Maxwell touches on your Mac.",
@@ -196,6 +196,23 @@ project-logo = Acme ~/projects/acme/apps/web/app/icon.png</code></pre>
 <p>${k("⌘ P")} or ${k("⇧ ⇧")} opens search. It matches a session's title, project, branch, account, last message and every file it touched. ${k("↑")} ${k("↓")} move, ${k("⏎")} opens, ${k("Esc")} or a click outside closes.</p>
 <h2>Run an action</h2>
 <p>${k("⌘ K")} shows actions only: every menu command, plus the actions plugins add. Each shows its shortcut, and every shortcut can be changed in <strong>Settings › Keys</strong>.</p>`,
+  },
+
+  voice: {
+    title: "Voice mode",
+    lede: "Maxwell says which session needs you. You answer out loud, and your words are typed into it.",
+    body: `
+<h2>Turn it on</h2>
+<p>Voice mode is off until you turn it on in <strong>Settings › Voice</strong>. Then ${k("⌃ ⌥ M")} starts and ends it from any app. While it is on, an orb sits at the bottom of the screen; its × ends it too.</p>
+<h2>Answer a session</h2>
+<p>When a session needs you, Maxwell says its name and what it asks, then listens for 25 seconds. Say your answer. Once you pause, your words are typed into that session exactly as you said them, and it carries on. Nothing rewrites your reply on the way.</p>
+<p>If the 25 seconds pass, ${k("⌃ ⌥ A")} or a click on the orb opens the microphone again. A second session that starts waiting meanwhile is only named; its question comes when the first is answered.</p>
+<p>A reply that is only one of these is a command, in English or German: <strong>skip</strong> leaves the session for later, <strong>repeat</strong> says the question again, <strong>goodbye</strong> ends voice mode. <strong>Cancel</strong> as your last word takes back what you just said.</p>
+<p>Permission prompts are said but not answered by voice. Sessions in another terminal app and cloud sessions are not announced, because Maxwell can't type into them.</p>
+<h2>What hears you, what speaks</h2>
+<p>Hearing happens on your Mac, with the speech model in macOS 26 or later. What you say is never sent anywhere. Pick the one language Maxwell listens for in Settings › Voice.</p>
+<p>Speaking uses your Mac's own voice. With an <a href="https://elevenlabs.io">ElevenLabs</a> API key, pasted in Settings › Voice and kept in the Keychain, it uses an ElevenLabs voice instead; then the lines Maxwell says, which hold session names and their questions, are sent to ElevenLabs. If ElevenLabs refuses a line, your Mac's voice says it and Settings › Voice shows why.</p>
+<p>The microphone is open only while Maxwell waits for an answer.</p>`,
   },
 
   panels: {
@@ -453,6 +470,9 @@ judge = on                    <span class="c"># off skips the model read, so not
 skip-permissions = on         <span class="c"># off keeps Claude's own permission mode</span>
 auto-titles = on              <span class="c"># off: sessions keep the names you give them</span>
 confirm-close = on            <span class="c"># off: an unfinished session closes without asking</span>
+voice = off                   <span class="c"># on: voice mode, ⌃⌥M from any app</span>
+voice-name = Ada              <span class="c"># what voice mode calls you</span>
+voice-language = en-US        <span class="c"># the language it hears: en-US, en-GB, de-DE</span>
 wrap-line = on                <span class="c"># off: replies don't end with a status line</span>
 notify = true                 <span class="c"># a notification when a session needs you</span>
 notify-sound = Funk           <span class="c"># none, or a macOS sound: Glass, Ping, Submarine…</span>
@@ -497,6 +517,7 @@ linear.sync = suggest</code></pre>
 <tr><td>claude.ai logins</td><td>Maxwell's own WebKit storage, one per account</td><td>Settings › Accounts › Sign out</td></tr>
 <tr><td>Plugins</td><td><code>~/.config/maxwell/plugins/</code></td><td>delete the folder</td></tr>
 <tr><td>Plugin secrets</td><td>Keychain, "Maxwell plugin &lt;id&gt;"</td><td>Settings › Plugins › Remove</td></tr>
+<tr><td>ElevenLabs key, if you add one</td><td>Keychain, "Maxwell voice dev.maxwell.app"</td><td>Settings › Voice › Remove</td></tr>
 </tbody></table>
 <h2>How it works</h2>
 <p>Hooks append each session event to one log file, from every account, whether Maxwell is open or not. The hook is a small C program that takes about 2 ms and always exits 0, so it can never block Claude Code.</p>
@@ -507,6 +528,7 @@ linear.sync = suggest</code></pre>
 <li><strong>Cloud sessions</strong>: every 20 seconds Maxwell asks Claude Code's Sessions API for each account's cloud sessions, signed in with that account's own Claude Code login, which it reads from the Keychain item Claude Code keeps it in. The login is never stored, logged or sent anywhere else.</li>
 <li><strong>Linear</strong>, once you add a key: reads tickets and makes the moves you accept.</li>
 <li><strong>Slack</strong>, once you add a token: reads your DMs, mentions and threads.</li>
+<li><strong>Voice mode</strong>, once you add an ElevenLabs key: the lines Maxwell says, which hold session names and their questions, go to ElevenLabs to be spoken. What you say is turned into text on your Mac and goes nowhere.</li>
 <li><strong>Crash reports</strong>, unless you turn them off: see below.</li>
 </ul>
 <h2 id="crash-reports">Crash reports</h2>

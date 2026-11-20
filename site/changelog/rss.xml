@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Answer your sessions out loud</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-20-voice-mode</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-20-voice-mode</guid>
+<pubDate>Fri, 20 Nov 2026 12:00:00 GMT</pubDate>
+<description>Maxwell has a voice mode. Turn it on in Settings › Voice, press ⌃⌥M from any app, and an orb appears: when a session needs you, Maxwell says its name and what it asks, listens, and types your spoken reply into that session word for word, so it carries on without you touching the keyboard. Say skip, repeat or goodbye to steer it. Hearing happens on your Mac, with the speech model in macOS 26, and what you say is sent nowhere. The voice is your Mac's own, or an ElevenLabs voice once you paste an API key; then the lines Maxwell says go to ElevenLabs. &lt;a href=&quot;/docs/voice&quot;&gt;How voice mode works&lt;/a&gt;</description>
+</item>
+<item>
 <title>Close without being asked</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-20-terminal-keeps-focus</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-20-terminal-keeps-focus</guid>

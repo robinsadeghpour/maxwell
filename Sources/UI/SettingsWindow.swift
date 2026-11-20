@@ -26,6 +26,7 @@ struct SettingsModel {
     var brokenPlugins: [(folder: String, why: String)] = []
     var pluginsFolder = ""
     var phone = PhoneStatus()
+    var voice = VoiceStatus()
 }
 
 /// One plugin as Settings shows it.
@@ -37,7 +38,7 @@ struct PluginInfo {
 }
 
 enum SettingsSection: String, CaseIterable {
-    case general = "General", appearance = "Appearance", accounts = "Accounts", projects = "Projects", phone = "Phone", plugins = "Plugins", keys = "Keys", advanced = "Advanced"
+    case general = "General", appearance = "Appearance", accounts = "Accounts", projects = "Projects", phone = "Phone", voice = "Voice", plugins = "Plugins", keys = "Keys", advanced = "Advanced"
 }
 
 // MARK: controls
@@ -520,6 +521,9 @@ final class SettingsView: MXView {
     /// A phone to remove, and whether to sign out the accounts whose claude.ai sign-in it was given.
     var onRemovePhone: ((String, Bool) -> Void)?
     var onCancelPairing: (() -> Void)?
+    /// Saves (nil: removes) the ElevenLabs key.
+    var onVoiceKey: ((String?) -> Void)?
+    var onVoiceTest: (() -> Void)?
     private let sections = SectionList(frame: .zero)
     private let scroll = NSScrollView()
     let form = FormView(frame: .zero)
@@ -569,6 +573,7 @@ final class SettingsView: MXView {
         case .accounts: accounts()
         case .projects: projects()
         case .phone: phone()
+        case .voice: voice()
         case .plugins: plugins()
         case .keys: keys()
         case .advanced: advanced()

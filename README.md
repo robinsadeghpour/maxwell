@@ -60,6 +60,7 @@ Maxwell takes each group from Claude Code's own record first: what the process s
 - **Files open beside the session, in tabs.** When a session writes or mentions a Markdown file, it opens on the right, rendered, in a preview tab that its next file replaces, like VS Code's. Click any file path in the session to give it a tab of its own; double-click a tab to keep it. Each tab keeps your place, a dot marks a tab with something new, ⌥⌘← → step through them, and they come back after a restart.
 - **Artifacts too, in the right account.** When a session publishes a claude.ai artifact, it opens on the right, signed in to that session's account; a republish reloads it in place. Each account signs in once, on claude.ai's own page, and keeps its own login. Click an artifact link in the terminal to open it the same way, or ⇧⌘O for the account's browser profile or container.
 - **Cloud sessions too.** Sessions running on Anthropic's cloud machines sit in the same groups, marked cloud, with their claude.ai page in the pane. ⌥⌘N starts one, ⌥⌘↑ sends a session there (it commits, pushes and writes a brief first), ⌥⌘↓ brings one back into a fresh worktree. See [Cloud sessions](https://runmaxwell.com/docs/cloud).
+- **Answer out loud.** In voice mode (⌃⌥M, off until you turn it on) Maxwell says which session needs you and what it asks; your spoken reply is typed into it word for word. Hearing happens on your Mac.
 - **Usage for every account.** 5-hour and weekly use with reset times, next to CPU and memory for your Claude processes.
 - **Panels go where you want them.** Sessions, viewer, usage and system can sit left, right or bottom, collapse to a stripe, and remember their place on each screen, like tool windows in JetBrains IDEs.
 - **Names you can read at a glance.** A session keeps Claude's title when it says something. When it's only a slug ("acme-75"), generic ("Continue Previous Task") or the first words of the prompt ("hi, do I need to do"), Haiku names the task once, for about $0.0003. Right-click a session to rename it yourself. Your name always wins. `Maxwell titles` lists every title and where it came from.
@@ -159,6 +160,7 @@ Everything stays on your machine. Maxwell sends nothing anywhere, apart from the
 | claude.ai logins, one per account | Maxwell's own WebKit storage | Settings › Accounts › Sign out |
 | Your plugins | `~/.config/maxwell/plugins/` | delete the folder |
 | Plugin secrets (Linear API key, Slack token) | Keychain, "Maxwell plugin <id>" | Settings › Plugins › Remove |
+| ElevenLabs key for voice mode, if you add one | Keychain, "Maxwell voice dev.maxwell.app" | Settings › Voice › Remove |
 
 ## Configure
 
@@ -236,6 +238,7 @@ Scripted test runs (anything with `--quit-after`) are quiet: no Dock icon, the w
 | `Sources/Install` | Hook installer that edits settings without reordering them |
 | `Sources/Plugins` | Plugin host: discovery, the JSON-RPC wire, restarts, Keychain secrets |
 | `Sources/Bridge` | The phone app's way in: relay connection, pairing, state, commands, pushes ([docs/phone.md](docs/phone.md)) |
+| `Sources/Voice` | Voice mode: hearing you on this Mac, speaking, typing your reply into the session ([docs/voice.md](docs/voice.md)) |
 | `Sources/ClaudeCode` | What Maxwell assumes about Claude Code: cloud sessions, `claude attach` on a windowless terminal, following a transcript |
 | `plugins/` | Plugins that ship with Maxwell (Linear, Slack) and the Swift plugin SDK |
 | `examples/plugins/` | A complete plugin in 55 lines of Python |

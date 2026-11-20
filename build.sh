@@ -105,6 +105,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSItemContentTypes</key><array><string>public.folder</string></array>
   </dict></array>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Voice mode hears your spoken reply to a session. What you say is turned into text on this Mac. Programs you run in Maxwell's terminals may ask for the microphone too.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Voice mode turns your spoken reply into text on this Mac, to type it into the session that asked.</string>
   <key>NSHumanReadableCopyright</key><string>MIT. Ghostty (MIT) and JetBrains Mono (OFL) notices in Resources.</string>
 </dict></plist>
 PLIST
