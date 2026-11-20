@@ -39,6 +39,8 @@ Seen in Claude Code 2.1.3xx (2.1.325 on 2026-11-15). Code: `Sources/App/ClaudeCL
 
 Hooks (session start, stop, notification, prompt submit) and the status-line tap append to `~/.local/state/maxwell/events.jsonl`. Fields used: `session_id`, `transcript_path`, `cwd`, `notification_type`, `last_assistant_message`, `prompt`, `source`, `rate_limits` (`used_percentage`, `resets_at`), `context_window` (`total_input_tokens`, and `used_percentage` of `context_window_size`, which is 1,000,000 on 1M-context models; 2.1.327). Real recorded payloads are in `fixtures/events/`; the reducer tests replay them.
 
+`rate_limits` reaches only the `statusLine` command in `settings.json`, never a hook, and is missing from its payload until the session's first reply (2.1.329). An account with no `statusLine` therefore reports no usage, so install-hooks gives it `maxwell-hook --statusline` as its status line. A status-line command that prints nothing draws nothing in the terminal (2.1.329).
+
 ## The background service
 
 `claude --bg` starts one `claude daemon run` per config folder if none is running. It owns every background session on that account (through `bg-pty-host` and pre-warmed `bg-spare` processes) and outlives Maxwell. Restarting Maxwell does not restart it.

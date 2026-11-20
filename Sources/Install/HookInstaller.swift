@@ -1,13 +1,16 @@
 import Foundation
 
 /// Merges Maxwell's hook into each account's settings.json and a usage tap into the
-/// status-line script. Idempotent, backed up, and reversed exactly by `uninstall`.
+/// status-line script, or a status line that shows nothing where an account has none.
+/// Idempotent, backed up, and reversed exactly by `uninstall`.
 enum HookInstaller {
     static let events = ["SessionStart", "UserPromptSubmit", "Stop", "StopFailure", "Notification", "SessionEnd"]
     static let marker = "maxwell-hook"
     static let tapMarker = "# maxwell usage tap"
     static var hookBinary: URL { Paths.home.appendingPathComponent(".local/share/maxwell/maxwell-hook") }
     static let hookCommand = "\"$HOME/.local/share/maxwell/maxwell-hook\" 2>/dev/null || true"
+    /// The status line for an account that has none. The hook prints nothing in this mode.
+    static let statusLineCommand = "\"$HOME/.local/share/maxwell/maxwell-hook\" --statusline 2>/dev/null || true"
 
     struct Report: CustomStringConvertible {
         var lines: [String] = []
@@ -21,7 +24,7 @@ enum HookInstaller {
         let updated = try copyBinary(bundledHook)
         r.add("hook binary: \(hookBinary.path) (\(updated ? "updated" : "current"))")
         for file in settingsFiles(accounts) {
-            try edit(file, report: &r) { addHooks(&$0) }
+            try edit(file, report: &r) { addHooks(&$0); addStatusLine(&$0) }
         }
         for script in statusLineScripts(accounts) {
             try editText(script, report: &r) { addTap($0) }
@@ -29,10 +32,19 @@ enum HookInstaller {
         return r
     }
 
-    /// After an app update: brings an installed hook up to the bundled one. Never installs it.
-    static func refreshBinary(bundledHook: URL) {
+    /// After an app update: brings an installed hook up to the bundled one, and gives accounts
+    /// that have Maxwell's hooks but no status line the one that reads usage. Never installs
+    /// into an account without the hooks.
+    static func refresh(accounts: [Account], bundledHook: URL) {
         guard FileManager.default.fileExists(atPath: hookBinary.path) else { return }
         _ = try? copyBinary(bundledHook)
+        for file in settingsFiles(accounts) {
+            var r = Report()
+            do {
+                try edit(file, report: &r) { if hasHooks($0) { addStatusLine(&$0) } }
+                if r.description.contains("changed (") { NSLog("usage status line added: %@", r.description) }
+            } catch { NSLog("usage status line not added to %@: %@", file.path, "\(error)") }
+        }
     }
 
     /// Replaces the installed binary when it differs from the bundled one; true if it did.
@@ -50,7 +62,7 @@ enum HookInstaller {
     static func uninstall(accounts: [Account]) throws -> Report {
         var r = Report()
         for file in settingsFiles(accounts) {
-            try edit(file, report: &r) { removeHooks(&$0) }
+            try edit(file, report: &r) { removeHooks(&$0); removeStatusLine(&$0) }
         }
         for script in statusLineScripts(accounts) {
             try editText(script, report: &r) { removeTap($0) }
@@ -119,7 +131,25 @@ enum HookInstaller {
         return hs[0]["command"]?.stringValue?.contains(marker) == true
     }
 
+    static func hasHooks(_ json: OJSON) -> Bool {
+        events.contains { event in
+            guard case .array(let groups) = json["hooks"]?[event] ?? .array([]) else { return false }
+            return groups.contains(where: isOurs)
+        }
+    }
+
     // MARK: status line
+
+    /// Claude Code reports usage only to a status-line command, so an account with none gets
+    /// Maxwell's, which prints nothing. An account's own status line is never replaced.
+    static func addStatusLine(_ json: inout OJSON) {
+        guard json["statusLine"] == nil else { return }
+        json.set("statusLine", .object([("type", .string("command")), ("command", .string(statusLineCommand))]))
+    }
+
+    static func removeStatusLine(_ json: inout OJSON) {
+        if json["statusLine"]?["command"]?.stringValue == statusLineCommand { json.set("statusLine", nil) }
+    }
 
     /// Inserts the tap after the line that reads stdin into a variable (`IN=$(cat)`).
     static func addTap(_ text: String) -> String {
