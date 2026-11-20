@@ -1113,6 +1113,11 @@ final class InputField: MXView, NSTextFieldDelegate {
     func focus() { window?.makeFirstResponder(field) }
     func controlTextDidEndEditing(_ n: Notification) {
         needsDisplay = true
+        commit()
+    }
+
+    /// Commits what is typed now, as Return does: for a Save button beside the field.
+    func commit() {
         let v = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard v != committed else { return }
         committed = v
