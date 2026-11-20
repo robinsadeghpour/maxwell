@@ -577,6 +577,7 @@ resumeElsewhereTests()
 goneFolderTests()
 phoneTests()
 hookInstallerTests()
+voiceTests()
 
 print(failures == 0 ? "reducer tests: all passed" : "reducer tests: \(failures) failed")
 exit(failures == 0 ? 0 : 1)

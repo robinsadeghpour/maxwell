@@ -5,6 +5,15 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-20-voice-mode",
+    date: "2026-11-20",
+    versions: "0.1.70",
+    title: "Answer your sessions out loud",
+    figure: "",
+    body: "Maxwell has a voice mode. Turn it on in Settings › Voice, press ⌃⌥M from any app, and an orb appears: when a session needs you, Maxwell says its name and what it asks, listens, and types your spoken reply into that session word for word, so it carries on without you touching the keyboard. Say skip, repeat or goodbye to steer it. Hearing happens on your Mac, with the speech model in macOS 26, and what you say is sent nowhere. The voice is your Mac's own, or an ElevenLabs voice once you paste an API key; then the lines Maxwell says go to ElevenLabs. <a href=\"/docs/voice\">How voice mode works</a>",
+    fixes: [],
+  },
+  {
     slug: "2026-11-20-terminal-keeps-focus",
     date: "2026-11-20",
     versions: "0.1.69",

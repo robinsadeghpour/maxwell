@@ -4,7 +4,16 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     let store: Store
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
     private var terminals: [SessionID: TerminalView] = [:]
-    private var detached = Set<SessionID>()
+    private(set) var detached = Set<SessionID>()
+    /// Voice mode (MainWindow+Voice): the mode, its orb, and its two shortcuts that work from any app.
+    let voice = VoiceMode()
+    let voiceOrb = VoiceOrb()
+    let voiceToggleKey = GlobalHotKey(id: 1)
+    let voiceAnswerKey = GlobalHotKey(id: 2)
+    var voiceKeyTaken = false
+    let voiceTerminals = PhoneTerminals()
+    /// Scripted runs: the title prefix of the only sessions voice mode may talk to (VoiceHarness).
+    var voiceOnly: String?
     /// When each attached terminal was last on screen; off screen long enough, it is let go.
     private var lastShown: [SessionID: Date] = [:]
     /// Sessions you asked to resume: opening one attaches even though Claude Code stopped it.
@@ -100,6 +109,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         wire()
         restoreShells()
         actions = makeActions()
+        setUpVoice()
         tooltips = Tooltips(window: w)
         Tooltips.shortcut = { [weak self] id in self?.actions.first { $0.id == id }?.shortcut?.display }
         // Ages and the Idle fold move with the clock, not only with events.
@@ -172,7 +182,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
         // A relative link in a rendered file opens in the viewer, in the preview tab.
         root.viewerPane.viewer.onFileLink = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
-        store.onChange = { [weak self] in self?.render($0) }
+        store.onChange = { [weak self] in self?.render($0); self?.voice.sessionsChanged(); self?.releaseVoiceTerminals() }
         store.onViewerItem = { [weak self] id, item, reload in self?.itemSeen(id, item, reload: reload) }
         root.viewerPane.reload.action = { [weak self] in self?.reloadArtifact() }
         root.viewerPane.external.action = { [weak self] in self?.openInBrowser() }
@@ -1283,6 +1293,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         v.onAddAccount = { [weak self] in self?.addAccount() }
         v.onBrowser = { [weak self] account, choice in self?.onConfigEdit?("browser:\(account)", choice?.line ?? "") }
         v.onRunAction = { [weak self] id in self?.actions.first { $0.id == id }?.run() }
+        v.onVoiceKey = { [weak self] in self?.setVoiceKey($0) }
+        v.onVoiceTest = { [weak self] in self?.testVoice() }
         recheckNotifications()
         v.onPluginSecret = { [weak self] id, key, value in
             self?.store.plugins.setSecret(id, key, value)
@@ -1305,7 +1317,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                                      secretsSet: Set(m.settings.filter { $0.type == .secret && store.plugins.secrets.get(m.id, $0.key) != nil }.map(\.key)))
                       },
                       brokenPlugins: store.plugins.broken.map { ($0.dir.lastPathComponent, "\($0.why)") },
-                      pluginsFolder: (store.plugins.paths.user.path as NSString).abbreviatingWithTildeInPath, phone: phone?.status ?? PhoneStatus())
+                      pluginsFolder: (store.plugins.paths.user.path as NSString).abbreviatingWithTildeInPath, phone: phone?.status ?? PhoneStatus(), voice: voiceStatus)
     }
 
     /// Adds `account = <name> <dir>` for a folder that holds a Claude login.
@@ -1756,6 +1768,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 guard let self else { return }; self.onConfigEdit?("rail", self.store.config.rail == "shown" ? "auto" : "shown")
             },
             Action(id: "bring-all-in", title: "Bring Terminal Sessions into Maxwell…", menu: "Session") { [weak self] in self?.bringAllIn() },
+        ] + voiceActions + [
             Action(id: "check-updates", title: "Check for Updates…", menu: "Maxwell") { [weak self] in self?.checkForUpdates() },
             Action(id: "install-update", title: "Restart to Update", menu: "Maxwell", isEnabled: { [weak self] in self?.updater.ready != nil }) { [weak self] in self?.updater.install() },
             Action(id: "install-hooks", title: "Install Hooks", menu: "Maxwell", shortcut: Shortcut("cmd+shift+h")) { [weak self] in self?.installHooks() },

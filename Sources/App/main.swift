@@ -173,6 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         main.refreshSetup()
         CrashReports.apply(enabled: c.crashReports)
         main.applyLook(c)
+        main.voiceConfigChanged()
         IconArt.choice = c.appIcon
         IconArt.apply(dark: Look.theme.dark)
     }

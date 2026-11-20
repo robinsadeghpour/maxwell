@@ -74,14 +74,16 @@ else
 fi
 
 # Sign inside out: the hook helper, then the app. Hardened runtime and a secure timestamp are
-# what notarization requires; Maxwell needs no extra entitlements.
+# what notarization requires. The app's one entitlement is the microphone, for voice mode
+# (packaging/Maxwell.entitlements); the helpers get none.
 # Every executable in the bundle needs this, plugins included, so find them instead of listing them.
 find "$APP/Contents" -type f -perm +111 ! -path "$APP/Contents/MacOS/Maxwell" -print0 |
   while IFS= read -r -d '' bin; do
     file -b "$bin" | grep -q Mach-O && codesign --force --timestamp --options runtime --sign "$ID" "$bin"
   done
-codesign --force --timestamp --options runtime --sign "$ID" "$APP"
+codesign --force --timestamp --options runtime --entitlements packaging/Maxwell.entitlements --sign "$ID" "$APP"
 codesign --verify --strict --deep "$APP"
+codesign -d --entitlements - "$APP" 2>/dev/null | grep -q audio-input || { echo "The signed app lost its microphone entitlement."; exit 1; }
 
 # Notarize the app and staple the ticket to it, so it opens offline too.
 rm -f "$ZIP"
