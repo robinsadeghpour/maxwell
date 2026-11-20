@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         mark("ghostty ready")
 
         Wrap.publish(config.wrapLine)
-        if Updater.isRelease { HookInstaller.refreshBinary(bundledHook: bundledHookURL()) }
+        if Updater.isRelease { HookInstaller.refresh(accounts: config.accounts, bundledHook: bundledHookURL()) }
         store = Store(config: config)
         mark("event log folded (\(store.state.sessions.count) sessions)")
         main = MainWindowController(store: store)

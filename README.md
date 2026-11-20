@@ -152,6 +152,7 @@ Everything stays on your machine. Maxwell sends nothing anywhere, apart from the
 |---|---|---|
 | Hook entries for 6 events | each account's `settings.json`, backed up next to it first | `Maxwell uninstall-hooks` restores them exactly |
 | One line that samples usage | your status-line script, backed up first | same |
+| A status line that shows nothing and samples usage, only where an account has none | that account's `settings.json` | same |
 | The hook program (C, ~2 ms, always exits 0) | `~/.local/share/maxwell/` | delete the folder |
 | Event log, and the status-line rule the hook gives new sessions | `~/.local/state/maxwell/` | delete the folder |
 | Config | `~/.config/maxwell/config` | delete the file |

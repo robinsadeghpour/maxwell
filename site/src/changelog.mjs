@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-20-usage-without-status-line",
+    date: "2026-11-20",
+    versions: "0.1.68",
+    title: "Usage without a status line",
+    figure: "",
+    body: "",
+    fixes: [
+      "Usage now shows for an account that has no status line in Claude Code. Before, its 5-hour and weekly bars stayed empty, because Maxwell reads usage through the status line. Maxwell gives such an account a status line that shows nothing, and takes it out again on uninstall",
+    ],
+  },
+  {
     slug: "2026-11-19-phone-live-activity",
     date: "2026-11-19",
     versions: "0.1.67",

@@ -1026,7 +1026,7 @@ final class SettingsView: MXView {
 
     private func advanced() {
         let missing = model.hooks.contains { !$0.installed }
-        form.header("Hooks", note: "Hooks tell Maxwell when a session starts, stops or needs you. Without them it can't tell. Maxwell also adds one line to your status-line script to read usage; your status line won't change.")
+        form.header("Hooks", note: "Hooks tell Maxwell when a session starts, stops or needs you. Without them it can't tell. Maxwell also adds one line to your status-line script to read usage; your status line won't change. An account with no status line gets one that shows nothing.")
         for h in model.hooks {
             let state = h.file == nil ? "No settings.json" : h.installed ? "Installed" : "Not installed"
             let font = Fonts.mono(Metrics.fontSize - 1)
