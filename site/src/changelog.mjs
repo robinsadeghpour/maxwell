@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-20-terminal-keeps-focus",
+    date: "2026-11-20",
+    versions: "0.1.69",
+    title: "A terminal keeps the keyboard",
+    figure: "",
+    body: "",
+    fixes: [
+      "A plain terminal now keeps the keyboard while you type. Before, it lost it every time another session reported something, and you had to click into the terminal again",
+    ],
+  },
+  {
     slug: "2026-11-20-usage-without-status-line",
     date: "2026-11-20",
     versions: "0.1.68",

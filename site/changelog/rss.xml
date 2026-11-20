@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>A terminal keeps the keyboard</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-20-terminal-keeps-focus</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-20-terminal-keeps-focus</guid>
+<pubDate>Fri, 20 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;A plain terminal now keeps the keyboard while you type. Before, it lost it every time another session reported something, and you had to click into the terminal again&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Usage without a status line</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-20-usage-without-status-line</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-20-usage-without-status-line</guid>
