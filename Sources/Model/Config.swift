@@ -41,7 +41,7 @@ struct Config: Equatable {
     var rail = "auto"
     /// How long the pointer rests on the left edge before the rail slides in (the Dock waits longer).
     var railDelay: Double = 0.18
-    /// `project-pin = <name>` lines, in rail order. Unpinned projects show on the rail only while they need him.
+    /// `project-pin = <name>` lines, in rail order. Other projects show on the rail while a session in them is open.
     var pinned: [String] = []
     /// `project-logo = <name> <path>` overrides the logo found in the repo.
     var logos: [String: String] = [:]

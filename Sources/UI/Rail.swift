@@ -1,9 +1,10 @@
 import AppKit
 
-/// The project rail, Dock-like: All, the pinned projects, then unpinned ones only while they
-/// need him. Click or ⌘0–⌘9; right-click to keep or remove; drag to reorder, drag out to remove.
+/// The project rail, Dock-like: All, the kept projects (with or without sessions), then the others
+/// while a session in them is open. Keys that don't fit stay in the ⋯ menu.
+/// Click or ⌘0–⌘9; right-click to keep or remove; drag to reorder, drag out to remove.
 final class ProjectRail: MXView, TipSource {
-    /// `entries[0]` is All; then pinned projects in order; then unpinned ones that need him.
+    /// `entries[0]` is All; then kept projects in order; then the others with an open session.
     var entries: [ProjectEntry] = [] {
         didSet { if entries != oldValue { monograms = Self.unique(entries.map(\.name)); needsDisplay = true } }
     }
@@ -70,8 +71,12 @@ final class ProjectRail: MXView, TipSource {
     }
     private var dividers: [CGFloat] {
         var out = [rect(0).maxY + 6]
-        if pinnedCount > 0, entries.count > pinnedCount + 1 { out.append(rect(pinnedCount).maxY + 6) }
+        if pinnedCount > 0, shown.count > pinnedCount + 1 { out.append(rect(pinnedCount).maxY + 6) }
         return out
+    }
+    /// The keys that fit above the ⋯ key; the rest are only in its menu.
+    private var shown: Range<Int> {
+        entries.startIndex..<(entries.indices.first { rect($0).maxY > moreRect.minY - 6 } ?? entries.endIndex)
     }
     private var moreRect: NSRect { NSRect(x: (bounds.width - Self.key) / 2, y: bounds.height - Self.key - 7, width: Self.key, height: Self.key) }
 
@@ -89,7 +94,7 @@ final class ProjectRail: MXView, TipSource {
         if e.name == nil {
             detail = counts.isEmpty ? "What needs you, from every project" : counts.joined(separator: ", ") + ", across all projects"
         } else {
-            let state = e.pinned ? "Kept in the rail" : "Shows while it needs you"
+            let state = e.pinned ? "Kept in the rail" : "Shows while a session is open"
             detail = counts.isEmpty ? state : counts.joined(separator: ", ") + ". " + state
         }
         let action = e.name == nil ? "project-all" : e.key.map { "project-\($0)" }
@@ -102,8 +107,8 @@ final class ProjectRail: MXView, TipSource {
         if overlay { t.panel.withAlphaComponent(0.97).setFill(); bounds.fill() }
         t.hair.setFill()
         for y in dividers { NSRect(x: 12, y: y, width: bounds.width - 24, height: 1).fill() }
-        for (i, e) in entries.enumerated() where drag?.index != i {
-            drawKey(i, e, in: rect(i), alpha: 1)
+        for i in shown where drag?.index != i {
+            drawKey(i, entries[i], in: rect(i), alpha: 1)
         }
         if let d = drag {
             if !d.out, let slot = dropSlot(d.y) {
@@ -151,7 +156,7 @@ final class ProjectRail: MXView, TipSource {
 
     private func index(at p: NSPoint) -> Int? {
         if moreRect.insetBy(dx: -6, dy: -2).contains(p) { return -1 }
-        return entries.indices.first { rect($0).insetBy(dx: -7, dy: -2).contains(p) }
+        return shown.first { rect($0).insetBy(dx: -7, dy: -2).contains(p) }
     }
 
     /// Where a dragged key would land among the pinned: 0 … pinnedCount.
