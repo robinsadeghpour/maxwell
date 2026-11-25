@@ -641,7 +641,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         for (name, flag) in [("cmd+", NSEvent.ModifierFlags.command), ("shift+", .shift), ("alt+", .option), ("ctrl+", .control)] where key.contains(name) {
             mods.insert(flag); key = key.replacingOccurrences(of: name, with: "")
         }
-        let named: [String: (String, UInt16)] = ["esc": ("\u{1b}", 53), "return": ("\r", 36), "down": ("\u{F701}", 125), "up": ("\u{F700}", 126), "left": ("\u{F702}", 123), "right": ("\u{F703}", 124)]
+        let named: [String: (String, UInt16)] = ["backspace": ("\u{7f}", 51), "esc": ("\u{1b}", 53), "return": ("\r", 36), "down": ("\u{F701}", 125), "up": ("\u{F700}", 126), "left": ("\u{F702}", 123), "right": ("\u{F703}", 124)]
         let (chars, code) = named[key] ?? (key, Self.keyCodes[key] ?? 0)
         for t in [NSEvent.EventType.keyDown, .keyUp] {
             if let e = NSEvent.keyEvent(with: t, location: .zero, modifierFlags: mods, timestamp: now, windowNumber: w.windowNumber,

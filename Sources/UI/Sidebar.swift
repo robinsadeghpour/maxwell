@@ -43,6 +43,9 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private var cursor: SessionID?
     private var hoverIndex: Int?
     var onOpen: ((SessionID) -> Void)?
+    /// ⌘⌫ on the row under the cursor, a session's or a terminal's, as in Finder. Only here: in the
+    /// terminal ⌘⌫ deletes the line being typed.
+    var onClose: ((SessionID) -> Void)?
     /// Plain terminals, drawn first under their own header; × on a row ends it.
     var shells: [ShellRow] = [] { didSet { if shells != oldValue { rebuildItems() } } }
     var onCloseShell: ((String) -> Void)?
@@ -665,6 +668,11 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     override func resignFirstResponder() -> Bool { needsDisplay = true; return true }
 
     override func keyDown(with e: NSEvent) {
+        if e.keyCode == 51, e.modifierFlags.intersection([.command, .shift, .control, .option]) == .command {
+            // A closed session has nothing left to close.
+            if let c = cursor, shells.contains(where: { $0.id == c }) || row(c).map({ $0.group != .recentlyClosed }) == true { onClose?(c) }
+            return
+        }
         switch e.charactersIgnoringModifiers {
         case "j", String(UnicodeScalar(NSDownArrowFunctionKey)!): move(1)
         case "k", String(UnicodeScalar(NSUpArrowFunctionKey)!): move(-1)
