@@ -284,7 +284,7 @@ browser = work firefox container Work   <span class="c"># &lt;account&gt; &lt;br
 account = personal ~/.claude-personal</code></pre>
 <p>Run <strong>Maxwell › Install Hooks</strong> again after adding one, so its sessions report in.</p>
 <h2>Usage</h2>
-<p>The Usage panel shows 5-hour and weekly use for every account, with reset times. The System panel shows CPU and memory for your Claude processes.</p>
+<p>The Usage panel shows 5-hour and weekly use for every account, with reset times. The System panel shows CPU and memory for Claude Code, Maxwell and the whole Mac. Click it, or choose Panels › System Details, for the last five minutes of CPU and what each session uses with the commands it runs; click a session there to open it.</p>
 <p>New sessions from ${k("⌘ T")} go to the account with the most room. A session that hits its limit moves to <strong>Limited</strong>. Resume it when the window resets, or press ${k("⇧ ⌘ M")} to move it to the account with the most room.</p>`,
   },
 

@@ -14,7 +14,6 @@
   "plugins/slack/Sources/Manifest.swift": 1
  },
  "effects-in-ui": {
-  "Sources/UI/BottomPanel.swift": 1,
   "Sources/UI/FileTree.swift": 1,
   "Sources/UI/IconArt.swift": 2,
   "Sources/UI/ProjectLogo.swift": 5,
@@ -53,8 +52,7 @@
   "Sources/App/Browsers.swift": 1,
   "Sources/App/ClaudeCLI.swift": 1,
   "Sources/App/Updater.swift": 2,
-  "Sources/Plugins/PluginConnection.swift": 1,
-  "Sources/UI/BottomPanel.swift": 1
+  "Sources/Plugins/PluginConnection.swift": 1
  },
  "remembered-state": {
   "Sources/App/MainWindow.swift": 5,

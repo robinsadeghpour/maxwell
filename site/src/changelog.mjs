@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-25-system-details",
+    date: "2026-11-25",
+    versions: "0.1.73",
+    title: "Which session is using your Mac",
+    figure: "",
+    body: "Click the System panel, or choose Panels › System Details, and a card opens over it: the last five minutes of CPU for the whole Mac and for Claude Code, then every running session with the CPU and memory it uses, counting the commands and MCP servers it runs. Click a session to open it. The footer shows memory pressure and opens Activity Monitor.",
+    fixes: [
+      "The claude row in the System panel now counts the commands each session runs, as its tooltip always said",
+    ],
+  },
+  {
     slug: "2026-11-25-steady-usage",
     date: "2026-11-25",
     versions: "0.1.72",
