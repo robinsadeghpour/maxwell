@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Usage bars that hold still</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-25-steady-usage</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-25-steady-usage</guid>
+<pubDate>Wed, 25 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;The usage bars now hold still. Before, they jumped back to an older number now and then, because every session reports the limits it last saw and an idle session sent its old ones again. Maxwell now keeps the newest reading for each 5-hour and weekly window&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Answer your sessions out loud</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-20-voice-mode</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-20-voice-mode</guid>
