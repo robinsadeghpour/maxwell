@@ -23,21 +23,24 @@ final class Updater {
         timer = Timer.scheduledTimer(withTimeInterval: 4 * 3600, repeats: true) { [weak self] _ in self?.check() }
     }
 
+    /// Looks for a newer release, also while one is waiting: a newer one takes its place.
     func check(done: ((Check) -> Void)? = nil) {
-        if let r = ready { done?(.ready(r.version)); return }
         guard !busy else { return }
         busy = true
+        let waiting = ready?.version
         DispatchQueue.global(qos: .utility).async {
-            let result = Self.fetch()
+            let result = Self.fetch(waiting: waiting)
             DispatchQueue.main.async {
                 self.busy = false
-                switch result {
-                case .success(let r?):
+                if case .success(let r?) = result {
                     self.ready = r
                     self.onReady?(r.version)
-                    done?(.ready(r.version))
-                case .success(nil): done?(.upToDate)
-                case .failure(let e): done?(.failed(e.message))
+                }
+                Self.dropDownloads(except: self.ready?.version)
+                switch (result, self.ready) {
+                case (_, let r?): done?(.ready(r.version))
+                case (.success, nil): done?(.upToDate)
+                case (.failure(let e), nil): done?(.failed(e.message))
                 }
             }
         }
@@ -89,20 +92,31 @@ final class Updater {
 
     private static let curl = "/usr/bin/curl"
 
-    /// The latest public release and its zip, from GitHub's API. No login needed.
-    private static func fetch() -> Result<(version: String, app: URL)?, Failure> {
+    private static var downloads: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("\(releaseID)/updates")
+    }
+
+    /// Every downloaded release but the one waiting to be installed goes: each is a whole app.
+    private static func dropDownloads(except version: String?) {
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: downloads.path)) ?? [] where name != version {
+            try? FileManager.default.removeItem(at: downloads.appendingPathComponent(name))
+        }
+    }
+
+    /// The latest public release and its zip, from GitHub's API, when it is newer than this app
+    /// and than the update `waiting`. No login needed.
+    private static func fetch(waiting: String?) -> Result<(version: String, app: URL)?, Failure> {
         guard let out = run(curl, ["-fsSL", "--max-time", "20", "-H", "Accept: application/vnd.github+json", "https://api.github.com/repos/\(repo)/releases/latest"]),
               let json = try? JSONSerialization.jsonObject(with: Data(out.utf8)) as? [String: Any],
               let tag = json["tag_name"] as? String else { return .failure(Failure(message: "Couldn't reach GitHub.")) }
         let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
-        guard newer(version, than: current) else { return .success(nil) }
+        guard UpdateVersion.wanted(latest: version, running: current, waiting: waiting) else { return .success(nil) }
         let assets = json["assets"] as? [[String: Any]] ?? []
         guard let asset = assets.first(where: { ($0["name"] as? String)?.hasSuffix(".zip") == true }),
               let name = asset["name"] as? String, let url = asset["browser_download_url"] as? String else {
             return .failure(Failure(message: "\(tag) has no app to download."))
         }
-        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("\(releaseID)/updates/\(version)")
+        let dir = downloads.appendingPathComponent(version)
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let zip = dir.appendingPathComponent(name)
@@ -117,16 +131,6 @@ final class Updater {
             return .failure(Failure(message: "The download for \(tag) isn't a Maxwell release."))
         }
         return .success((version, app))
-    }
-
-    static func newer(_ a: String, than b: String) -> Bool {
-        let x = a.split(separator: ".").compactMap { Int($0) }, y = b.split(separator: ".").compactMap { Int($0) }
-        guard !x.isEmpty else { return false }
-        for i in 0..<max(x.count, y.count) {
-            let l = i < x.count ? x[i] : 0, r = i < y.count ? y[i] : 0
-            if l != r { return l > r }
-        }
-        return false
     }
 
     private static func run(_ path: String, _ args: [String]) -> String? {
