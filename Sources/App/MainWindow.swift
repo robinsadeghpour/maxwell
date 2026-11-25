@@ -134,6 +134,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
         root.sidebar.list.onCloseShell = { [weak self] in self?.requestCloseShell($0) }
+        root.sidebar.list.onClose = { [weak self] in self?.close($0) }
         root.sidebar.list.shellMenuFor = { [weak self] in self?.shellMenu($0) }
         root.sidebar.list.onRenameShell = { [weak self] in self?.renameShell($0) }
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
@@ -834,7 +835,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// ⇧⌘⌫ (⌘⌫ itself belongs to the terminal: delete to line start), the row menu and the banner button. Safe sessions close at once; any other asks
+    /// ⇧⌘⌫ anywhere, ⌘⌫ in the session list (in the terminal ⌘⌫ deletes the line being typed), the row menu and the banner button. Safe sessions close at once; any other asks
     /// first and says what is still open, unless `confirm-close` is off. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
         if shell(id) != nil { return requestCloseShell(id) }

@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-close-from-the-list",
+    date: "2026-11-26",
+    versions: "0.1.74",
+    title: "⌘⌫ closes from the session list",
+    figure: "",
+    body: "",
+    fixes: [
+      "⌘⌫ now closes the session or terminal under the cursor in the session list. Before, the right-click menu showed ⌘⌫ beside Close Session, but only ⇧⌘⌫ closed one. In the terminal ⌘⌫ still deletes the line you're typing, and ⇧⌘⌫ closes from anywhere",
+    ],
+  },
+  {
     slug: "2026-11-25-rail-keeps-projects",
     date: "2026-11-25",
     versions: "0.1.73",

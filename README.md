@@ -97,6 +97,7 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘N | New session: pick the project (search all your repos) and account. From a terminal: `open -a Maxwell .` |
 | Esc or click outside | Close search, the palette or a panel |
 | ⇧⌘⌫ | Close the session: at once when it's safe, otherwise after saying what's still open |
+| ⌘⌫ | The same, in the session list, for the row under the cursor. In the terminal it deletes the line you're typing |
 | ⇧⌘X | Close all safe (asks first) |
 | ⌘⌫, ⌥⌫ | In the terminal: delete to the start of the line, delete a word |
 | ⌘V | Paste text, copied files (as paths) or a screenshot (as an image) |
