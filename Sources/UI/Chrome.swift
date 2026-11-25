@@ -358,6 +358,7 @@ final class TreeHeader: MXView {
         t.hair2.setFill()
         NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
         NSRect(x: bounds.width - 1, y: 0, width: 1, height: bounds.height).fill()
-        Text.draw(title, in: NSRect(x: 17, y: 0, width: bounds.width - 29, height: bounds.height - 1), color: t.fg2, font: Fonts.mono(Metrics.fontSize, .semibold))
+        // The label style of every panel header ("SLACK 2", "USAGE").
+        Text.draw(title.uppercased(), in: NSRect(x: 12, y: 0, width: bounds.width - 24, height: bounds.height - 1), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 2.5, .medium))
     }
 }

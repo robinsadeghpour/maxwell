@@ -117,7 +117,10 @@ final class ViewerTabStrip: MXView, TipSource {
     }
 
     /// One line, cut in the middle so the extension stays ("decisi…ons.tsv").
-    private func drawTitle(_ s: String, in r: NSRect, color: NSColor, font: NSFont) {
+    private func drawTitle(_ s: String, in r: NSRect, color: NSColor, font: NSFont) { Self.drawName(s, in: r, color: color, font: font) }
+
+    /// A file name on one line, cut in the middle; shared with the file tree.
+    static func drawName(_ s: String, in r: NSRect, color: NSColor, font: NSFont) {
         let p = NSMutableParagraphStyle(); p.lineBreakMode = .byTruncatingMiddle
         let a = NSAttributedString(string: s, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: p])
         let h = font.ascender - font.descender

@@ -435,7 +435,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <h2>Panels and viewer</h2>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌘ B")}, ${k("⌥ ⌘ B")}, ${k("⌥ ⌘ J")}</td><td>Toggle left, right, bottom panels</td></tr>
-<tr><td>${k("⌥ ⌘ 6")}</td><td>The first plugin panel (every one is in the Panels menu and ⌘K)</td></tr>
+<tr><td>${k("⌥ ⌘ 6")} – ${k("⌥ ⌘ 9")}</td><td>Plugin panels, in their order on the stripe (every one is in the Panels menu and ⌘K)</td></tr>
 <tr><td>${k("⇧ ⌘ ↩")}</td><td>The panel you're in fills the window, or comes back (also Esc, or double-click its header)</td></tr>
 <tr><td>${k("⇧ ⌘ T")}</td><td>Show or hide the session's folder beside the viewer's page</td></tr>
 <tr><td>${k("⌥ ⌘ P")}</td><td>Keep the viewer tab open</td></tr>

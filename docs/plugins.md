@@ -79,7 +79,7 @@ Everything a plugin can show is declared here, so Maxwell can list it in Setting
 
 Each plugin panel is a tool window of its own, on the right by default, with a button on that
 side's stripe that shows its title's first letter and the panel's `count`. It moves, hides and fills
-the window like Maxwell's own panels. ⌥⌘6 opens the first one; every one is in the Panels menu
+the window like Maxwell's own panels. ⌥⌘6 to ⌥⌘9 open the first four, in the layout's order; every one is in the Panels menu
 and ⌘K. It exists while its plugin is on, and keeps its place in the layout while it is off.
 
 There is no HTML and no custom drawing. A panel is data (sections of rows) and Maxwell draws it

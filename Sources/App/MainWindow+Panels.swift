@@ -140,7 +140,7 @@ extension MainWindowController {
         var list: [Action] = []
         let plugins = root.panels.order.filter { root.pluginPanels[$0] != nil }
         for p in PanelID.builtIn + plugins {
-            let key = p.key ?? (p == plugins.first ? 6 : nil)
+            let key = p.key ?? plugins.firstIndex(of: p).flatMap { $0 < 4 ? 6 + $0 : nil }
             list.append(Action(id: "panel-\(p.rawValue)", title: "\(root.title(p)) Panel", menu: "Panels",
                                shortcut: key.flatMap { Shortcut("cmd+alt+\($0)") }) { [weak self] in self?.togglePanel(p) })
         }

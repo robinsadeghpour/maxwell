@@ -499,7 +499,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let fr = w.firstResponder as? NSView
         let inViewer = fr.map { $0.isDescendant(of: root.viewerPane) } ?? false
         let inSession = fr.map { $0.isDescendant(of: root.sessionPane) } ?? false
-        root.sessionDim.isHidden = inSession || current == nil
+        root.sessionDim.isHidden = inSession || current == nil || root.maximized != nil
         root.viewerDim.isHidden = inViewer || !root.isShown(.viewer)
     }
 
@@ -564,6 +564,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     // MARK: sessions
 
     func open(_ id: SessionID) {
+        root.maximized = nil  // another session: show it, not a panel over it
         if let t = shell(id) {
             current = id
             remember(id)
@@ -1025,7 +1026,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func show(_ item: ViewerItem, for id: SessionID?, keep: Bool = true) {
         guard let id else { return }
         viewers[id, default: ViewerTabs()].open(item, keep: keep)
-        if id == current { viewerForced = nil; syncViewer() }
+        guard id == current else { return }
+        viewerForced = nil
+        syncViewer()
+        // You opened it: it shows, even over Slack or with the right side hidden.
+        if !root.isShown(.viewer) { root.setHidden(.viewer, false); updateBadges() }
     }
 
     /// A click, drag or menu choice on a viewer tab.
@@ -1132,7 +1137,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// The folder beside the page stays until hidden (saved in the config).
     func toggleTree() {
-        root.viewerPane.toggleTree { [weak self] on in self?.onConfigEdit?("file-tree", on ? "true" : "false") }
+        var on = false
+        root.viewerPane.toggleTree { [weak self] in on = $0; self?.onConfigEdit?("file-tree", $0 ? "true" : "false") }
+        // The folder lives in the viewer: turning it on with the viewer away brings the viewer.
+        if on, !root.isShown(.viewer) { togglePanel(.viewer) }
     }
 
     /// Test runs: as if the session on show wrote or named it.

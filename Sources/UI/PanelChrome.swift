@@ -35,7 +35,7 @@ final class PanelControls: MXView {
                 root.toggleMaximize(d)
             }) }
         buttons.append(
-            IconButton(.close, tip: Tip("Hide \(title)", action: p.key == nil ? nil : "panel-\(p.rawValue)")) { [weak self] in self?.root?.setHidden(p, true) })
+            IconButton(.minimize, tip: Tip("Hide \(title)", action: "panel-\(p.rawValue)")) { [weak self] in self?.root?.setHidden(p, true) })
         buttons.forEach(addSubview)
         needsLayout = true
     }
@@ -122,15 +122,14 @@ final class Stripe: MXView, TipSource {
     required init?(coder: NSCoder) { fatalError() }
 
     private func rects() -> [NSRect] {
-        items.indices.map { NSRect(x: 3, y: 6 + CGFloat($0) * 28, width: bounds.width - 6, height: 24) }
+        items.indices.map { NSRect(x: 3, y: Metrics.header / 2 - 12 + CGFloat($0) * 28, width: bounds.width - 6, height: 24) }
     }
 
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         guard let i = index(at: p) else { return nil }
         let it = items[i]
-        let shortcut = it.panel.key.map { _ in "panel-\(it.panel.rawValue)" }
-        var tip = Tip(it.title, action: shortcut)
-        if case .count(let n)? = it.badge { tip = tip.adding(n == 1 ? "1 needs you" : "\(n) need you") }
+        var tip = Tip(it.title, action: "panel-\(it.panel.rawValue)")
+        if case .count(let n)? = it.badge { tip = tip.adding("\(n) waiting for you") }
         if it.badge == .dot { tip = tip.adding("Something new opened here") }
         if it.badge == .warning { tip = tip.adding("The plugin stopped") }
         return (tip, rects()[i])
@@ -162,6 +161,31 @@ final class Stripe: MXView, TipSource {
         if let i = index(at: convert(e.locationInWindow, from: nil)) { onMenu?(items[i].panel, e) }
     }
     override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+
+    // Drawn by hand, so each icon tells VoiceOver it is a button, what it shows and whether it is open.
+    override func isAccessibilityElement() -> Bool { false }
+    override func accessibilityChildren() -> [Any]? {
+        zip(items, rects()).map { it, r in
+            var label = it.title
+            if case .count(let n)? = it.badge { label += ", \(n) waiting for you" }
+            return PressElement(parent: self, frame: r, label: label, selected: it.open) { [weak self] in self?.onToggle?(it.panel) }
+        }
+    }
+}
+
+/// A hand-drawn control's stand-in for VoiceOver: a button that can be pressed.
+final class PressElement: NSAccessibilityElement {
+    private let press: () -> Void
+    init(parent: NSView, frame: NSRect, label: String, selected: Bool, press: @escaping () -> Void) {
+        self.press = press
+        super.init()
+        setAccessibilityParent(parent)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(label)
+        setAccessibilitySelected(selected)
+        setAccessibilityFrameInParentSpace(frame)
+    }
+    override func accessibilityPerformPress() -> Bool { press(); return true }
 }
 
 /// The small line icons that stand for a panel on a stripe and in the status bar. A plugin's
@@ -203,11 +227,8 @@ enum PanelGlyph {
                 path.move(to: NSPoint(x: c.x + 4, y: c.y + CGFloat(o))); path.line(to: NSPoint(x: c.x + 6.5, y: c.y + CGFloat(o)))
             }
         default:
-            let box = NSRect(x: c.x - 7, y: c.y - 7, width: 14, height: 14)
-            path.appendRoundedRect(box.insetBy(dx: 0.5, dy: 0.5), xRadius: 3, yRadius: 3)
-            path.stroke()
             let letter = String(title.first.map { String($0).uppercased() } ?? "?")
-            Text.draw(letter, in: box.offsetBy(dx: 0, dy: 0.5), color: color, font: Fonts.mono(9, .semibold), align: .center)
+            Text.draw(letter, in: NSRect(x: c.x - 8, y: c.y - 8, width: 16, height: 16), color: color, font: Fonts.mono(12, .semibold), align: .center)
             return
         }
         path.stroke()
@@ -218,6 +239,8 @@ enum PanelGlyph {
     static func badge(_ b: Stripe.Badge, at p: NSPoint, theme t: Theme) {
         switch b {
         case .dot, .warning:
+            t.plane.setFill()
+            NSBezierPath(ovalIn: NSRect(x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9)).fill()
             (b == .dot ? t.fg : t.chk).setFill()
             NSBezierPath(ovalIn: NSRect(x: p.x - 3, y: p.y - 3, width: 6, height: 6)).fill()
         case .count(let n):
@@ -225,6 +248,8 @@ enum PanelGlyph {
             let font = Fonts.mono(8.5, .semibold)
             let w = max(12, Text.width(s, font: font) + 6)
             let r = NSRect(x: p.x - w + 4, y: p.y - 5, width: w, height: 11)
+            t.plane.setFill()
+            NSBezierPath(roundedRect: r.insetBy(dx: -1.5, dy: -1.5), xRadius: 7, yRadius: 7).fill()
             t.color(for: .needsYou).setFill()
             NSBezierPath(roundedRect: r, xRadius: 5.5, yRadius: 5.5).fill()
             Text.draw(s, in: r.offsetBy(dx: 0, dy: -0.5), color: t.background, font: font, align: .center)

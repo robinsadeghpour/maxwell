@@ -229,7 +229,7 @@ final class RootView: MXView {
         let ps = panels.panels(side, among: present)
         guard ps.count >= 2 else { return [] }
         let open = shown(side)
-        return ps.map { Stripe.Item(panel: $0, title: title($0), open: open.contains($0), badge: badges[$0]) }
+        return ps.map { Stripe.Item(panel: $0, title: title($0), open: open.contains($0), badge: open.contains($0) ? nil : badges[$0]) }
     }
 
     // MARK: layout
@@ -251,8 +251,11 @@ final class RootView: MXView {
         case .left: return min(max(Self.minSize[.left]!, s), bounds.width * 0.45)
         case .right:
             // The file tree and a readable page side by side: the area widens rather than squeeze either.
-            let least = ps.contains(.viewer) ? max(Self.minSize[.right]!, min(viewerPane.leastWidth, bounds.width * 0.7)) : Self.minSize[.right]!
-            return min(max(least, s), max(least, bounds.width * 0.6))
+            // ...but never so wide that the terminal drops under a readable width.
+            let room = bounds.width - taken(.left) - 2 * Stripe.width - Self.terminalMin
+            let least = ps.contains(.viewer) ? max(Self.minSize[.right]!, min(viewerPane.leastWidth, room)) : Self.minSize[.right]!
+            // A narrow window: the right side gives way first, down to its minimum.
+            return min(max(least, s), max(least, min(bounds.width * 0.6, room)))
         case .bottom: return min(max(Self.minSize[.bottom]!, s), bodyH * 0.6)
         }
     }
@@ -411,6 +414,8 @@ final class RootView: MXView {
     // MARK: resizing the areas
 
 
+    /// Under this the session's screen reflows into a column.
+    static let terminalMin: CGFloat = 480
     static let minSize: [Dock: CGFloat] = [.left: 200, .right: 280, .bottom: 80]
 
     /// A divider moved to `p` (root coordinates): the area's edge follows the pointer.

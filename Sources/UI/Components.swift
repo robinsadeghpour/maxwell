@@ -262,7 +262,7 @@ final class IconButton: MXView, TipSource {
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? { (tip, bounds) }
 
     override func draw(_ r: NSRect) {
-        if hover || isOn || pressed {
+        if hover || pressed || (isOn && icon != .sidebarLeft && icon != .sidebarRight) {
             (pressed ? t.rowSel : t.hover).setFill()
             NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4).fill()
         }

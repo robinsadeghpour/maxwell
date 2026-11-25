@@ -51,7 +51,7 @@ final class StatusBar: MXView, TipSource {
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         if let i = panelRects().firstIndex(where: { $0.contains(p) }) {
             let it = panels[i]
-            return (Tip("\(it.open ? "Hide" : "Show") \(it.title)", action: it.panel.key == nil ? nil : "panel-\(it.panel.rawValue)"), panelRects()[i])
+            return (Tip("\(it.open ? "Hide" : "Show") \(it.title)", action: "panel-\(it.panel.rawValue)"), panelRects()[i])
         }
         if let r = warningRect, r.contains(p), let w = warning { return (w.tip, r) }
         guard let (g, n, r) = countRects.first(where: { $0.2.contains(p) }) else { return nil }
@@ -124,6 +124,12 @@ final class StatusBar: MXView, TipSource {
         }
     }
 
+    override func accessibilityChildren() -> [Any]? {
+        let own = zip(panels, panelRects()).map { it, r in
+            PressElement(parent: self, frame: r, label: "\(it.open ? "Hide" : "Show") \(it.title)", selected: it.open) { [weak self] in self?.onPanel?(it.panel) }
+        }
+        return own + (super.accessibilityChildren() ?? [])
+    }
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if trackingAreas.isEmpty { addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)) }

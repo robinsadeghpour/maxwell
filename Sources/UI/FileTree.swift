@@ -252,7 +252,7 @@ final class FileCell: NSView {
         guard let node else { return }
         let t = Look.theme
         let midY = bounds.midY
-        t.hair.setFill()
+        t.fg3.withAlphaComponent(0.35).setFill()
         for l in 0..<level { NSRect(x: 14 + CGFloat(l) * Self.indent, y: 0, width: 1, height: bounds.height).fill() }
         var x = 8 + CGFloat(level) * Self.indent
         let ink = dimmed ? t.fg3 : t.fg2
@@ -271,8 +271,9 @@ final class FileCell: NSView {
         ViewerTabStrip.drawKind(node.isDir ? nil : ViewerPane.kind(node.url), at: NSPoint(x: x + 6, y: midY), color: ink)
         x += 17
         let name = node.url.lastPathComponent
-        Text.draw(name, in: NSRect(x: x, y: 0, width: max(0, bounds.width - x - 6), height: bounds.height),
-                  color: dimmed ? t.fg3 : t.fg, font: Fonts.mono(Metrics.fontSize - 0.5))
+        // Cut in the middle, so the extension stays ("passkeys-r…ollout.md").
+        ViewerTabStrip.drawName(name, in: NSRect(x: x, y: 0, width: max(0, bounds.width - x - 6), height: bounds.height),
+                                color: dimmed ? t.fg3 : t.fg, font: Fonts.mono(Metrics.fontSize - 0.5))
     }
 }
 
