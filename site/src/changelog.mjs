@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-25-steady-usage",
+    date: "2026-11-25",
+    versions: "0.1.72",
+    title: "Usage bars that hold still",
+    figure: "",
+    body: "",
+    fixes: [
+      "The usage bars now hold still. Before, they jumped back to an older number now and then, because every session reports the limits it last saw and an idle session sent its old ones again. Maxwell now keeps the newest reading for each 5-hour and weekly window",
+    ],
+  },
+  {
     slug: "2026-11-20-voice-mode",
     date: "2026-11-20",
     versions: "0.1.70 – 0.1.71",
