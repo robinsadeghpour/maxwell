@@ -61,7 +61,10 @@ extension MainWindowController {
     func refreshSystemDetail() {
         guard let sample = root.system.sample else { return }
         let state = store.state
-        let rows = sample.sessions.compactMap { id, load in state.sessions[id].map { SystemDetail.Row(id: id, title: $0.title, load: load) } }
+        let now = Date(), rules = store.config.rules
+        let rows = sample.sessions.compactMap { id, load in
+            state.sessions[id].map { SystemDetail.Row(id: id, title: $0.title, group: state.group($0, now: now, rules: rules), load: load) }
+        }
         systemDetail.update(sample: sample, history: root.system.history, rows: rows)
     }
 }
