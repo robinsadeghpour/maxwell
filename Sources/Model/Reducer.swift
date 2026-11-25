@@ -17,8 +17,8 @@ func reduce(into s: inout AppState, _ event: Event) {
     case .usage(let u):
         guard let acct = s.accountId(forConfigDir: u.configDir), let i = s.accounts.firstIndex(where: { $0.id == acct }) else { return }
         if let prev = s.accounts[i].sampledAt, prev > u.at { return }
-        if let w = u.fiveHour { s.accounts[i].fiveHour = w }
-        if let w = u.week { s.accounts[i].week = w }
+        s.accounts[i].fiveHour = .newer(s.accounts[i].fiveHour, u.fiveHour)
+        s.accounts[i].week = .newer(s.accounts[i].week, u.week)
         s.accounts[i].sampledAt = u.at
         if let sid = u.sessionId, let tokens = u.contextTokens, tokens > 0 { s.sessions[sid]?.contextTokens = tokens; s.sessions[sid]?.contextPercent = u.contextPercent }
         // A limit hit often lands before the sample that says when it resets.

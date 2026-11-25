@@ -27,6 +27,15 @@ typealias SessionID = String
 struct UsageWindow: Equatable {
     var usedPercent: Double
     var resetsAt: Date
+
+    /// Every session reports the limits it last saw, so an idle one sends old numbers again.
+    /// Within one window usage only grows: a later reset is a newer window, and for the same
+    /// reset the higher percent is the newer reading.
+    static func newer(_ old: UsageWindow?, _ new: UsageWindow?) -> UsageWindow? {
+        guard let new else { return old }
+        guard let old, new.resetsAt <= old.resetsAt else { return new }
+        return new.resetsAt == old.resetsAt && new.usedPercent > old.usedPercent ? new : old
+    }
 }
 
 struct Account: Equatable {

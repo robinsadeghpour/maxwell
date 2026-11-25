@@ -25,6 +25,21 @@ check(folded.sessions[p]?.phase == .yourTurn, "private stopped with 'ok' says do
 check(folded.sessions[w2]?.phase == .limited(Date(timeIntervalSince1970: 1794599400)), "work2 rate_limit is limited until the 5h reset")
 check(folded.sessions[w1]?.title == "mxtest-w1", "title from session_title")
 check(folded.account("work2")?.fiveHour?.usedPercent == 100, "work2 usage sample folded")
+// Each session reports the limits it last saw: an idle one sends old numbers after a busy one.
+do {
+    func sample(_ ms: Int, _ fivePct: Int, _ fiveReset: Int, _ weekPct: Int?) -> Event {
+        let week = weekPct.map { #","seven_day":{"used_percentage":\#($0),"resets_at":1800500000}"# } ?? ""
+        return EventParser.parse(line: Substring(#"{"ts":\#(ms),"configDir":"/Users/me/.claude","usage":{"session_id":"x","rate_limits":{"five_hour":{"used_percentage":\#(fivePct),"resets_at":\#(fiveReset)}\#(week)},"context_window":null}}"#))!
+    }
+    var st = AppState(accounts: accounts)
+    st = reduce(st, sample(1_800_000_000_000, 44, 1800010000, 93))
+    st = reduce(st, sample(1_800_000_030_000, 5, 1800010000, 86))
+    check(st.account("work")?.fiveHour?.usedPercent == 44 && st.account("work")?.week?.usedPercent == 93, "an idle session's older reading doesn't lower usage")
+    st = reduce(st, sample(1_800_000_060_000, 2, 1799990000, nil))
+    check(st.account("work")?.fiveHour?.usedPercent == 44, "a reading from the window before doesn't replace the current one")
+    st = reduce(st, sample(1_800_000_090_000, 3, 1800030000, nil))
+    check(st.account("work")?.fiveHour?.usedPercent == 3 && st.account("work")?.week?.usedPercent == 93, "a later reset is a new window")
+}
 check(folded.sessions[w1]?.accountId == "work" && folded.sessions[p]?.accountId == "private", "accounts from configDir")
 
 let t0 = Date(timeIntervalSince1970: 1_800_000_000)
