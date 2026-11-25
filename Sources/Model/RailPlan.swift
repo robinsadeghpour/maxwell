@@ -30,6 +30,17 @@ enum RailPlan {
         return names
     }
 
+    /// Kept names as the projects spell them: `project-pin = maxwell` keeps Maxwell rather than
+    /// adding an empty key of its own. A name no project has is kept as written.
+    static func spelled(_ pinned: [String], like live: [String]) -> [String] {
+        var out: [String] = []
+        for p in pinned {
+            let n = live.first { $0.caseInsensitiveCompare(p) == .orderedSame } ?? p
+            if !out.contains(n) { out.append(n) }
+        }
+        return out
+    }
+
     /// The projects on the rail, in rail order: kept ones, then the others that have an open
     /// session, those that need you first. `names` is `order(…)`.
     static func onRail(_ names: [String], pinned: [String], counts: [String: Counts], scope: String?) -> [String] {

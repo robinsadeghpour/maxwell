@@ -854,7 +854,7 @@ final class SettingsView: MXView {
             let others = model.projects.filter { !pinned.contains($0) }
             form.paragraph("On the bar, right-click a logo and choose Keep in Rail to pin it, or drag it off to unpin.")
             if !others.isEmpty {
-                form.header("Other projects", note: "On the rail while a session there is open.")
+                form.header("Other projects", note: "On the bar while a session there is open.")
                 for p in others {
                     let pin = MXButton("Pin", small: true) { [weak self] in self?.set("project-pin", (pinned + [p]).joined(separator: "\n") + "\n") }
                     form.row(p, [(pin, pin.intrinsicContentSize.width)], padding: 7, icon: mark(p))

@@ -9,6 +9,7 @@ func railPlanTests() {
     check(RailPlan.order(live: [], pinned: [], ruleOrder: []).isEmpty, "with no pins, a project whose sessions are gone is gone")
     check(RailPlan.Counts([.working, .idle, .recentlyClosed, .needsYou]) == .init(needsYou: 1, yourTurn: 0, open: 3), "recently closed sessions are not open")
 
+    check(RailPlan.spelled(["maxwell", "Maxwell", "Gone"], like: ["Maxwell"]) == ["Maxwell", "Gone"], "a kept name matches its project whatever the case, once")
     var counts: [String: RailPlan.Counts] = [
         "Orbit": .init(needsYou: 0, yourTurn: 0, open: 2),
         "Zephyr": .init(needsYou: 0, yourTurn: 0, open: 0),        // only recently closed sessions

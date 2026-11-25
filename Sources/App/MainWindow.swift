@@ -249,7 +249,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         // ⌘1–⌘9 follow the kept order, then the rest by rule and name, so a key never moves
         // when an unpinned project appears on or leaves the rail. Kept projects count with no sessions.
         let ruleOrder = store.config.projects.map(\.name)
-        let pins = store.config.pinned.isEmpty ? RailPlan.order(live: Array(byProject.keys), pinned: [], ruleOrder: ruleOrder) : store.config.pinned
+        let pins = store.config.pinned.isEmpty ? RailPlan.order(live: Array(byProject.keys), pinned: [], ruleOrder: ruleOrder) : RailPlan.spelled(store.config.pinned, like: Array(byProject.keys))
         projectNames = RailPlan.order(live: Array(byProject.keys), pinned: pins, ruleOrder: ruleOrder)
         if let s = scope, !projectNames.contains(s), !byProject.isEmpty { scope = nil }
         func entry(_ name: String?, _ items: [(PhaseGroup, Session)]) -> ProjectEntry {
@@ -586,7 +586,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Pinned projects in rail order; every known project while the config pins none.
     private var pinnedNames: [String] {
-        store.config.pinned.isEmpty ? projectNames : store.config.pinned
+        store.config.pinned.isEmpty ? projectNames : RailPlan.spelled(store.config.pinned, like: projectNames)
     }
     func windowDidEndLiveResize(_ n: Notification) { if let w = window { WindowPlacement.save(w) } }
     func windowDidBecomeKey(_ n: Notification) { updateDim() }
