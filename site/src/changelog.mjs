@@ -5,6 +5,19 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-25-rail-keeps-projects",
+    date: "2026-11-25",
+    versions: "0.1.73",
+    title: "Projects you keep stay on the rail",
+    figure: "",
+    body: "",
+    fixes: [
+      "Projects you keep in the rail now stay there even when none of their sessions ran this week. Before, a kept project with no recent sessions dropped off the rail",
+      "A session in a folder outside any project, such as Downloads, now keeps its key on the rail while it is open. Before, the key went away once the session stopped needing you, and the session could only be found under All projects",
+      "When the rail is too short for every key, Maxwell now keeps the open project and the ones waiting on you, and the rest stay in the ⋯ menu. Before, keys ran under the ⋯ key",
+    ],
+  },
+  {
     slug: "2026-11-25-steady-usage",
     date: "2026-11-25",
     versions: "0.1.72",
