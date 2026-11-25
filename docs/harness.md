@@ -12,6 +12,7 @@ For videos and screenshots that leave the Mac, use the invented world in `demo/`
 - `--click x,y`: y counts from the bottom of the title bar, not the top of the window. Log a view's `convert(bounds, to: nil)` against `contentLayoutRect.height` to aim.
 - `--keys` only reaches the menu for lowercase letters (`cmd+shift+g`). Before Maxwell knows the state, a disabled shortcut falls through and types into the session's prompt.
 - `--type-shell` types through the terminal itself, so it works even when the terminal lost the keyboard. Its log line says which: `typed in terminal (has keyboard focus)` or `(lost keyboard focus)`. To check that a plain terminal keeps the keyboard while sessions report: `--action new-terminal@3 --type-shell x --type-after 16`.
+- `MAXWELL_TERMINAL_STEPS` types into a plain terminal with real key events on your keyboard layout and logs what it shows and whether it has the keyboard (`Sources/Harness/TerminalHarness.swift`). Focus while sessions report: `MAXWELL_TERMINAL_STEPS="1:new /tmp;8:type x;8.5:dump a;9:type x;9.5:dump b" …/Maxwell --quit-after 12`, then look for `lost keyboard`.
 - ⇧⌘A is swallowed (probably by Select All on ⌘A). Don't bind it.
 - A bare `ghostty_surface_key` without characters never reaches Claude. Send keys through `TerminalView.keyDown` with a real NSEvent.
 - Test sessions: use `--model haiku`. To keep a test subagent busy (a hook blocks `sleep`, and long foreground commands get moved to the background), repeat `ping -c 90 -i 1 127.0.0.1` six times, about nine minutes.
