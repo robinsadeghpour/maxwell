@@ -386,10 +386,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             // --move usage:right,system:right  places panels, like the "Move to" menu.
             for part in spec.split(separator: ",") {
                 let kv = part.split(separator: ":").map(String.init)
-                if kv.count == 2, let p = PanelID(rawValue: kv[0]), let d = Dock(rawValue: kv[1]) { main.root.panels.move(p, to: d) }
+                if kv.count == 2, let d = Dock(rawValue: kv[1]) { main.root.move(PanelID(kv[0]), to: d) }
             }
         }
-        if let spec = arg("--hide") { for p in spec.split(separator: ",").compactMap({ PanelID(rawValue: String($0)) }) { main.root.setHidden(p, true) } }
+        if let spec = arg("--hide") { for p in spec.split(separator: ",").map({ PanelID(String($0)) }) { main.root.setHidden(p, true) } }
         if arg("--confirm-after") != nil { after("--confirm-after", 8) { mark("confirm"); self.main.closeSheet.submit() } }
         if arg("--undo-after") != nil { after("--undo-after", 14) { mark("undo: \(self.main.root.status.runToastAction())") } }
         if let spec = arg("--move-to") {

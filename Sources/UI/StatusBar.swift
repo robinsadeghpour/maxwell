@@ -1,7 +1,15 @@
 import AppKit
 
-/// Bottom line: counts per state, a transient toast, and the key hints.
+/// Bottom line: the bottom panels' buttons, counts per state, a transient toast, and the key hints.
 final class StatusBar: MXView, TipSource {
+    /// A panel of the bottom area, shown and hidden from its icon here (VS Code and Zed do the same).
+    struct PanelToggle: Equatable { var panel: PanelID; var title: String; var open: Bool }
+    var panels: [PanelToggle] = [] { didSet { if panels != oldValue { needsDisplay = true } } }
+    var onPanel: ((PanelID) -> Void)?
+    private var hoverPanel: Int?
+    private func panelRects() -> [NSRect] {
+        panels.indices.map { NSRect(x: 4 + CGFloat($0) * 24, y: 2, width: 22, height: bounds.height - 3) }
+    }
     var counts: [(PhaseGroup, Int)] = [] { didSet { needsDisplay = true } }
     /// A warning after the counts ("! 2 unverified") and what it means on hover.
     var warning: (text: String, tip: Tip)? { didSet { if warning?.text != oldValue?.text { needsDisplay = true } } }
@@ -41,6 +49,10 @@ final class StatusBar: MXView, TipSource {
     }
 
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
+        if let i = panelRects().firstIndex(where: { $0.contains(p) }) {
+            let it = panels[i]
+            return (Tip("\(it.open ? "Hide" : "Show") \(it.title)", action: it.panel.key == nil ? nil : "panel-\(it.panel.rawValue)"), panelRects()[i])
+        }
         if let r = warningRect, r.contains(p), let w = warning { return (w.tip, r) }
         guard let (g, n, r) = countRects.first(where: { $0.2.contains(p) }) else { return nil }
         return (Tip(g.count(n)).adding(g.meaning), r)
@@ -48,7 +60,8 @@ final class StatusBar: MXView, TipSource {
 
     override func mouseDown(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
-        if let r = actionRect, r.contains(p) { runToastAction() }
+        if let i = panelRects().firstIndex(where: { $0.contains(p) }) { onPanel?(panels[i].panel) }
+        else if let r = actionRect, r.contains(p) { runToastAction() }
         else if let r = updateRect, r.contains(p) { onUpdate?() }
         else { super.mouseDown(with: e) }
     }
@@ -58,6 +71,11 @@ final class StatusBar: MXView, TipSource {
         NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
         let font = Fonts.mono(Metrics.fontSize - 1)
         var x: CGFloat = 10
+        for (i, (it, r)) in zip(panels, panelRects()).enumerated() {
+            if it.open || hoverPanel == i { (it.open ? t.rowSel : t.hover).setFill(); NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4).fill() }
+            PanelGlyph.draw(it.panel, title: it.title, in: r, color: it.open || hoverPanel == i ? t.fg : t.fg3, theme: t)
+            x = r.maxX + 12
+        }
         countRects = []
         for (g, n) in counts where n > 0 {
             let x0 = x
@@ -105,4 +123,14 @@ final class StatusBar: MXView, TipSource {
             Text.draw(hints, in: NSRect(x: bounds.width - hw - 10, y: 1, width: hw, height: bounds.height - 1), color: t.fg3, font: font)
         }
     }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if trackingAreas.isEmpty { addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)) }
+    }
+    override func mouseMoved(with e: NSEvent) {
+        let i = panelRects().firstIndex { $0.contains(convert(e.locationInWindow, from: nil)) }
+        if i != hoverPanel { hoverPanel = i; needsDisplay = true }
+    }
+    override func mouseExited(with e: NSEvent) { if hoverPanel != nil { hoverPanel = nil; needsDisplay = true } }
 }

@@ -63,7 +63,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private var projectRoots: [String: [String]] = [:]
     private var projects = Projects(rules: [])
     /// ⌘\ overrides the viewer for the current session; nil follows "is a file open".
-    private var viewerForced: Bool?
+    var viewerForced: Bool?
+    var loadingLayout = false
+    /// A session opened a file or artifact while another panel had the right side.
+    var viewerNews = false
+    /// Where the keyboard was before a panel filled the window.
+    weak var focusBeforeMaximize: NSView?
 
     init(store: Store) {
         self.store = store
@@ -97,7 +102,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.delegate = self
         loadPanelLayout()
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
-        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim() }
+        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges() }
         root.onSettled = { [weak self] in self?.updateDim() }
         root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
@@ -141,16 +146,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if let a = b.badge.action { self?.store.runPluginAction(b.plugin, a, session: id) }
         }
         store.onPluginsChanged = { [weak self] in self?.pluginsChanged() }
-        root.pluginPanel.onRun = { [weak self] plugin, action, session, item in self?.store.runPluginAction(plugin, action, session: session, item: item) }
-        root.pluginPanel.onSelectSession = { [weak self] in self?.open($0) }
-        root.pluginPanel.onOpenURL = { NSWorkspace.shared.open($0) }
-        root.pluginPanel.onRestart = { [weak self] in self?.store.plugins.restart($0) }
         store.plugins.onStartSession = { [weak self] _, prompt, name, cwd, model, done in
             guard let self, self.startHere(prompt: prompt, name: name, cwd: cwd, model: model, done: done) else {
                 return done(.failure(.init(message: "No folder to start in. Open a session in the project first.")))
             }
         }
-        root.pluginPanel.onSettings = { [weak self] _ in self?.showSettings(.plugins) }
         root.sidebar.list.onDragSession = { [weak self] on in
             guard let self else { return }
             self.root.rail.sessionDrag = on
@@ -168,11 +168,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.titleBar.plus.action = { [weak self] in self?.showNewSession() }
         root.titleBar.palette.action = { [weak self] in self?.showSearch() }
         root.titleBar.gear.action = { [weak self] in self?.showSettings() }
+        root.titleBar.leftToggle.action = { [weak self] in self?.toggleSide(.left) }
+        root.titleBar.rightToggle.action = { [weak self] in self?.toggleSide(.right) }
+        root.onMaximized = { [weak self] in self?.maximizedChanged($0) }
         root.sessionPane.delegate = self
         root.viewerPane.pin.action = { [weak self] in self?.togglePin() }
         root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
-        // Browsing the tree previews, as in VS Code's explorer; double-click the tab to keep it.
-        root.viewerPane.onTreeSelect = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
+        // Browsing the tree previews, as in VS Code's explorer; a double-click or ⏎ keeps the tab.
+        root.viewerPane.onTreeSelect = { [weak self] url, keep in self?.show(.file(url), for: self?.current, keep: keep) }
         root.viewerPane.onTab = { [weak self] in self?.tabAction($0) }
         root.viewerPane.onKeepToggle = { [weak self] in self?.togglePin() }
         root.viewerPane.onArtifactTitle = { [weak self] link, title in
@@ -515,60 +518,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         window?.toolbarStyle = .unifiedCompact
         root.titleBar.fullScreen = false
         MXWindow.clipCorners([glass, root], fullScreen: false)
-    }
-
-    // MARK: panels
-
-    private var screenKey: String { window?.screen.map(WindowPlacement.key) ?? "default" }
-    private var loadingLayout = false
-    private func loadPanelLayout() {
-        loadingLayout = true
-        root.panels = PanelLayout.load(screen: screenKey)
-        loadingLayout = false
-    }
-    /// Test runs (--snap) arrange panels for a capture and must not change the saved layout.
-    private func savePanelLayout() {
-        if !loadingLayout, !CommandLine.arguments.contains("--snap") { root.panels.save(screen: screenKey) }
-    }
-
-    /// ⌥⌘ number, JetBrains style: shows a hidden panel and focuses it; hides a focused one.
-    /// A stripe tab: an open panel closes, a closed one opens and takes focus.
-    private func stripeClicked(_ p: PanelID) {
-        guard root.isShown(p) else { return togglePanel(p) }
-        root.setHidden(p, true)
-        if p == .viewer { viewerForced = nil }
-        focusMain()
-    }
-
-    func togglePanel(_ p: PanelID) {
-        if !root.isShown(p) {
-            root.setHidden(p, false)
-            if p == .viewer, !root.viewerOpen { viewerForced = true; syncViewer() }
-            focusPanel(p)
-        } else if p == .usage || p == .system || isFocused(p) {
-            root.setHidden(p, true)
-            focusMain()
-        } else {
-            focusPanel(p)
-        }
-    }
-
-    private func isFocused(_ p: PanelID) -> Bool {
-        guard let fr = window?.firstResponder as? NSView else { return false }
-        return fr.isDescendant(of: root.content(p))
-    }
-
-    func focusPanel(_ p: PanelID) {
-        switch p {
-        case .sessions: focus(1)
-        case .viewer: focus(3)
-        case .usage, .system, .plugins: break
-        }
-    }
-
-    func movePanel(_ p: PanelID, to d: Dock) {
-        root.panels.move(p, to: d)
-        toast("\(p.title) moved to the \(d.rawValue).")
     }
 
     /// The Dock's "Keep in Dock". With no pins in the config yet, every project counts as pinned,
@@ -1019,6 +968,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.show(v, account: current.flatMap(account(of:)), reload: reload)
         root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
         updateDim()
+        updateBadges()
     }
 
     /// The account a session runs on: its artifacts open signed in to it.
@@ -1064,6 +1014,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewers[id] = v
         if id == current {
             if moved { viewerForced = nil }
+            if !root.isShown(.viewer) { viewerNews = true }
             syncViewer()
         }
     }
@@ -1179,8 +1130,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         return fr.isDescendant(of: root.viewerPane)
     }
 
-    /// Beside the page the folder stays until hidden (saved in the config); in a narrow viewer it
-    /// slides over the page for one pick.
+    /// The folder beside the page stays until hidden (saved in the config).
     func toggleTree() {
         root.viewerPane.toggleTree { [weak self] on in self?.onConfigEdit?("file-tree", on ? "true" : "false") }
     }
@@ -1223,13 +1173,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func pluginsChanged() {
         let host = store.plugins
         let sig = host.manifests.filter { store.config.pluginEnabled($0) }.map { "\($0.id)@\($0.version)" }.joined(separator: ",")
+        syncPluginPanels()
         if sig != pluginSignature { pluginSignature = sig; rebuildActions() }
         for (id, st) in host.status {
             if case .failed(let why) = st.run, pluginRun[id] != st.run { toast("\(host.manifest(id)?.name ?? id) stopped: \(why). Settings › Plugins can restart it.") }
             pluginRun[id] = st.run
         }
-        root.pluginPanel.update(host: host, state: store.state)
-        root.setPluginPanels(!host.panels.isEmpty || host.manifests.contains { !$0.panels.isEmpty && store.config.pluginEnabled($0) })
         refreshSettings()
         render(store.state)
     }
@@ -1718,8 +1667,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 self?.root.sidebar.list.toggleIdle()
             },
             Action(id: "focus-terminal", title: "Focus Terminal", menu: "Panels", shortcut: Shortcut("cmd+alt+2")) { [weak self] in self?.focus(2) },
-            Action(id: "toggle-left", title: "Show or Hide Left Panels", menu: "Panels", shortcut: Shortcut("cmd+b")) { [weak self] in self?.root.toggleArea(.left) },
-            Action(id: "toggle-right", title: "Show or Hide Right Panels", menu: "Panels", shortcut: Shortcut("cmd+alt+b")) { [weak self] in self?.root.toggleArea(.right) },
+            Action(id: "toggle-left", title: "Show or Hide Left Panels", menu: "Panels", shortcut: Shortcut("cmd+b")) { [weak self] in self?.toggleSide(.left) },
+            Action(id: "toggle-right", title: "Show or Hide Right Panels", menu: "Panels", shortcut: Shortcut("cmd+alt+b")) { [weak self] in self?.toggleSide(.right) },
+            Action(id: "maximize-panel", title: "Fill the Window with the Panel", menu: "Panels", shortcut: Shortcut("cmd+shift+return"),
+                   isChecked: { [weak self] in self?.root.maximized != nil }) { [weak self] in self?.toggleMaximize() },
             Action(id: "toggle-bottom", title: "Show or Hide Bottom Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+j")) { [weak self] in self?.root.toggleArea(.bottom) },
             Action(id: "reset-panels", title: "Reset Panel Layout", menu: "Panels") { [weak self] in self?.root.panels = PanelLayout() },
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
@@ -1741,16 +1692,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 guard let self else { return }; self.onConfigEdit?("terminal-font-size", "\(Int(max(8, self.store.config.terminalFontSize - 1)))")
             },
         ]
-        let pluginPanel: () -> Bool = { [weak self] in self?.root.hasPluginPanels == true }
-        for p in PanelID.allCases {
-            list.append(Action(id: "panel-\(p.rawValue)", title: "\(p.title) Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+\(p.key)"),
-                               isEnabled: p == .plugins ? pluginPanel : { true }) { [weak self] in self?.togglePanel(p) })
-        }
-        for p in PanelID.allCases {
-            for d in Dock.allCases {
-                list.append(Action(id: "move-\(p.rawValue)-\(d.rawValue)", title: "Move \(p.title) to \(d.title)", menu: "Panels") { [weak self] in self?.movePanel(p, to: d) })
-            }
-        }
+        list += panelActions()
         for n in 1...9 {
             list.append(Action(id: "project-\(n)", title: "Project \(n)", menu: "Projects", shortcut: Shortcut("cmd+\(n)")) { [weak self] in self?.selectProject(n) })
         }

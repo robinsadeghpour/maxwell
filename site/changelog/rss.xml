@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Tool windows, a better file tree, and artifacts full size</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-25-tool-windows</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-25-tool-windows</guid>
+<pubDate>Wed, 25 Nov 2026 12:00:00 GMT</pubDate>
+<description>Each plugin's panel is now a tool window of its own, like in JetBrains IDEs: Linear and Slack each get a button beside the viewer, with a count of what needs you. The stripes of words down the window's sides are gone. A side only gets a slim row of icons when it holds two or more panels, Usage and System open from the status bar, and the title bar has a button for each side. Any panel can fill the window: press ⇧⌘↩, click ⤢ in its header, or double-click the header, so an artifact gets big without leaving Maxwell. The session's folder (⇧⌘T) now sits beside the page as a column you drag to size, follows files as they are written, previews a file on click and keeps it on double-click.&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;The folder no longer opens or closes by itself when the window gets wider or narrower&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Usage bars that hold still</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-25-steady-usage</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-25-steady-usage</guid>
