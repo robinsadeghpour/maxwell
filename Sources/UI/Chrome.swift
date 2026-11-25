@@ -68,7 +68,7 @@ final class ViewerPane: MXView {
             self.onTreeWidth?(max(Self.treeMin, min(x, self.bounds.width - 1 - Self.pageMin)))
         }
         treeSplit.onReset = { [weak self] in self?.onTreeWidth?(nil) }
-        empty.lines = ["Files the session opens show up here.", "⌘-click a path or link to open one."]
+        empty.lines = ["Files the session opens show up here.", "Click a path in the session to open one."]
         viewer.artifact.onTitle = { [weak self] title in
             guard let self, case .artifact(let l, nil)? = self.item else { return }
             self.onArtifactTitle?(l, title)
