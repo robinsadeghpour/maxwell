@@ -39,6 +39,7 @@
 
 ## Changelog
 
+- [Projects you keep stay on the rail](https://www.runmaxwell.com/changelog/2026-11-25-rail-keeps-projects) (2026-11-25, v0.1.73)
 - [Usage bars that hold still](https://www.runmaxwell.com/changelog/2026-11-25-steady-usage) (2026-11-25, v0.1.72)
 - [Answer your sessions out loud](https://www.runmaxwell.com/changelog/2026-11-20-voice-mode) (2026-11-20, v0.1.70 – 0.1.71)
 - [Close without being asked](https://www.runmaxwell.com/changelog/2026-11-20-terminal-keeps-focus) (2026-11-20, v0.1.69)
