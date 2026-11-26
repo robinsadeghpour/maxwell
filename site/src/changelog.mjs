@@ -5,6 +5,17 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-whole-tab",
+    date: "2026-11-26",
+    versions: "0.1.79",
+    title: "The tab on show is never cut off",
+    figure: "",
+    body: "",
+    fixes: [
+      "In a narrow viewer, the tab on show now fits the tab strip with its title shortened in the middle. Before, a long title, such as an artifact's, slid the tab off the strip's left edge and cut off the start of its name",
+    ],
+  },
+  {
     slug: "2026-11-26-system-details",
     date: "2026-11-26",
     versions: "0.1.78",

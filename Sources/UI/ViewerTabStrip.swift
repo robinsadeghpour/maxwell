@@ -60,18 +60,10 @@ final class ViewerTabStrip: MXView, TipSource {
     /// Full-width tabs (with icons) don't fit: the icons go, from every tab.
     private func squeezed(in width: CGFloat) -> Bool { tabs.map { natural($0) }.reduce(0, +) > width + 0.5 }
 
-    /// Each tab as wide as its title, up to a limit. When they don't fit, the others give up room down
-    /// to what still reads (the tab on show keeps its whole title), and past that the strip scrolls.
+    /// Each tab as wide as its title, up to a limit and never wider than the strip (`TabWidths`).
     private func widths(in width: CGFloat) -> [CGFloat] {
         let icons = !squeezed(in: width)
-        let nat = tabs.map { natural($0, icon: icons) }
-        let total = nat.reduce(0, +)
-        guard total > width, total > 0 else { return nat }
-        let give = nat.indices.map { $0 == active ? 0 : max(0, nat[$0] - Self.minWidth) }
-        let room = give.reduce(0, +)
-        guard room > 0 else { return nat }
-        let k = min(1, (total - width) / room)
-        return nat.indices.map { nat[$0] - give[$0] * k }
+        return TabWidths.fit(tabs.map { natural($0, icon: icons) }, active: active, in: width, least: Self.minWidth)
     }
 
     /// Only when even shrunk tabs don't fit does the strip scroll and ⌄ appear.

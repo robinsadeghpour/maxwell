@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>The tab on show is never cut off</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-26-whole-tab</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-26-whole-tab</guid>
+<pubDate>Thu, 26 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;In a narrow viewer, the tab on show now fits the tab strip with its title shortened in the middle. Before, a long title, such as an artifact's, slid the tab off the strip's left edge and cut off the start of its name&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>Which session is using your Mac</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-26-system-details</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-26-system-details</guid>
