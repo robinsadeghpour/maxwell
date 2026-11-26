@@ -48,7 +48,7 @@ Maxwell picks it up without a restart.
     { "id": "refresh", "title": "Refresh Linear", "scope": "global" }
   ],
   "panels": [
-    { "id": "tickets", "title": "Linear", "key": "l" }
+    { "id": "tickets", "title": "Linear" }
   ]
 }
 ```
@@ -60,7 +60,7 @@ Maxwell picks it up without a restart.
 | `run` | The command, relative to the folder. Runs with the folder as its working directory. |
 | `settings` | Fields Maxwell draws in Settings › Plugins. Types: `string`, `bool`, `choice`, `secret`. |
 | `actions` | Commands. Each gets a menu item, a search entry in ⌘K and an optional default shortcut. |
-| `panels` | Panels Maxwell draws with its own components. They dock like any other panel. |
+| `panels` | Panels Maxwell draws with its own components. Each is a tool window of its own. |
 
 Everything a plugin can show is declared here, so Maxwell can list it in Settings, the menu and
 ⌘K before the program has started, and can keep it listed (as unavailable) while it's stopped.
@@ -77,8 +77,10 @@ Everything a plugin can show is declared here, so Maxwell can list it in Setting
 | Notifications | A macOS notification | `notify` |
 | Settings | Fields and secrets | manifest `settings` |
 
-Plugin panels share one panel, **Plugins** (⌥⌘6), with a tab each. It docks, collapses and moves
-like the other panels, and only exists while a plugin contributes one.
+Each plugin panel is a tool window of its own, on the right by default, with a button on that
+side's stripe that shows its title's first letter and the panel's `count`. It moves, hides and fills
+the window like Maxwell's own panels. ⌥⌘6 to ⌥⌘9 open the first four, in the layout's order; every one is in the Panels menu
+and ⌘K. It exists while its plugin is on, and keeps its place in the layout while it is off.
 
 There is no HTML and no custom drawing. A panel is data (sections of rows) and Maxwell draws it
 with the same rows, badges and buttons as the rest of the window, in every theme. That keeps
@@ -318,6 +320,8 @@ and evidence they stop giving turns into unknown.
 - **1, additions** (15 Nov 2026): `session/start`; row `status`; `panel/set` `count`. Optional; older
   plugins are unaffected.
 - **1, clarified** (14 Nov 2026): session actions are off for sessions the plugin never annotated.
-  Plugin panels are tabs of one Plugins panel (⌥⌘6). A plugin's default shortcut is dropped when a
+  A plugin's default shortcut is dropped when a
   built-in action already uses it. A plugin that is restarted counts as not running until it
   answers `initialize` again. No wire change.
+- **1, clarified** (25 Nov 2026): each panel is its own tool window instead of a tab of one shared
+  Plugins panel. A panel's `key` was never read and is gone from the examples. No wire change.

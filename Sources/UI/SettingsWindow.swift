@@ -603,7 +603,7 @@ final class SettingsView: MXView {
         notifications()
         form.header("Files", note: "Markdown files open in the viewer, the pane beside the session.")
         form.toggle("Open files as sessions write them", c.autoOpen, note: "Also files a session mentions. ⌘-click any path in the terminal to open it yourself.") { [weak self] in self?.set("auto-open", $0 ? "true" : "false") }
-        form.toggle("Show the folder tree", c.showTree, note: "The session's folder, above the open file. ⇧⌘T") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
+        form.toggle("Show the folder tree", c.showTree, note: "The session's folder, beside the open file. ⇧⌘T") { [weak self] in self?.set("file-tree", $0 ? "true" : "false") }
         form.header("Sessions")
         form.toggle("Name sessions automatically", c.autoTitles, note: "Titles each session after what it's working on, with Haiku when Claude's own title says little. Off: a session keeps the name you give it (/rename or Rename…).") { [weak self] in self?.set("auto-titles", $0 ? "on" : "off") }
         form.toggle("Ask before closing unfinished sessions", c.confirmClose, note: "Closing a session that isn't safe to close says what is still open first. Off: it closes at once. Undo and Recently closed bring it back either way.") { [weak self] in self?.set("confirm-close", $0 ? "on" : "off") }

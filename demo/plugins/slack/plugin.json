@@ -5,5 +5,5 @@
   "description": "Demo: invented people waiting on a reply. Never talks to Slack.",
   "protocol": 1,
   "run": ["./slack"],
-  "panels": [{ "id": "waiting", "title": "Slack", "key": "s" }]
+  "panels": [{ "id": "waiting", "title": "Slack" }]
 }

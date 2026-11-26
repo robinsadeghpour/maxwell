@@ -1,35 +1,36 @@
 import AppKit
 
-/// The panel plugins draw into (docs/plugins.md, `panel/set`): one tab per contributed panel,
-/// and a list drawn with the same rows, badges and buttons as the session list.
+/// One panel a plugin contributes (docs/plugins.md, `panel/set`), as a tool window of its own: its
+/// name and count in the header, the plugin's status when it isn't simply running, and a list drawn
+/// with the same rows, badges and buttons as the session list.
 final class PluginPanel: MXView, PanelContent, TipSource {
-    struct Tab: Equatable { var plugin: PluginID; var panel: String; var title: String }
-    private(set) var tabs: [Tab] = []
-    private var views: [PluginID: [String: PluginView]] = [:]
-    private var counts: [PluginID: [String: Int]] = [:]
-    private var statuses: [PluginID: PluginStatus] = [:]
-    private var names: [PluginID: String] = [:]
-    private(set) var selected: Tab?
+    let plugin: PluginID
+    let panel: String
+    let id: PanelID
+    private(set) var title: String
+    private var view: PluginView?
+    private var count = 0
+    private var status = PluginStatus()
+    private var name = ""
     private let scroll = NSScrollView()
     private let body = PluginListView(frame: .zero)
     private let headerLine = Fill { $0.hair2 }
-    private var hoverTab: Int?
 
-    var onRun: ((PluginID, String, SessionID?, String?) -> Void)? { didSet { body.onRun = { [weak self] a, s, item in self?.selected.map { self?.onRun?($0.plugin, a, s, item) } } } }
+    var onRun: ((PluginID, String, SessionID?, String?) -> Void)? { didSet { body.onRun = { [weak self] a, s, item in self.map { $0.onRun?($0.plugin, a, s, item) } } } }
     var onSelectSession: ((SessionID) -> Void)? { didSet { body.onSelectSession = onSelectSession } }
     var onOpenURL: ((URL) -> Void)? { didSet { body.onOpenURL = onOpenURL } }
     var onRestart: ((PluginID) -> Void)?
     var onSettings: ((PluginID) -> Void)?
+    /// Room the panel's own ⋯ ⤢ × take at the header's right edge (set by the dock).
+    var headerReserve: CGFloat = 70 { didSet { if headerReserve != oldValue { needsDisplay = true } } }
 
-    /// The header right of the tabs drags the panel; the tabs themselves take the click.
-    var gripRect: NSRect {
-        let x = tabs.count > 1 ? (tabRects().last?.maxX ?? 0) + 4 : 0
-        return NSRect(x: x, y: 0, width: max(0, bounds.width - 64 - x), height: Metrics.header)
-    }
+    var gripRect: NSRect { NSRect(x: 0, y: 0, width: max(0, bounds.width - headerReserve), height: Metrics.header) }
     func preferredExtent(along d: Dock) -> CGFloat? { nil }
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
+    init(plugin: PluginID, panel: String, title: String) {
+        self.plugin = plugin; self.panel = panel; self.title = title
+        id = .plugin(plugin, panel)
+        super.init(frame: .zero)
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
@@ -38,42 +39,29 @@ final class PluginPanel: MXView, PanelContent, TipSource {
         addSubview(scroll)
         addSubview(headerLine)
         body.onStatusButton = { [weak self] in
-            guard let self, let tab = self.selected else { return }
-            if case .failed = self.statuses[tab.plugin]?.run { self.onRestart?(tab.plugin) } else { self.onSettings?(tab.plugin) }
+            guard let self else { return }
+            if case .failed = self.status.run { self.onRestart?(self.plugin) } else { self.onSettings?(self.plugin) }
         }
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    func update(host: PluginHost, state: AppState) {
-        let enabled = host.manifests.filter { host.status[$0.id].map { $0.run != .off } ?? false }
-        let newTabs = enabled.flatMap { m in m.panels.map { Tab(plugin: m.id, panel: $0.id, title: $0.title) } }
-        // The drag grip sits right of the tabs (gripRect), so the root re-places it when they change.
-        if newTabs != tabs { tabs = newTabs; rootView?.needsLayout = true }
-        views = host.panels
-        if counts != host.counts { counts = host.counts; rootView?.needsLayout = true }
-        statuses = host.status
-        names = Dictionary(uniqueKeysWithValues: host.manifests.map { ($0.id, $0.name) })
-        if selected == nil || !tabs.contains(selected!) {
-            let saved = UserDefaults.standard.string(forKey: "Maxwell.pluginTab")
-            selected = tabs.first { "\($0.plugin)/\($0.panel)" == saved } ?? tabs.first
-        }
-        refreshBody()
-        needsDisplay = true
-    }
+    /// How many items need you, for its stripe button.
+    var needsYou: Int { count }
+    var stopped: Bool { if case .failed = status.run { return true }; return false }
 
-    func select(plugin: PluginID) {
-        guard let t = tabs.first(where: { $0.plugin == plugin }) else { return }
-        selected = t
-        UserDefaults.standard.set("\(t.plugin)/\(t.panel)", forKey: "Maxwell.pluginTab")
+    func update(host: PluginHost) {
+        let m = host.manifest(plugin)
+        name = m?.name ?? plugin
+        title = m?.panels.first { $0.id == panel }?.title ?? title
+        view = host.panels[plugin]?[panel]
+        count = host.counts[plugin]?[panel] ?? 0
+        status = host.status[plugin] ?? PluginStatus()
         refreshBody()
         needsDisplay = true
     }
 
     private func refreshBody() {
-        guard let tab = selected else { body.content = .message("No plugin adds a panel.", nil, nil); return layoutBody() }
-        let name = names[tab.plugin] ?? tab.plugin
-        let st = statuses[tab.plugin] ?? PluginStatus()
+        let st = status
         switch st.run {
         case .failed(let why): body.content = .message("\(name) stopped.", why, "Restart")
         case .stopped(let why): body.content = .message("\(name) stopped. Restarting…", why, nil)
@@ -81,7 +69,7 @@ final class PluginPanel: MXView, PanelContent, TipSource {
         case .off: body.content = .message("\(name) is off.", nil, "Settings…")
         case .running:
             if st.reported == .setup { body.content = .message(st.message ?? "\(name) needs setup.", "Settings › Plugins › \(name)", "Settings…"); break }
-            switch views[tab.plugin]?[tab.panel] {
+            switch view {
             case nil, .loading?: body.content = .message("Loading…", nil, nil)
             case .empty(let title, let text, let action)?: body.content = .empty(title, text, action)
             case .list(let sections)?: body.content = .list(sections)
@@ -102,63 +90,26 @@ final class PluginPanel: MXView, PanelContent, TipSource {
         layoutBody()
     }
 
-    private var rootView: NSView? {
-        var v = superview
-        while let x = v, !(x is RootView) { v = x.superview }
-        return v
-    }
-
-    /// "SLACK 3": the tab's title and how many of its items need you.
-    private func label(_ tab: Tab) -> String {
-        guard let n = counts[tab.plugin]?[tab.panel], n > 0 else { return tab.title.uppercased() }
-        return "\(tab.title.uppercased()) \(n)"
-    }
-
-    private func tabRects() -> [NSRect] {
+    /// "LINEAR 3": the panel's title and how many of its items need you.
+    private var label: String { count > 0 ? "\(title.uppercased()) \(count)" : title.uppercased() }
+    private var labelRect: NSRect {
         let font = Fonts.mono(Metrics.fontSize - 2.5, .medium)
-        var x: CGFloat = 12
-        return tabs.map { tab in
-            let w = Text.width(label(tab), font: font) + 12
-            defer { x += w + 2 }
-            return NSRect(x: x - 6, y: 5, width: w, height: Metrics.header - 10)
-        }
+        return NSRect(x: 12, y: 0, width: Text.width(label, font: font) + 4, height: Metrics.header)
     }
 
     override func draw(_ r: NSRect) {
         let font = Fonts.mono(Metrics.fontSize - 2.5, .medium)
-        if tabs.isEmpty { Text.draw("PLUGINS", in: NSRect(x: 12, y: 0, width: 120, height: Metrics.header), color: t.fg3, font: font) }
-        for (i, (tab, rect)) in zip(tabs, tabRects()).enumerated() {
-            let on = tab == selected
-            if on || hoverTab == i {
-                (on ? t.rowSel : t.hover).setFill()
-                NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3).fill()
-            }
-            Text.draw(label(tab), in: rect.insetBy(dx: 6, dy: 0), color: on ? t.fg : t.fg3, font: font)
-        }
+        Text.draw(label, in: labelRect, color: t.fg2, font: font)
         // The plugin's own one-line status, right-aligned, when it isn't simply running.
-        if let tab = selected, let st = statuses[tab.plugin], st.run == .running, let r = st.reported, r != .ok, r != .setup {
-            let x = (tabRects().last?.maxX ?? 12) + 8
-            Text.draw(st.line, in: NSRect(x: x, y: 0, width: max(0, bounds.width - 70 - x), height: Metrics.header), color: t.fg3, font: font, align: .right)
+        if status.run == .running, let rep = status.reported, rep != .ok, rep != .setup {
+            let x = labelRect.maxX + 8
+            Text.draw(status.line, in: NSRect(x: x, y: 0, width: max(0, bounds.width - headerReserve - 8 - x), height: Metrics.header), color: t.fg3, font: font, align: .right)
         }
-    }
-
-    override func mouseMoved(with e: NSEvent) {
-        let p = convert(e.locationInWindow, from: nil)
-        let h = tabRects().firstIndex { $0.contains(p) }
-        if h != hoverTab { hoverTab = h; needsDisplay = true }
-    }
-    override func mouseExited(with e: NSEvent) { hoverTab = nil; needsDisplay = true }
-    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
-    override func mouseDown(with e: NSEvent) {
-        let p = convert(e.locationInWindow, from: nil)
-        guard tabs.count > 1, let i = tabRects().firstIndex(where: { $0.contains(p) }) else { return super.mouseDown(with: e) }
-        select(plugin: tabs[i].plugin)
     }
 
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
-        guard let i = tabRects().firstIndex(where: { $0.contains(p) }) else { return nil }
-        let tab = tabs[i]
-        return (Tip("\(tab.title), from the \(names[tab.plugin] ?? tab.plugin) plugin").adding(statuses[tab.plugin]?.line ?? ""), tabRects()[i])
+        guard labelRect.contains(p) else { return nil }
+        return (Tip("\(title), from the \(name) plugin").adding(status.line), labelRect)
     }
 }
 

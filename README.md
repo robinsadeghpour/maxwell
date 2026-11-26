@@ -103,6 +103,8 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘V | Paste text, copied files (as paths) or a screenshot (as an image) |
 | ⌘Z | Undo the last close |
 | ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |
+| ⇧⌘↩ | The panel you're in fills the window (or double-click its header); again, or Esc, to come back. Artifacts get big without leaving Maxwell |
+| ⇧⌘T | Show or hide the session's folder beside the viewer's page; drag its edge to size it |
 | ⌥⌘P | Pin the current file or artifact |
 | ⌥⌘R, ⇧⌘O | Reload the artifact, open it in the account's browser |
 | ⇧⌘I | Show or hide Idle |
