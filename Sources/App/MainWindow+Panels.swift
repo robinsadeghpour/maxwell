@@ -69,27 +69,37 @@ extension MainWindowController {
 
     // MARK: filling the window
 
-    /// ⇧⌘↩: the side the focus is in fills the window, or comes back; from the terminal, the right side.
-    func toggleMaximize() {
-        if let m = root.maximized { return root.toggleMaximize(m) }
+    /// ⇧⌘↩: the half the keyboard is in fills the window (the session, the viewer or a plugin's
+    /// panel), or everything comes back.
+    func toggleFill() {
+        if root.filling != nil { root.filling = nil; return }
         let fr = window?.firstResponder as? NSView
-        let d = Dock.allCases.first { d in root.shown(d).contains { p in root.content(p).map { fr?.isDescendant(of: $0) == true } ?? false } }
-        let target = d.flatMap { root.shown($0).contains(where: \.canFill) ? $0 : nil } ?? [Dock.right, .bottom, .left].first { root.shown($0).contains(where: \.canFill) }
-        if let target { root.toggleMaximize(target) }
+        let holding = Dock.allCases.first { d in root.shown(d).contains { p in p.canFill && root.content(p).map { fr?.isDescendant(of: $0) == true } ?? false } }
+        if let d = holding { return root.toggleFill(.panel(d)) }
+        if current != nil { return root.toggleFill(.session) }
+        if let d = [Dock.right, .bottom, .left].first(where: { root.shown($0).contains(where: \.canFill) }) { root.toggleFill(.panel(d)) }
     }
 
-    /// The keyboard follows: into the area that fills the window (the terminal behind it is hidden
-    /// and must not take typing), and back to where it was afterwards.
-    func maximizedChanged(_ d: Dock?) {
-        if let d {
-            let fr = window?.firstResponder as? NSView
-            focusBeforeMaximize = fr
-            let inside = root.shown(d).contains { p in root.content(p).map { fr?.isDescendant(of: $0) == true } ?? false }
-            if !inside, let p = root.shown(d).first { focusPanel(p) }
-            if !inside, let fr, fr.isDescendant(of: root.sessionPane) { window?.makeFirstResponder(root.content(root.shown(d).first ?? .viewer)) }
-        } else {
-            if let v = focusBeforeMaximize, v.window != nil { window?.makeFirstResponder(v) } else { focusMain() }
-            focusBeforeMaximize = nil
+    /// The keyboard follows: into what fills the window (what it covers is hidden and must not
+    /// keep the keyboard, or AppKit takes it away for good), and back to where it was afterwards.
+    func fillingChanged(_ f: WindowFill?) {
+        let fr = window?.firstResponder as? NSView
+        switch f {
+        case nil:
+            if let v = focusBeforeFill, v.window != nil { window?.makeFirstResponder(v) } else { focusMain() }
+            focusBeforeFill = nil
+        case .session?:
+            if focusBeforeFill == nil { focusBeforeFill = fr }
+            if fr?.isDescendant(of: root.sessionPane) != true {
+                if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) } else { window?.makeFirstResponder(nil) }
+            }
+        case .panel(let d)?:
+            if focusBeforeFill == nil { focusBeforeFill = fr }
+            let fills = root.shown(d).first(where: \.canFill) ?? .viewer
+            let isInside = { [root] (v: NSView?) in root.shown(d).contains { p in root.content(p).map { v?.isDescendant(of: $0) == true } ?? false } }
+            if !isInside(fr) { focusPanel(fills) }
+            // A panel with nothing to focus (an empty viewer) still takes the keyboard from what it covers.
+            if !isInside(window?.firstResponder as? NSView) { window?.makeFirstResponder(root.content(fills)) }
         }
         updateDim()
     }

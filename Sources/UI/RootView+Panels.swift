@@ -25,7 +25,7 @@ extension RootView {
             m.addItem(area)
         }
         if let d = panels.place[p], shownNow, p.canFill {
-            let fill = MenuAction(maximized == d ? "Back to Normal Size" : "Fill the Window") { [weak self] in self?.toggleMaximize(d) }
+            let fill = MenuAction(filling == .panel(d) ? "Back to Normal Size" : "Fill the Window") { [weak self] in self?.toggleFill(.panel(d)) }
             fill.keyEquivalent = "\r"
             fill.keyEquivalentModifierMask = [.command, .shift]
             m.addItem(fill)
@@ -94,12 +94,13 @@ extension RootView {
         var l = panels
         if hide { l.hidden.insert(p) } else { l.show(p, among: present) }
         panels = l
-        // A panel shown on another side while one fills the window: back to normal so it can be seen.
-        if let m = maximized, shown(m).isEmpty || (!hide && l.place[p] != m) { maximized = nil }
+        // A panel shown while something else fills the window: back to normal so it can be seen.
+        if !hide, let f = filling, l.place[p] != f.dock { filling = nil }
+        endFillIfEmpty()
     }
 
     func move(_ p: PanelID, to d: Dock) {
-        maximized = nil
+        filling = nil
         panels.move(p, to: d, among: present)
     }
 
@@ -113,21 +114,43 @@ extension RootView {
         // Shown again, a side still shows one list or document: the first in order.
         if !anyShown, d != .bottom, let first = ps.first(where: \.flexible) { l.show(first, among: present) }
         panels = l
-        if anyShown, maximized == d { maximized = nil }
+        // Hidden, an area that filled the window gives it back; shown, an area ends whatever else fills it.
+        if filling != nil, anyShown ? filling == .panel(d) : filling != .panel(d) { filling = nil }
     }
 
-    func toggleMaximize(_ d: Dock) { maximized = maximized == d || !shown(d).contains(where: \.canFill) ? nil : d }
+    /// Fills the window with `f`, or goes back to normal when it already does.
+    func toggleFill(_ f: WindowFill) {
+        if filling == f { filling = nil; return }
+        if let d = f.dock, !shown(d).contains(where: \.canFill) { return }
+        filling = f
+    }
+
+    /// An area that filled the window and has nothing left to show gives the window back.
+    func endFillIfEmpty() {
+        if let d = filling?.dock, shown(d).isEmpty { filling = nil }
+    }
 
     /// Esc that nothing else took: back to normal size.
     override func cancelOperation(_ sender: Any?) {
-        if maximized != nil { maximized = nil } else { nextResponder?.tryToPerform(#selector(cancelOperation(_:)), with: sender) }
+        if filling != nil { filling = nil } else { nextResponder?.tryToPerform(#selector(cancelOperation(_:)), with: sender) }
     }
 
-    /// While an area fills the window it is laid over the terminal's place and the other areas. The
-    /// terminal keeps its size, so the session doesn't reflow; it is only hidden until the area is
-    /// back. Returns whether an area fills (or is growing or shrinking).
-    func layoutMaximized(body: NSRect) -> Bool {
-        let active = maximized != nil || maxTween.isRunning
+    /// The session filling the window takes `whole`, the body without the rail; the areas and the
+    /// stripes step aside. An area filling the window is laid over the terminal's place and the
+    /// other areas (`body`): the terminal keeps its size, so the session doesn't reflow; it is only
+    /// hidden until the area is back. Returns whether something fills (or is growing or shrinking).
+    func layoutFill(body: NSRect, whole: NSRect) -> Bool {
+        if filling == .session {
+            sessionPane.isHidden = false
+            sessionPane.frame = whole
+            sessionDim.frame = whole
+            for v in docks.values { v.isHidden = true }
+            for v in splitters.values { v.isHidden = true }
+            leftStripe.isHidden = true
+            rightStripe.isHidden = true
+            return true
+        }
+        let active = filling != nil || maxTween.isRunning
         sessionPane.isHidden = active
         sessionDim.isHidden = active || sessionDim.isHidden
         guard active, maxTween.value > 0 else { return false }

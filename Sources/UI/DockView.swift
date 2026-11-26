@@ -12,7 +12,6 @@ final class DockView: MXView {
     var grips: [PanelID: PanelGrip] = [:]
     var controls: [PanelID: PanelControls] = [:]
     var split: CGFloat?
-    var maximized = false
     /// Between two lists or documents stacked in this area: drag to share the room differently.
     let innerSplit = Splitter(vertical: false)
     private var lines: [NSRect] = []
@@ -70,7 +69,6 @@ final class DockView: MXView {
                 addSubview(g, positioned: .above, relativeTo: v)
             }
             if let c = controls[p] {
-                c.maximized = maximized
                 let grip = v.gripRect
                 let w = c.preferredWidth
                 (v as? Sidebar)?.headerReserve = w + 4

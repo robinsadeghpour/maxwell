@@ -33,6 +33,17 @@ enum Dock: String, CaseIterable, Codable {
     var title: String { rawValue.capitalized }
 }
 
+/// What fills the window (⇧⌘↩, or a double-click on a tab): one gesture for the session and the
+/// tool windows, like Ghostty's zoom and JetBrains' Maximize Tool Window. Kept in memory only.
+enum WindowFill: Equatable {
+    /// The session's terminal takes the whole body and every panel steps aside; the terminal reflows.
+    case session
+    /// The area showing a document or a plugin's list lies over the rest; the terminal keeps its size.
+    case panel(Dock)
+
+    var dock: Dock? { if case .panel(let d) = self { return d }; return nil }
+}
+
 /// Where every panel sits, which are hidden, and how big each area is.
 /// Saved per screen, so the laptop and the external display keep their own arrangement.
 struct PanelLayout: Codable, Equatable {

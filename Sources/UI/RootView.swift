@@ -36,7 +36,7 @@ final class RootView: MXView {
         pluginPanels = new
         var l = panels
         for id in new.keys.sorted(by: { $0.rawValue < $1.rawValue }) { l.adopt(id) }
-        if let m = maximized, shown(m).isEmpty { maximized = nil }
+        endFillIfEmpty()
         if l != panels { panels = l } else { sync(animated: window != nil) }
     }
     /// The list or document each side showed last, for bringing the side back.
@@ -51,8 +51,8 @@ final class RootView: MXView {
     private let textTint = CALayer()
     static let textFloor: CGFloat = 0.72
     private(set) var docks: [Dock: DockView] = [:]
-    private let leftStripe = Stripe(side: .left)
-    private let rightStripe = Stripe(side: .right)
+    let leftStripe = Stripe(side: .left)
+    let rightStripe = Stripe(side: .right)
     let drop = DropPreview(frame: .zero)
     private let railLine = Fill { $0.hair }
     private var reveal: [Dock: Tween] = [:]
@@ -167,11 +167,11 @@ final class RootView: MXView {
     func setViewer(open: Bool, animated: Bool = true) {
         guard open != viewerOpen else { return }
         viewerOpen = open
-        if let m = maximized, shown(m).isEmpty { maximized = nil }
+        endFillIfEmpty()
         sync(animated: animated)
     }
 
-    /// Each panel's header grip and its ⋯ ⤢ × buttons, made the first time the panel shows.
+    /// Each panel's header grip and its ⋯ button, made the first time the panel shows.
     private func chrome(_ p: PanelID) -> (PanelGrip, PanelControls) {
         if let g = grips[p], let c = controls[p] { return (g, c) }
         let g = PanelGrip(panel: p), c = PanelControls(panel: p)
@@ -310,7 +310,6 @@ final class RootView: MXView {
             v.grips = grips
             v.controls = controls
             v.split = panels.split?[d]
-            v.maximized = maximized == d
             v.isHidden = v.frame.width <= 0 || v.frame.height <= 0
             v.needsLayout = true
             v.needsDisplay = true
@@ -334,7 +333,8 @@ final class RootView: MXView {
         sr.frame = NSRect(x: x1 - rwid - hit / 2, y: top, width: hit + 1, height: bodyH)
         sb.frame = NSRect(x: cx0, y: bottom - bh - hit / 2, width: cx1 - cx0, height: hit + 1)
 
-        let filled = layoutMaximized(body: NSRect(x: x0, y: top, width: x1 - x0, height: bodyH))
+        let filled = layoutFill(body: NSRect(x: x0, y: top, width: x1 - x0, height: bodyH),
+                                whole: NSRect(x: railMode == .shown ? rw + 1 : 0, y: top, width: w - (railMode == .shown ? rw + 1 : 0), height: bodyH))
         drawsLines = filled ? [] : (lw > 0 ? [NSRect(x: x0 + lw - 1, y: top, width: 1, height: bodyH)] : [])
             + (rwid > 0 ? [NSRect(x: x1 - rwid, y: top, width: 1, height: bodyH)] : [])
             + (bh > 0 ? [NSRect(x: cx0, y: bottom - bh, width: cx1 - cx0, height: 1)] : [])
@@ -456,18 +456,18 @@ final class RootView: MXView {
 
     // MARK: filling the window
 
-    /// The area that fills the window, JetBrains' Maximize Tool Window. Kept in memory only: a
-    /// relaunch opens at normal size.
-    var maximized: Dock? {
+    /// What fills the window, if anything. A relaunch opens at normal size.
+    var filling: WindowFill? {
         didSet {
-            guard maximized != oldValue else { return }
-            if let m = maximized { growing = m }
-            maxTween.set(maximized == nil ? 0 : 1, animated: window != nil)
+            guard filling != oldValue else { return }
+            if let d = filling?.dock { growing = d }
+            // An area grows over the rest and shrinks back; the session takes its room at once.
+            maxTween.set(filling?.dock == nil ? 0 : 1, animated: window != nil && filling != .session && oldValue != .session)
             sync(animated: false)
-            onMaximized?(maximized)
+            onFilling?(filling)
         }
     }
-    var onMaximized: ((Dock?) -> Void)?
+    var onFilling: ((WindowFill?) -> Void)?
     let maxTween = Tween(0)
     /// The area growing to fill the window, or shrinking back.
     var growing = Dock.right

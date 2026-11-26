@@ -3,13 +3,15 @@ import AppKit
 /// What a viewer tab was asked to do: from a click, a drag or its menu.
 enum ViewerTabAction {
     case select(Int), close(Int), keep(Int), move(Int, Int), closeOthers(Int), closeAll, reveal(Int), copyPath(Int), openInBrowser(Int)
+    /// A double-click on a tab: the viewer fills the window, or comes back.
+    case fill
 }
 
 /// The viewer's tabs, the way VS Code and Cursor draw an editor's: one per open file or artifact,
 /// the active one open to the page under it with a mark on top that slides from tab to tab, the
 /// preview tab in italics, a dot on a tab that got something new while you were elsewhere.
-/// Click to show, × or a middle click to close, double-click to keep, drag to reorder (the other
-/// tabs make room as you go). When they don't fit, the strip scrolls and ⌄ lists them all.
+/// Click to show, × or a middle click to close, double-click to fill the window, drag to reorder
+/// (the other tabs make room as you go). When they don't fit, the strip scrolls and ⌄ lists them all.
 final class ViewerTabStrip: MXView, TipSource {
     enum Kind: Equatable { case markdown, code, pdf, image, other, artifact }
     struct Tab: Equatable { var title: String; var detail: String; var preview: Bool; var unseen: Bool; var kind: Kind }
@@ -257,7 +259,7 @@ final class ViewerTabStrip: MXView, TipSource {
         guard let i = index(at: p) else { return }
         let r0 = rects()[i]
         if closeRect(r0).contains(p) { return onAction?(.close(i)) ?? () }
-        if e.clickCount == 2 { return onAction?(.keep(i)) ?? () }
+        if e.clickCount == 2 { return onAction?(.fill) ?? () }
         onAction?(.select(i))
         // Drag to reorder: the tab follows the pointer and the others make room.
         while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
@@ -321,7 +323,7 @@ final class ViewerTabStrip: MXView, TipSource {
         let tab = tabs[i]
         var tip = Tip(tab.detail)
         if tab.unseen { tip = tip.adding("New since you last looked") }
-        if tab.preview { tip = tip.adding("Preview: the session's next file replaces it. Double-click to keep it") }
+        if tab.preview { tip = tip.adding("Preview: the session's next file replaces it. ⌥⌘P keeps it") }
         return (tip, r)
     }
 }

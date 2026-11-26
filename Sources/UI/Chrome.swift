@@ -253,6 +253,8 @@ final class TitleBar: MXView, TipSource {
     var tabs: [Tab] = [] { didSet { needsDisplay = true } }
     var current: SessionID? { didSet { needsDisplay = true } }
     var onSelect: ((SessionID) -> Void)?
+    /// A double-click on a tab: the session fills the window, or comes back.
+    var onFill: ((SessionID) -> Void)?
     var onCloseTab: ((SessionID) -> Void)?
     let plus = IconButton(.plus, tip: Tip("New session", action: "new-session"))
     let palette = IconButton(.search, tip: Tip("Search sessions, projects and actions", action: "search"))
@@ -344,7 +346,7 @@ final class TitleBar: MXView, TipSource {
             if e.clickCount == 2 { window?.performZoom(nil) } else { window?.performDrag(with: e) }
             return
         }
-        if p.x > tabRects()[i].maxX - 22 { onCloseTab?(tabs[i].id) } else { onSelect?(tabs[i].id) }
+        if p.x > tabRects()[i].maxX - 22 { onCloseTab?(tabs[i].id) } else if e.clickCount == 2 { onFill?(tabs[i].id) } else { onSelect?(tabs[i].id) }
     }
     override func mouseDragged(with e: NSEvent) {}
     override var mouseDownCanMoveWindow: Bool { false }

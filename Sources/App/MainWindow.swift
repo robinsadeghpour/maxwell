@@ -82,8 +82,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var loadingLayout = false
     /// A session opened a file or artifact while another panel had the right side.
     var viewerNews = false
-    /// Where the keyboard was before a panel filled the window.
-    weak var focusBeforeMaximize: NSView?
+    /// Where the keyboard was before something filled the window.
+    weak var focusBeforeFill: NSView?
 
     init(store: Store) {
         self.store = store
@@ -182,14 +182,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.rail.onPin = { [weak self] name, pin, at in self?.pin(name, pin, at: at) }
         root.rail.onConfig = { [weak self] k, v in self?.onConfigEdit?(k, v) }
         root.sidebar.tabs.onSelect = { [weak self] in self?.setScope($0) }
-        root.titleBar.onSelect = { [weak self] in self?.open($0) }
-        root.titleBar.onCloseTab = { [weak self] in self?.forget($0) }
-        root.titleBar.plus.action = { [weak self] in self?.showNewSession() }
-        root.titleBar.palette.action = { [weak self] in self?.showSearch() }
-        root.titleBar.gear.action = { [weak self] in self?.showSettings() }
-        root.titleBar.leftToggle.action = { [weak self] in self?.toggleSide(.left) }
-        root.titleBar.rightToggle.action = { [weak self] in self?.toggleSide(.right) }
-        root.onMaximized = { [weak self] in self?.maximizedChanged($0) }
+        wireTitleBar()
+        root.onFilling = { [weak self] in self?.fillingChanged($0) }
         root.sessionPane.delegate = self
         root.viewerPane.pin.action = { [weak self] in self?.togglePin() }
         root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
@@ -317,12 +311,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.current = current
         root.status.counts = PhaseGroup.allCases.map { g in (g, all.first { $0.0 == g }?.1.count ?? 0) }
         root.status.warning = unverifiedWarning(state)
-        let terminalTabs = Dictionary(uniqueKeysWithValues: shellRows().map { ($0.id, $0.title) })
-        root.titleBar.tabs = tabRow.order.compactMap { id in
-            if let title = terminalTabs[id] { return TitleBar.Tab(id: id, title: title, group: nil) }
-            return state.sessions[id].map { TitleBar.Tab(id: id, title: $0.title, group: state.group($0, now: now, rules: rules) ?? .idle) }
-        }
-        root.titleBar.current = current
+        renderTabs(state, now: now)
         let s = current.flatMap { state.sessions[$0] ?? state.closed[$0]?.session }
         root.sessionPane.show(s, group: s.flatMap { state.group($0, now: now, rules: rules) },
                               blockers: s.map { state.checks($0, now: now, rules: rules).filter { $0.outcome != .pass }.map { "\($0.title): \($0.detail)" } } ?? [],
@@ -514,7 +503,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let fr = w.firstResponder as? NSView
         let inViewer = fr.map { $0.isDescendant(of: root.viewerPane) } ?? false
         let inSession = fr.map { $0.isDescendant(of: root.sessionPane) } ?? false
-        root.sessionDim.isHidden = inSession || current == nil || root.maximized != nil
+        root.sessionDim.isHidden = inSession || current == nil || root.filling != nil
         root.viewerDim.isHidden = inViewer || !root.isShown(.viewer)
     }
 
@@ -579,7 +568,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     // MARK: sessions
 
     func open(_ id: SessionID) {
-        root.maximized = nil  // another session: show it, not a panel over it
+        // Another session, or this one from under a panel: it shows. Filling the window, it stays big.
+        if root.filling != .session || id != current { root.filling = nil }
         if let t = shell(id) {
             remember(id)
             current = id
@@ -1038,6 +1028,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         case .openInBrowser(let i):
             if let link = at(i)?.artifact, let acc = account(of: id) { openExternally(link.url, account: acc) }
             return
+        case .fill:
+            return root.toggleFill(.panel(.right))
         }
         viewers[id] = v
         if v.tabs.isEmpty { viewerForced = nil }
@@ -1662,8 +1654,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "focus-terminal", title: "Focus Terminal", menu: "Panels", shortcut: Shortcut("cmd+alt+2")) { [weak self] in self?.focus(2) },
             Action(id: "toggle-left", title: "Show or Hide Left Panels", menu: "Panels", shortcut: Shortcut("cmd+b")) { [weak self] in self?.toggleSide(.left) },
             Action(id: "toggle-right", title: "Show or Hide Right Panels", menu: "Panels", shortcut: Shortcut("cmd+alt+b")) { [weak self] in self?.toggleSide(.right) },
-            Action(id: "maximize-panel", title: "Fill the Window with the Panel", menu: "Panels", shortcut: Shortcut("cmd+shift+return"),
-                   isChecked: { [weak self] in self?.root.maximized != nil }) { [weak self] in self?.toggleMaximize() },
+            Action(id: "maximize-panel", title: "Fill the Window", menu: "Panels", shortcut: Shortcut("cmd+shift+return"),
+                   isChecked: { [weak self] in self?.root.filling != nil }) { [weak self] in self?.toggleFill() },
             Action(id: "toggle-bottom", title: "Show or Hide Bottom Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+j")) { [weak self] in self?.root.toggleArea(.bottom) },
             Action(id: "reset-panels", title: "Reset Panel Layout", menu: "Panels") { [weak self] in self?.root.panels = PanelLayout() },
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
