@@ -36,3 +36,24 @@ func panelLayoutTests() {
     check(again == fresh, "a layout with plugin panels and a tree width survives saving")
     check(again?.place[PanelID("someone.else")] == nil && PanelID("someone.else").isPlugin, "an unknown name is a plugin panel")
 }
+
+/// The viewer lives on the right: layouts saved while it could be moved bring it back there, and
+/// nothing moves it away.
+func viewerPlaceTests() {
+    for side in ["left", "bottom"] {
+        // As the build before this one saved it, after "Move Viewer to …".
+        let saved = """
+        {"place":["sessions","left","viewer","\(side)","usage","bottom","system","bottom"],
+         "order":["sessions","usage","system","viewer"],"hidden":["usage"],
+         "size":["left",300,"right",520,"bottom",220],"treeWidth":240}
+        """
+        guard let l = PanelLayout.decode(Data(saved.utf8)) else { check(false, "a layout with the viewer on the \(side) decodes"); continue }
+        check(l.place[.viewer] == .right, "a layout that put the viewer on the \(side) loads with it on the right")
+        check(l.place[.sessions] == .left && l.hidden == [.usage] && l.size[.right] == 520 && l.treeWidth == 240, "and keeps the rest of it (\(side))")
+        check(l.panels(.right, among: Set(PanelID.builtIn)) == [.viewer] && l.panels(.left, among: Set(PanelID.builtIn)) == [.sessions], "the viewer is listed on the right only (\(side))")
+    }
+    var l = PanelLayout()
+    l.move(.viewer, to: .left, among: Set(PanelID.builtIn))
+    check(l.place[.viewer] == .right && l == PanelLayout(), "the viewer can't be moved")
+    check(!PanelID.viewer.movable && PanelID.sessions.movable && PanelID.plugin("linear", "tickets").movable, "every other panel still moves")
+}

@@ -5,12 +5,12 @@ extension RootView {
 
     func menu(for p: PanelID) -> NSMenu {
         let m = NSMenu()
-        for d in Dock.allCases {
+        for d in Dock.allCases where p.movable {
             let i = MenuAction("Move to \(d.title)") { [weak self] in self?.move(p, to: d) }
             i.state = panels.place[p] == d ? .on : .off
             m.addItem(i)
         }
-        m.addItem(.separator())
+        if p.movable { m.addItem(.separator()) }
         let shownNow = isShown(p)
         let hide = MenuAction(shownNow ? "Hide \(title(p))" : "Show \(title(p))") { [weak self] in self?.setHidden(p, shownNow) }
         if let k = p.key {
@@ -46,6 +46,7 @@ extension RootView {
 
     /// Drag a panel by its header: the area under the pointer lights up; release to move it there.
     func dragPanel(_ p: PanelID, from e: NSEvent) {
+        guard p.movable else { return }
         let start = convert(e.locationInWindow, from: nil)
         var target: Dock?
         var started = false

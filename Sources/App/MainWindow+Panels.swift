@@ -145,7 +145,7 @@ extension MainWindowController {
             list.append(Action(id: "panel-\(p.rawValue)", title: "\(root.title(p)) Panel", menu: "Panels",
                                shortcut: key.flatMap { Shortcut("cmd+alt+\($0)") }) { [weak self] in self?.togglePanel(p) })
         }
-        for p in PanelID.builtIn + plugins {
+        for p in PanelID.builtIn + plugins where p.movable {
             for d in Dock.allCases {
                 list.append(Action(id: "move-\(p.rawValue)-\(d.rawValue)", title: "Move \(root.title(p)) to \(d.title)", menu: "Panels") { [weak self] in self?.movePanel(p, to: d) })
             }
