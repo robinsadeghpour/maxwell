@@ -996,8 +996,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         guard id == current else { return }
         viewerForced = nil
         syncViewer()
-        // You opened it: it shows, even over Slack or with the right side hidden.
+        // You opened it: it shows, even over Slack, with the right side hidden or the session filling the window.
         if !root.isShown(.viewer) { root.setHidden(.viewer, false); updateBadges() }
+        if root.filling == .session { root.filling = nil }
     }
 
     /// A click, drag or menu choice on a viewer tab.
