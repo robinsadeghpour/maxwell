@@ -55,7 +55,7 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 
 Maxwell takes each group from Claude Code's own record first: what the process says it is doing (`sessions/<pid>.json`), and for background sessions its verdict on the last turn (`jobs/<id>/state.json`). Then it reads the session's status line, and only then the wording of the reply. Hooks make the change show at once, and the next listing confirms or corrects it within seconds. Hover the line under a session's title to see where its group came from. `Maxwell state` prints the same thing for every session.
 
-- **Projects stay separate.** A rail on the left, like the macOS Dock, switches between projects. Pin the ones you work on, and the others only appear when something there needs you. Each project shows its own logo, redrawn in Maxwell's style.
+- **Projects stay separate.** A rail on the left, like the macOS Dock, switches between projects. Pinned projects always stay; the others appear while a session there is open. Each project shows its own logo, redrawn in Maxwell's style.
 - **The real session, in place.** The middle pane is the actual Claude session, attached in a Ghostty terminal. Closing Maxwell doesn't stop it.
 - **Files open beside the session, in tabs.** When a session writes or mentions a Markdown file, it opens on the right, rendered, in a preview tab that its next file replaces, like VS Code's. Click any file path in the session to give it a tab of its own; double-click a tab to keep it. Each tab keeps your place, a dot marks a tab with something new, ⌥⌘← → step through them, and they come back after a restart.
 - **Artifacts too, in the right account.** When a session publishes a claude.ai artifact, it opens on the right, signed in to that session's account; a republish reloads it in place. Each account signs in once, on claude.ai's own page, and keeps its own login. Click an artifact link in the terminal to open it the same way, or ⇧⌘O for the account's browser profile or container.
@@ -97,6 +97,7 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘N | New session: pick the project (search all your repos) and account. From a terminal: `open -a Maxwell .` |
 | Esc or click outside | Close search, the palette or a panel |
 | ⇧⌘⌫ | Close the session: at once when it's safe, otherwise after saying what's still open |
+| ⌘⌫ | The same, in the session list, for the row under the cursor. In the terminal it deletes the line you're typing |
 | ⇧⌘X | Close all safe (asks first) |
 | ⌘⌫, ⌥⌫ | In the terminal: delete to the start of the line, delete a word |
 | ⌘V | Paste text, copied files (as paths) or a screenshot (as an image) |

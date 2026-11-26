@@ -60,7 +60,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// The project the sidebar shows; nil is "All" (only what needs you, every project).
     private(set) var scope: String? = UserDefaults.standard.string(forKey: "Maxwell.project")
     private(set) var projectNames: [String] = []
+    /// Each project's repo folders, kept after its last session ends so its logo stays.
     private var projectRoots: [String: [String]] = [:]
+    /// Repos in the usual code folders by project, read once per set of project rules: logos for
+    /// kept projects with no sessions this week.
+    private var reposOnDiskCache: [String: [String]]?
+    private var reposOnDisk: [String: [String]] {
+        if let c = reposOnDiskCache { return c }
+        let c = Dictionary(grouping: ProjectFolders.all(used: [], projects: projects), by: \.project).mapValues { $0.map(\.path) }
+        reposOnDiskCache = c
+        return c
+    }
     private var projects = Projects(rules: [])
     /// ⌘\ overrides the viewer for the current session; nil follows "is a file open".
     var viewerForced: Bool?
@@ -129,6 +139,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
         root.sidebar.list.onCloseShell = { [weak self] in self?.requestCloseShell($0) }
+        root.sidebar.list.onClose = { [weak self] in self?.close($0) }
         root.sidebar.list.shellMenuFor = { [weak self] in self?.shellMenu($0) }
         root.sidebar.list.onRenameShell = { [weak self] in self?.renameShell($0) }
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
@@ -234,22 +245,16 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func render(_ state: AppState) {
         let now = Date(), rules = store.config.rules
         if let c = current, terminals[c] != nil { lastShown[c] = now }
-        if projects.rules != store.config.projects { projects = Projects(rules: store.config.projects) }
+        if projects.rules != store.config.projects { projects = Projects(rules: store.config.projects); reposOnDiskCache = nil }
         followHostedTerminals(state)
         let all = state.grouped(now: now, rules: rules)
-        // One rail entry per project with live sessions; config rules first, in config order.
         var byProject: [String: [(PhaseGroup, Session)]] = [:]
         for (g, list) in all { for s in list { byProject[state.project(s, in: projects), default: []].append((g, s)) } }
-        // ⌘1–⌘9 follow the pinned order, then the rest alphabetically, so a key never moves
-        // when an unpinned project appears on or leaves the rail.
-        let pins = pinnedNames
+        // ⌘1–⌘9 follow the kept order, then the rest by rule and name, so a key never moves
+        // when an unpinned project appears on or leaves the rail. Kept projects count with no sessions.
         let ruleOrder = store.config.projects.map(\.name)
-        projectNames = byProject.keys.sorted { a, b in
-            let pa = pins.firstIndex(of: a) ?? Int.max, pb = pins.firstIndex(of: b) ?? Int.max
-            if pa != pb { return pa < pb }
-            let ia = ruleOrder.firstIndex(of: a) ?? Int.max, ib = ruleOrder.firstIndex(of: b) ?? Int.max
-            return ia != ib ? ia < ib : a.localizedCaseInsensitiveCompare(b) == .orderedAscending
-        }
+        let pins = store.config.pinned.isEmpty ? RailPlan.order(live: Array(byProject.keys), pinned: [], ruleOrder: ruleOrder) : RailPlan.spelled(store.config.pinned, like: Array(byProject.keys))
+        projectNames = RailPlan.order(live: Array(byProject.keys), pinned: pins, ruleOrder: ruleOrder)
         if let s = scope, !projectNames.contains(s), !byProject.isEmpty { scope = nil }
         func entry(_ name: String?, _ items: [(PhaseGroup, Session)]) -> ProjectEntry {
             var e = ProjectEntry(name: name, needsYou: items.filter { $0.0 == .needsYou }.count, yourTurn: items.filter { $0.0 == .yourTurn }.count, total: items.count)
@@ -257,17 +262,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 e.pinned = pins.contains(name)
                 e.key = projectNames.firstIndex(of: name).flatMap { $0 < 9 ? $0 + 1 : nil }
                 // A session moved here from another project's folder says nothing about this one's logo.
-                e.roots = Array(Set(items.filter { state.moved[$0.1.id] == nil }.map { self.repoRoot($0.1.cwd) ?? $0.1.cwd })).sorted()
+                let live = Array(Set(items.filter { state.moved[$0.1.id] == nil }.map { self.repoRoot($0.1.cwd) ?? $0.1.cwd })).sorted()
+                // A kept project with no sessions keeps the logo it had, or its repo's on disk.
+                e.roots = live.isEmpty ? self.projectRoots[name] ?? self.reposOnDisk[name] ?? [] : live
             }
             return e
         }
         let every = projectNames.map { entry($0, byProject[$0] ?? []) }
-        projectRoots = Dictionary(uniqueKeysWithValues: every.compactMap { e in e.name.map { ($0, e.roots) } })
+        for e in every { if let n = e.name, !e.roots.isEmpty { projectRoots[n] = e.roots } }
         let allEntry = entry(nil, all.flatMap { g, l in l.map { (g, $0) } })
-        // Pinned projects always; others while they need him, or while they are the open scope.
-        let onRail = every.filter { $0.pinned }
-            + every.filter { !$0.pinned && ($0.needsYou + $0.yourTurn > 0 || $0.name == scope) }.sorted { $0.needsYou + $0.yourTurn > $1.needsYou + $1.yourTurn }
-        root.rail.entries = [allEntry] + onRail
+        let onRail = RailPlan.onRail(projectNames, pinned: pins, counts: byProject.mapValues { RailPlan.Counts($0.map(\.0)) }, scope: scope)
+        root.rail.entries = [allEntry] + onRail.compactMap { n in every.first { $0.name == n } }
         root.rail.everyProject = every
         root.sidebar.elsewhere = scope == nil ? 0 : every.filter { $0.name != scope }.reduce(0) { $0 + $1.needsYou }
         titleProjectMenu()
@@ -531,7 +536,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Pinned projects in rail order; every known project while the config pins none.
     private var pinnedNames: [String] {
-        store.config.pinned.isEmpty ? projectNames : store.config.pinned
+        store.config.pinned.isEmpty ? projectNames : RailPlan.spelled(store.config.pinned, like: projectNames)
     }
     func windowDidEndLiveResize(_ n: Notification) { if let w = window { WindowPlacement.save(w) } }
     func windowDidBecomeKey(_ n: Notification) { updateDim() }
@@ -780,7 +785,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// ⇧⌘⌫ (⌘⌫ itself belongs to the terminal: delete to line start), the row menu and the banner button. Safe sessions close at once; any other asks
+    /// ⇧⌘⌫ anywhere, ⌘⌫ in the session list (in the terminal ⌘⌫ deletes the line being typed), the row menu and the banner button. Safe sessions close at once; any other asks
     /// first and says what is still open, unless `confirm-close` is off. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
         if shell(id) != nil { return requestCloseShell(id) }

@@ -3,14 +3,14 @@ import Foundation
 /// Tool windows: layouts saved before each plugin panel was its own still load, plugin panels take
 /// the old Plugins panel's place, and a side shows one list or document at a time.
 func panelLayoutTests() {
-    // Saved by 0.1.72: one "plugins" panel, the bottom area maximized. Enum keys encode as flat lists.
+    // Saved by 0.1.74: one "plugins" panel, the bottom area maximized. Enum keys encode as flat lists.
     let old = """
     {"place":["sessions","left","viewer","right","usage","bottom","system","bottom","plugins","right"],
      "order":["sessions","viewer","usage","system","plugins"],"hidden":["viewer"],
      "size":["left",300,"right",520,"bottom",220],"bottomMaximized":true}
     """
-    guard var l = PanelLayout.decode(Data(old.utf8)) else { return check(false, "a layout saved by 0.1.72 decodes") }
-    check(l.place[.viewer] == .right && l.size[.right] == 520 && l.hidden == [.viewer], "a layout saved by 0.1.72 keeps its places, sizes and hidden panels")
+    guard var l = PanelLayout.decode(Data(old.utf8)) else { return check(false, "a layout saved by 0.1.74 decodes") }
+    check(l.place[.viewer] == .right && l.size[.right] == 520 && l.hidden == [.viewer], "a layout saved by 0.1.74 keeps its places, sizes and hidden panels")
     let linear = PanelID.plugin("linear", "tickets"), slack = PanelID.plugin("slack", "inbox")
     l.adopt(linear)
     l.adopt(slack)

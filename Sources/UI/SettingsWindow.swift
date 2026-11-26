@@ -831,7 +831,7 @@ final class SettingsView: MXView {
         }
         let pinned = c.pinned
         if pinned.isEmpty {
-            form.header("Pinned projects", note: "Nothing is pinned, so every project shows on the bar. Pin the ones you work on to keep only those, plus any project where a session needs you.")
+            form.header("Pinned projects", note: "Nothing is pinned, so every project shows on the bar. Pin the ones you work on to keep only those, plus any project with a session open.")
             for p in model.projects {
                 let pin = MXButton("Pin", small: true) { [weak self] in self?.set("project-pin", p + "\n") }
                 form.row(p, [(pin, pin.intrinsicContentSize.width)], padding: 7, icon: mark(p))
@@ -848,13 +848,13 @@ final class SettingsView: MXView {
                 down.isEnabled = i < pinned.count - 1
                 down.tip = Tip("Move down the bar")
                 let unpin = MXButton("Unpin", small: true) { [weak self] in self?.set("project-pin", pinned.filter { $0 != p }.joined(separator: "\n") + "\n") }
-                unpin.tip = Tip("Show \(p) only when a session there needs you")
+                unpin.tip = Tip("Show \(p) only while a session there is open")
                 form.row(p, [(key, 28), (up, 24), (down, 24), (unpin, unpin.intrinsicContentSize.width)], padding: 7, icon: mark(p))
             }
             let others = model.projects.filter { !pinned.contains($0) }
             form.paragraph("On the bar, right-click a logo and choose Keep in Rail to pin it, or drag it off to unpin.")
             if !others.isEmpty {
-                form.header("Other projects", note: "On the bar only while a session there needs you.")
+                form.header("Other projects", note: "On the bar while a session there is open.")
                 for p in others {
                     let pin = MXButton("Pin", small: true) { [weak self] in self?.set("project-pin", (pinned + [p]).joined(separator: "\n") + "\n") }
                     form.row(p, [(pin, pin.intrinsicContentSize.width)], padding: 7, icon: mark(p))

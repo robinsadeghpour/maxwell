@@ -413,6 +413,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⌥ ⌘ ↑")}</td><td>Send the session to the cloud (asks first)</td></tr>
 <tr><td>${k("⌥ ⌘ ↓")}</td><td>Bring a cloud session to this Mac</td></tr>
 <tr><td>${k("⇧ ⌘ ⌫")}</td><td>Close the session: at once when it's safe, otherwise after saying what's still open</td></tr>
+<tr><td>${k("⌘ ⌫")}</td><td>The same, in the session list, for the session or terminal under the cursor. In the terminal it deletes the line you're typing</td></tr>
 <tr><td>${k("⇧ ⌘ X")}</td><td>Close all safe (asks first)</td></tr>
 <tr><td>${k("⌘ Z")}</td><td>Undo the last close</td></tr>
 <tr><td>${k("⇧ ⌘ I")}</td><td>Show or hide Idle</td></tr>

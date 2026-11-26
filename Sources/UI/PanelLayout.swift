@@ -10,7 +10,7 @@ struct PanelID: RawRepresentable, Hashable, Codable {
 
     static let sessions = PanelID("sessions"), viewer = PanelID("viewer"), usage = PanelID("usage"), system = PanelID("system")
     static let builtIn: [PanelID] = [.sessions, .viewer, .usage, .system]
-    /// Before 0.1.73 every plugin panel was a tab of one panel with this name; layouts saved then
+    /// Before 0.1.75 every plugin panel was a tab of one panel with this name; layouts saved then
     /// still name it, and plugin panels take its place.
     static let legacyPlugins = PanelID("plugins")
     static func plugin(_ plugin: PluginID, _ panel: String) -> PanelID { PanelID("\(plugin).\(panel)") }

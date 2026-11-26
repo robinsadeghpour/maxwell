@@ -11,6 +11,7 @@ For videos and screenshots that leave the Mac, use the invented world in `demo/`
 - `--move usage:right` and `--hide sessions,viewer` take panel names: `sessions`, `viewer`, `usage`, `system`, or a plugin panel as `<plugin>.<panel>` (the demo's `linear.tickets`, `slack.waiting`).
 - `--select` takes the title shown in the list, the generated name or an id prefix, and logs `no such session` when none matches. It fires at 1.5 s, before `claude agents` is folded in. A session started from the CLI isn't known as background yet, so it never attaches and the pane says "Detached". Add `--reattach-after 3`.
 - `--click x,y`: y counts from the bottom of the title bar, not the top of the window. Log a view's `convert(bounds, to: nil)` against `contentLayoutRect.height` to aim.
+- `--keys` knows `backspace`: `--action panel-sessions@14 --keys "18:cmd+backspace"` is ⌘⌫ in the session list. Run it with `confirm-close = on`, so a cursor on the wrong session only opens the question.
 - `--keys` only reaches the menu for lowercase letters (`cmd+shift+g`). Before Maxwell knows the state, a disabled shortcut falls through and types into the session's prompt.
 - `--type-shell` types through the terminal itself, so it works even when the terminal lost the keyboard. Its log line says which: `typed in terminal (has keyboard focus)` or `(lost keyboard focus)`. To check that a plain terminal keeps the keyboard while sessions report: `--action new-terminal@3 --type-shell x --type-after 16`.
 - ⇧⌘A is swallowed (probably by Select All on ⌘A). Don't bind it.

@@ -5,14 +5,38 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
-    slug: "2026-11-25-tool-windows",
-    date: "2026-11-25",
-    versions: "0.1.73",
+    slug: "2026-11-26-tool-windows",
+    date: "2026-11-26",
+    versions: "0.1.75",
     title: "Tool windows, a better file tree, and artifacts full size",
     figure: "",
     body: "Each plugin's panel is now a tool window of its own, like in JetBrains IDEs: Linear and Slack each get a button beside the viewer, with a count of what needs you. The stripes of words down the window's sides are gone. A side only gets a slim row of icons when it holds two or more panels, Usage and System open from the status bar, and the title bar has a button for each side. Any panel can fill the window: press ⇧⌘↩, click ⤢ in its header, or double-click the header, so an artifact gets big without leaving Maxwell. The session's folder (⇧⌘T) now sits beside the page as a column you drag to size, follows files as they are written, previews a file on click and keeps it on double-click.",
     fixes: [
       "The folder no longer opens or closes by itself when the window gets wider or narrower",
+    ],
+  },
+  {
+    slug: "2026-11-26-close-from-the-list",
+    date: "2026-11-26",
+    versions: "0.1.74",
+    title: "⌘⌫ closes from the session list",
+    figure: "",
+    body: "",
+    fixes: [
+      "⌘⌫ now closes the session or terminal under the cursor in the session list. Before, the right-click menu showed ⌘⌫ beside Close Session, but only ⇧⌘⌫ closed one. In the terminal ⌘⌫ still deletes the line you're typing, and ⇧⌘⌫ closes from anywhere",
+    ],
+  },
+  {
+    slug: "2026-11-25-rail-keeps-projects",
+    date: "2026-11-25",
+    versions: "0.1.73",
+    title: "Projects you keep stay on the rail",
+    figure: "",
+    body: "",
+    fixes: [
+      "Projects you keep in the rail now stay there even when none of their sessions ran this week. Before, a kept project with no recent sessions dropped off the rail",
+      "A session in a folder outside any project, such as Downloads, now keeps its key on the rail while it is open. Before, the key went away once the session stopped needing you, and the session could only be found under All projects",
+      "When the rail is too short for every key, Maxwell now keeps the open project and the ones waiting on you, and the rest stay in the ⋯ menu. Before, keys ran under the ⋯ key",
     ],
   },
   {
