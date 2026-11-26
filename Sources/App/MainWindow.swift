@@ -147,6 +147,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
         root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
         root.sessionPane.onHideSetup = { [weak self] in self?.hideSetup() }
+        root.sessionPane.onOverview(next: { [weak self] in self?.nextNeedsYou() }, new: { [weak self] in self?.showNewSession() })
         NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: nil, queue: .main) { [weak self] _ in self?.refreshSetup() }
         root.sidebar.list.onReopen = { [weak self] in self?.reopen($0) }
         root.sidebar.list.onNotSafe = { [weak self] in self?.notSafe($0) }
@@ -324,7 +325,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                               // A plain terminal too: a pane told to show none hides the one being typed
                               // in, and AppKit takes keyboard focus from a hidden view for good.
                               terminal: current.flatMap { detached.contains($0) ? nil : terminal(for: $0) ?? shell($0) },
-                              summary: PhaseGroup.allCases.filter { !$0.folds }.map { g in (g, (scope == nil ? all : shown).first { $0.0 == g }?.1.count ?? 0) })
+                              // ⌘J reaches every project, so the overview counts all of them and names this one's share.
+                              needsYou: (all: all.first { $0.0 == .needsYou }?.1.count ?? 0, here: shown.first { $0.0 == .needsYou }?.1.count ?? 0),
+                              scope: scope)
         if let t = shell(current) {
             let row = shellRows().first { $0.id == current }
             root.sessionPane.showShell(title: row?.title ?? "", path: row?.detail ?? "", terminal: t)
@@ -1397,11 +1400,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             for a in store.state.accounts {
                 let status = ClaudeWeb.shared.status[a.name] ?? .unknown
                 if status == .unknown { ClaudeWeb.shared.refresh(a) }
-                let title = many ? "claude.ai · \(a.name)" : "claude.ai"
+                // The account first: it is what tells the rows apart when the card is narrow.
+                let title = many ? "\(a.name) · claude.ai" : "claude.ai"
                 let email = ClaudeWeb.expectedEmail(a)
                 steps.append(status == .signedIn
                     ? SetupStep(title: title, detail: "Artifacts open signed in, beside the session.", done: true)
-                    : SetupStep(title: title, detail: "Sign in\(email.map { " as \($0)" } ?? "") so artifacts open beside the session.", done: false, button: "Sign in…") { [weak self] in
+                    : SetupStep(title: title, detail: email ?? "Sign in so artifacts open beside the session.", done: false, button: "Sign in…") { [weak self] in
                         SignInWindow.show(a, near: self?.window)
                     })
             }
@@ -1409,7 +1413,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         switch notificationsAllowed {
         case true?: steps.append(SetupStep(title: "Notifications", detail: "A session that needs you taps you on the shoulder.", done: true))
         case false?:
-            steps.append(SetupStep(title: "Notifications", detail: "Allow them so a session that needs you can tell you.", done: false, button: "Open Settings…") {
+            steps.append(SetupStep(title: "Notifications", detail: "Get told when a session needs you.", done: false, button: "System Settings…") {
                 let id = Bundle.main.bundleIdentifier ?? "dev.maxwell.app"
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") { NSWorkspace.shared.open(url) }
             })

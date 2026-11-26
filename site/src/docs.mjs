@@ -26,7 +26,7 @@ export const pages = {
 <h2>Install</h2>
 <ol class="steps">
 <li>Install with <a href="https://brew.sh">Homebrew</a>:<pre><code>brew install --cask robinsadeghpour/maxwell/maxwell</code></pre>Or <a href="${GH}/releases/latest/download/Maxwell.dmg">download Maxwell</a>, open the DMG and drag Maxwell to Applications. Older versions are on <a href="${GH}/releases">Releases</a>. Maxwell is signed and notarized by Apple, so it opens without a warning.</li>
-<li>Open Maxwell. With no session open, <strong>Set up Maxwell</strong> lists what's left: Claude Code, the session hooks, a claude.ai sign-in for artifacts, and notifications. Each step has one button and ticks itself off. The list goes away once everything is done.</li>
+<li>Open Maxwell. With no session open, <strong>Set up Maxwell</strong> lists what's left: Claude Code, the session hooks, a claude.ai sign-in for artifacts, and notifications. Each step has one button; a finished step leaves the list and fills the progress bar. The list goes away once everything is done.</li>
 </ol>
 <p>The session hooks are how Maxwell learns what your sessions are doing. You can also install them with <strong>Maxwell › Install Hooks</strong> (${k("⇧ ⌘ H")}).</p>
 <p class="note">Install Hooks backs up each account's <code>settings.json</code> before it adds anything. <code>Maxwell uninstall-hooks</code> restores them exactly. See <a href="/docs/privacy">What Maxwell touches</a>.</p>
