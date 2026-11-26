@@ -164,18 +164,16 @@ final class ViewerTabStrip: MXView, TipSource {
 
     override func draw(_ r: NSRect) {
         let rs = rects()
-        // The strip sits one step off the page; the active tab is the page itself (no tint, no line
-        // under it), the way an editor's tab joins its document.
+        // The title bar's line runs under the strip, open under the active tab: the tab is the page
+        // itself, the way an editor's tab joins its document.
         let gap: NSRect? = { if let a = active, rs.indices.contains(a), drag == nil { return rs[a] }; return nil }()
-        for (c, h) in [(t.plane, bounds.height - 1), (t.hair2, CGFloat(1))] {
-            c.setFill()
-            let y = h == 1 ? bounds.height - 1 : 0
-            if let g = gap {
-                NSRect(x: 0, y: y, width: max(0, min(g.minX, tabRoom)), height: h).fill()
-                NSRect(x: g.maxX, y: y, width: max(0, bounds.width - g.maxX), height: h).fill()
-            } else {
-                NSRect(x: 0, y: y, width: bounds.width, height: h).fill()
-            }
+        t.hair.setFill()
+        let y = bounds.height - 1
+        if let g = gap {
+            NSRect(x: 0, y: y, width: max(0, min(g.minX, tabRoom)), height: 1).fill()
+            NSRect(x: g.maxX, y: y, width: max(0, bounds.width - g.maxX), height: 1).fill()
+        } else {
+            NSRect(x: 0, y: y, width: bounds.width, height: 1).fill()
         }
         NSGraphicsContext.saveGraphicsState()
         NSRect(x: 0, y: 0, width: tabRoom, height: bounds.height).clip()
@@ -199,11 +197,10 @@ final class ViewerTabStrip: MXView, TipSource {
             let compact = squeezed
             if !compact { drawIcon(tab.kind, at: NSPoint(x: rr.minX + Self.pad + 7, y: rr.midY), color: sel ? t.fg2 : t.fg3) }
             let textX = rr.minX + Self.pad + (compact ? 0 : Self.iconW)
-            let textEnd = compact && !sel ? rr.maxX - (tab.unseen ? 20 : 8) : rr.maxX - Self.closeW - 10
+            let textEnd = compact && !sel && !hot ? rr.maxX - (tab.unseen ? 20 : 8) : rr.maxX - Self.closeW - 10
             drawTitle(tab.title, in: NSRect(x: textX, y: 0, width: textEnd - textX, height: rr.height), color: ink, font: font(tab))
             let c = closeRect(rr)
             if sel || hot {
-                if compact && !sel { t.plane.setFill(); NSRect(x: c.minX - 4, y: 1, width: rr.maxX - c.minX + 3, height: rr.height - 2).fill(); t.hover.withAlphaComponent(0.5).setFill(); NSRect(x: c.minX - 4, y: 0, width: rr.maxX - c.minX + 3, height: rr.height - 1).fill() }
                 if hot, hoverClose { t.hover.setFill(); NSBezierPath(roundedRect: c, xRadius: 3, yRadius: 3).fill() }
                 let p = NSBezierPath(); p.lineWidth = 1.2; p.lineCapStyle = .round
                 let m = NSPoint(x: c.midX, y: c.midY)
@@ -225,7 +222,6 @@ final class ViewerTabStrip: MXView, TipSource {
         NSGraphicsContext.restoreGraphicsState()
         if overflows {
             let lr = listRect
-            t.plane.setFill(); NSRect(x: lr.minX, y: 0, width: lr.width, height: lr.height - 1).fill()
             if hoverList { t.hover.setFill(); NSBezierPath(roundedRect: lr.insetBy(dx: 2, dy: 4), xRadius: 4, yRadius: 4).fill() }
             t.hair2.setFill(); NSRect(x: lr.minX, y: 0, width: 1, height: lr.height - 1).fill()
             let p = NSBezierPath(); p.lineWidth = 1.1; p.lineCapStyle = .round; p.lineJoinStyle = .round
@@ -256,7 +252,8 @@ final class ViewerTabStrip: MXView, TipSource {
     override func mouseDown(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
         if overflows, listRect.contains(p) { return showList() }
-        guard let i = index(at: p) else { return }
+        // The empty end of the row moves the window, as the rest of the title bar does.
+        guard let i = index(at: p) else { return e.clickCount == 2 ? window?.performZoom(nil) ?? () : window?.performDrag(with: e) ?? () }
         let r0 = rects()[i]
         if closeRect(r0).contains(p) { return onAction?(.close(i)) ?? () }
         if e.clickCount == 2 { return onAction?(.fill) ?? () }

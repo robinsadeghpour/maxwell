@@ -1,7 +1,7 @@
 import AppKit
 
-/// The title bar's session and terminal tabs: which are in the row and what shows when one closes.
-/// The rules are `TabRow`'s; this wires them to the window.
+/// The title bar: the session and terminal tabs (which are in the row and what shows when one
+/// closes, by `TabRow`'s rules), and the current session's document tabs and buttons.
 extension MainWindowController {
     func wireTitleBar() {
         let bar = root.titleBar
@@ -13,6 +13,13 @@ extension MainWindowController {
         bar.gear.action = { [weak self] in self?.showSettings() }
         bar.leftToggle.action = { [weak self] in self?.toggleSide(.left) }
         bar.rightToggle.action = { [weak self] in self?.toggleSide(.right) }
+        let docs = root.viewerPane.header
+        docs.onTab = { [weak self] in self?.tabAction($0) }
+        docs.onKeepToggle = { [weak self] in self?.togglePin() }
+        docs.pin.action = { [weak self] in self?.togglePin() }
+        docs.treeButton.action = { [weak self] in self?.toggleTree() }
+        docs.reload.action = { [weak self] in self?.reloadArtifact() }
+        docs.external.action = { [weak self] in self?.openInBrowser() }
     }
 
     /// Each tab with its session's title and state; a plain terminal's with its name.

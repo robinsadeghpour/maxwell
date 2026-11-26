@@ -185,12 +185,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         wireTitleBar()
         root.onFilling = { [weak self] in self?.fillingChanged($0) }
         root.sessionPane.delegate = self
-        root.viewerPane.pin.action = { [weak self] in self?.togglePin() }
-        root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
         // Browsing the tree previews, as in VS Code's explorer; a double-click or ⏎ keeps the tab.
         root.viewerPane.onTreeSelect = { [weak self] url, keep in self?.show(.file(url), for: self?.current, keep: keep) }
-        root.viewerPane.onTab = { [weak self] in self?.tabAction($0) }
-        root.viewerPane.onKeepToggle = { [weak self] in self?.togglePin() }
         root.viewerPane.onArtifactTitle = { [weak self] link, title in
             guard let self, let id = self.current else { return }
             self.viewers[id, default: ViewerTabs()].setTitle(title, for: link)
@@ -200,8 +196,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.viewer.onFileLink = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
         store.onChange = { [weak self] in self?.render($0); self?.voice.sessionsChanged(); self?.releaseVoiceTerminals() }
         store.onViewerItem = { [weak self] id, item, reload in self?.itemSeen(id, item, reload: reload) }
-        root.viewerPane.reload.action = { [weak self] in self?.reloadArtifact() }
-        root.viewerPane.external.action = { [weak self] in self?.openInBrowser() }
         root.viewerPane.viewer.artifact.onOpenExternal = { [weak self] url, a in self?.openExternally(url, account: a) }
         root.viewerPane.viewer.artifact.onArtifactLink = { [weak self] l in self?.show(.artifact(l, title: nil), for: self?.current, keep: false) }
         root.viewerPane.viewer.onLink = { [weak self] url in
@@ -1007,7 +1001,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     }
 
     /// A click, drag or menu choice on a viewer tab.
-    private func tabAction(_ a: ViewerTabAction) {
+    func tabAction(_ a: ViewerTabAction) {
         guard let id = current, var v = viewers[id] else { return }
         let at = { (i: Int) in v.tabs.indices.contains(i) ? v.tabs[i] : nil }
         switch a {
@@ -1663,8 +1657,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "next-viewer-tab", title: "Next Viewer Tab", menu: "View", shortcut: Shortcut("cmd+alt+right")) { [weak self] in self?.stepViewerTab(1) },
             Action(id: "prev-viewer-tab", title: "Previous Viewer Tab", menu: "View", shortcut: Shortcut("cmd+alt+left")) { [weak self] in self?.stepViewerTab(-1) },
             Action(id: "viewer-tabs", title: "All Viewer Tabs…", menu: "View") { [weak self] in
-                guard let self, !self.root.viewerPane.strip.isHidden else { return }
-                self.root.viewerPane.strip.showList()
+                guard let self, !self.root.viewerPane.header.strip.isHidden else { return }
+                self.root.viewerPane.header.strip.showList()
             },
             Action(id: "pin", title: "Keep Viewer Tab Open", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
             Action(id: "reload-artifact", title: "Reload Artifact", menu: "View", shortcut: Shortcut("cmd+alt+r"), isEnabled: hasArtifact) { [weak self] in self?.reloadArtifact() },

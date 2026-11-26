@@ -261,7 +261,7 @@ final class FileCell: NSView {
         x += 16
         let ink = dimmed ? t.fg3 : t.fg2
         if node.isDir { Self.symbol("folder", size: 13, weight: .regular, at: NSPoint(x: x + 8, y: midY), color: ink) }
-        else { ViewerTabStrip.drawKind(ViewerPane.kind(node.url), at: NSPoint(x: x + 8, y: midY), color: ink, size: 12) }
+        else { ViewerTabStrip.drawKind(ViewerHeader.kind(node.url), at: NSPoint(x: x + 8, y: midY), color: ink, size: 12) }
         x += 22
         // Cut in the middle, so the extension stays ("passkeys-r…ollout.md").
         ViewerTabStrip.drawName(node.url.lastPathComponent, in: NSRect(x: x, y: 0, width: max(0, bounds.width - x - 8), height: bounds.height),

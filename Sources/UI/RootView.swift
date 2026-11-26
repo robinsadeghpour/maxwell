@@ -119,6 +119,9 @@ final class RootView: MXView {
         }
         status.onPanel = { [weak self] p in self?.onStripe?(p) }
         viewerPane.onTreeWidth = { [weak self] w in self?.panels.treeWidth = w }
+        titleBar.docTabs = viewerPane.header
+        let more = viewerPane.header.more
+        more.action = { [weak self, weak more] in if let more { self?.showMenu(for: .viewer, below: more) } }
         railReveal.step = { [weak self] _ in self?.needsLayout = true }
         maxTween.duration = 0.2
         maxTween.step = { [weak self] _ in self?.needsLayout = true }
@@ -187,9 +190,11 @@ final class RootView: MXView {
             let want = shown(d)
             for p in want {
                 guard let v = content(p) else { continue }
+                if v.superview !== dock { dock.addSubview(v) }
+                // The viewer's tabs and ⋯ are in the title bar.
+                guard p != .viewer else { continue }
                 let (g, c) = chrome(p)
                 c.title = title(p)
-                if v.superview !== dock { dock.addSubview(v) }
                 if g.superview !== dock { dock.addSubview(g) }
                 if c.superview !== dock { dock.addSubview(c) }
             }
@@ -213,8 +218,9 @@ final class RootView: MXView {
         status.panels = panels.panels(.bottom, among: present).map {
             StatusBar.PanelToggle(panel: $0, title: title($0), open: shown(.bottom).contains($0))
         }
-        titleBar.leftToggle.isHidden = panels.panels(.left, among: present).isEmpty
-        titleBar.rightToggle.isHidden = panels.panels(.right, among: present).isEmpty
+        // Filling the window, the sides are out of play until it comes back.
+        titleBar.leftToggle.isHidden = filling != nil || panels.panels(.left, among: present).isEmpty
+        titleBar.rightToggle.isHidden = filling != nil || panels.panels(.right, among: present).isEmpty
         titleBar.leftToggle.isOn = !shown(.left).isEmpty
         titleBar.rightToggle.isOn = !shown(.right).isEmpty
         titleBar.needsLayout = true
@@ -340,9 +346,21 @@ final class RootView: MXView {
             + (bh > 0 ? [NSRect(x: cx0, y: bottom - bh, width: cx1 - cx0, height: 1)] : [])
         drawsLines += [leftStripe.isHidden ? nil : NSRect(x: leftStripe.frame.maxX, y: top, width: 1, height: bodyH),
                        rightStripe.isHidden ? nil : NSRect(x: rightStripe.frame.minX - 1, y: top, width: 1, height: bodyH)].compactMap { $0 }
+        titleBar.docs = docsPlace(line: x1 - rwid, open: rwid > 0)
         planeRect = NSRect(x: 0, y: top, width: railMode == .shown ? rw + 1 : 0, height: bodyH)
         needsDisplay = true
         window?.invalidateCursorRects(for: self)
+    }
+
+    /// The viewer's tabs head it in the title bar: right of the pane line beside the session, or
+    /// the whole row after the session's own tab while it fills the window.
+    private func docsPlace(line x: CGFloat, open: Bool) -> TitleBar.Docs {
+        guard shown(.right).contains(.viewer) else { return .none }
+        switch filling {
+        case nil: return open ? .beside(at: x) : .none
+        case .panel(.right)?: return .filling
+        default: return .none
+        }
     }
 
     private var drawsLines: [NSRect] = []

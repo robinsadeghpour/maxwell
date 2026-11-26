@@ -23,7 +23,7 @@ final class PluginPanel: MXView, PanelContent, TipSource {
     var onOpenURL: ((URL) -> Void)? { didSet { body.onOpenURL = onOpenURL } }
     var onRestart: ((PluginID) -> Void)?
     var onSettings: ((PluginID) -> Void)?
-    /// Room the panel's own ⋯ ⤢ × take at the header's right edge (set by the dock).
+    /// Room the panel's ⋯ takes at the header's right edge (set by the dock).
     var headerReserve: CGFloat = 70 { didSet { if headerReserve != oldValue { needsDisplay = true } } }
 
     var gripRect: NSRect { NSRect(x: 0, y: 0, width: max(0, bounds.width - headerReserve), height: Metrics.header) }
