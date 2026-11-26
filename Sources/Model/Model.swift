@@ -183,6 +183,8 @@ struct Session: Equatable {
     var reach: Reach
     var doneCheck: DoneCheck?
     var transcriptPath: String?
+    /// Its Claude Code process, from the listing or a hook; what the System panel adds up per session.
+    var pid: ProcessID?
     /// False until the first prompt: a session nobody has used yet is never "safe to close".
     var prompted = false
     /// When the session's account listing last included it, and the status it gave.

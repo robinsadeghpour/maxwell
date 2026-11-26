@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Which session is using your Mac</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-26-system-details</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-26-system-details</guid>
+<pubDate>Thu, 26 Nov 2026 12:00:00 GMT</pubDate>
+<description>Click the System panel, or choose Panels › System Details, and a card opens over it: the last five minutes of CPU for the whole Mac and for Claude Code, then every running session with the CPU and memory it uses, counting the commands and MCP servers it runs. Click a session to open it. The footer shows memory pressure and opens Activity Monitor.&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;The claude row in the System panel now counts the commands each session runs, as its tooltip always said&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>A calmer screen when no session is open</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-26-calmer-home</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-26-calmer-home</guid>

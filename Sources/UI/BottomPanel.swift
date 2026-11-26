@@ -1,5 +1,4 @@
 import AppKit
-import Darwin
 
 /// The one way usage is drawn: a 2 pt bar on a hairline track, the percent, then when it
 /// resets. Grey until 80%, brighter to 95%, amber at the limit.
@@ -110,10 +109,15 @@ final class UsagePanel: MXView, PanelContent, TipSource {
 }
 
 /// What Claude Code and the machine use right now: CPU and memory, sampled every 2 s while shown.
+/// A click on a row opens the details card (`SystemDetail`).
 final class SystemPanel: MXView, PanelContent, TipSource {
-    private var sample: SystemSample?
+    private(set) var sample: SystemSample?
+    private(set) var history = SystemHistory()
     private var timer: Timer?
-    private let sampler = SystemSampler()
+    /// Takes one reading off the main thread and hands it back on it. Set by the window controller.
+    var measure: ((@escaping (SystemSample) -> Void) -> Void)?
+    var onSample: (() -> Void)?
+    var onOpen: (() -> Void)?
 
     var gripRect: NSRect { NSRect(x: 0, y: 0, width: bounds.width, height: Widget.header) }
     func preferredExtent(along d: Dock) -> CGFloat? { Widget.header + 3 * Widget.line + 8 }
@@ -133,8 +137,21 @@ final class SystemPanel: MXView, PanelContent, TipSource {
     }
 
     private func tick() {
-        sampler.take { [weak self] s in self?.sample = s; self?.needsDisplay = true }
+        measure? { [weak self] s in
+            guard let self else { return }
+            self.sample = s
+            self.history.add(s)
+            self.needsDisplay = true
+            self.onSample?()
+        }
     }
+
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
+    override func mouseDown(with e: NSEvent) {
+        let p = convert(e.locationInWindow, from: nil)
+        if p.y >= Widget.header, sample != nil { onOpen?() } else { super.mouseDown(with: e) }
+    }
+    override func resetCursorRects() { addCursorRect(NSRect(x: 0, y: Widget.header, width: bounds.width, height: bounds.height - Widget.header), cursor: .pointingHand) }
 
     /// What each row measures. CPU is always a share of the whole Mac, so the rows add up.
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
@@ -146,10 +163,11 @@ final class SystemPanel: MXView, PanelContent, TipSource {
             return nil
         }
         let i = Int((p.y - Widget.header) / Widget.line)
+        let n = s.sessions.count
         let tips = [
-            Tip("Claude Code, every account").adding(s.claudeCount == 1 ? "1 process, sessions and their tools together" : "\(s.claudeCount) processes, sessions and their tools together"),
-            Tip("Maxwell itself"),
-            Tip("The whole Mac").adding("\(s.cores) cores, \(Self.gb(s.memTotal)) GB memory"),
+            Tip("Claude Code, every account").adding("\(n == 1 ? "1 session" : "\(n) sessions") and the commands they run").adding("Click for each session"),
+            Tip("Maxwell itself").adding("Click for details"),
+            Tip("The whole Mac").adding("\(s.cores) cores, \(Self.gb(s.memTotal)) GB memory").adding("Click for details"),
         ]
         guard tips.indices.contains(i) else { return nil }
         return (tips[i], NSRect(x: 0, y: Widget.header + CGFloat(i) * Widget.line, width: bounds.width, height: Widget.line))
@@ -161,9 +179,10 @@ final class SystemPanel: MXView, PanelContent, TipSource {
             Text.draw("Measuring…", in: NSRect(x: 12, y: Widget.header, width: 200, height: Widget.line), color: t.fg3, font: Fonts.mono(Metrics.fontSize - 2))
             return
         }
+        let claude = s.claude
         let rows: [(String, String, Double, UInt64)] = [
-            ("claude", "\(s.claudeCount)", s.claudeCPU, s.claudeMem),
-            ("maxwell", "", s.selfCPU, s.selfMem),
+            ("claude", s.sessions.isEmpty ? "" : "\(s.sessions.count)", claude.cpu, claude.memory),
+            ("maxwell", "", s.maxwell.cpu, s.maxwell.memory),
             ("machine", "", s.machineCPU, s.memUsed),
         ]
         let x0: CGFloat = 12 + 76
@@ -181,9 +200,9 @@ final class SystemPanel: MXView, PanelContent, TipSource {
             let y = Widget.header + CGFloat(i) * Widget.line
             let nw = Text.draw(name, in: NSRect(x: 12, y: y, width: 70, height: Widget.line), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1))
             if !count.isEmpty { Text.draw(count, in: NSRect(x: 12 + nw + 5, y: y, width: 30, height: Widget.line), color: t.fg3, font: small) }
-            bar(cpu, label: String(format: cpu < 10 ? "%.1f%%" : "%.0f%%", cpu), labelWidth: Text.width("100.0%", font: small), in: NSRect(x: x0, y: y, width: w, height: Widget.line))
+            bar(cpu, label: Self.percent(cpu), labelWidth: Text.width("100.0%", font: small), in: NSRect(x: x0, y: y, width: w, height: Widget.line))
             let memPct = Double(mem) / Double(max(1, s.memTotal)) * 100
-            let label = i == 2 ? "\(Self.gb(mem))/\(Self.gb(s.memTotal)) GB" : mem > 1 << 30 ? "\(Self.gb(mem)) GB" : "\(mem >> 20) MB"
+            let label = i == 2 ? "\(Self.gb(mem))/\(Self.gb(s.memTotal)) GB" : Self.memory(mem)
             bar(memPct, label: label, labelWidth: Text.width("88.8/88.8 GB", font: small), in: NSRect(x: x0 + w + 16, y: y, width: w, height: Widget.line))
         }
     }
@@ -195,98 +214,8 @@ final class SystemPanel: MXView, PanelContent, TipSource {
     }
 
     static func gb(_ b: UInt64) -> String { String(format: "%.1f", Double(b) / Double(1 << 30)) }
-}
-
-struct SystemSample {
-    var claudeCount = 0
-    var claudeCPU = 0.0      // % of the whole machine
-    var claudeMem: UInt64 = 0
-    var selfCPU = 0.0
-    var selfMem: UInt64 = 0
-    var machineCPU = 0.0
-    var memUsed: UInt64 = 0
-    var memTotal: UInt64 = ProcessInfo.processInfo.physicalMemory
-    var cores = ProcessInfo.processInfo.activeProcessorCount
-}
-
-/// Reads `ps` for the Claude processes and the kernel for the machine, off the main thread.
-final class SystemSampler {
-    private let queue = DispatchQueue(label: "maxwell.system", qos: .utility)
-    private var lastTicks: (busy: UInt64, total: UInt64)?
-
-    func take(_ done: @escaping (SystemSample) -> Void) {
-        queue.async {
-            var s = SystemSample()
-            let me = getpid()
-            for line in Self.ps().split(separator: "\n") {
-                let f = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
-                guard f.count == 4, let pid = Int32(f[0]), let cpu = Double(f[1]), let rss = UInt64(f[2]) else { continue }
-                let comm = String(f[3])
-                if pid == me { s.selfCPU = cpu / Double(s.cores) }
-                if (comm as NSString).lastPathComponent == "claude" || comm.contains("/claude/versions/") {
-                    s.claudeCount += 1
-                    s.claudeCPU += cpu / Double(s.cores)
-                    s.claudeMem += rss * 1024
-                }
-            }
-            s.selfMem = Self.footprint()
-            s.memUsed = Self.memoryUsed()
-            let ticks = Self.cpuTicks()
-            if let last = self.lastTicks, ticks.total > last.total {
-                s.machineCPU = Double(ticks.busy - last.busy) / Double(ticks.total - last.total) * 100
-            }
-            self.lastTicks = ticks
-            DispatchQueue.main.async { done(s) }
-        }
-    }
-
-    private static func ps() -> String {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/ps")
-        p.arguments = ["-Ao", "pid=,%cpu=,rss=,comm="]
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return "" }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        return String(decoding: data, as: UTF8.self)
-    }
-
-    private static func footprint() -> UInt64 {
-        var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-        let kr = withUnsafeMutablePointer(to: &info) { $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) } }
-        return kr == KERN_SUCCESS ? info.phys_footprint : 0
-    }
-
-    /// What Activity Monitor calls Memory Used: app memory + wired + compressed.
-    private static func memoryUsed() -> UInt64 {
-        var vm = vm_statistics64_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size)
-        let kr = withUnsafeMutablePointer(to: &vm) { $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count) } }
-        guard kr == KERN_SUCCESS else { return 0 }
-        let page = UInt64(vm_kernel_page_size)
-        let app = UInt64(vm.internal_page_count) - UInt64(vm.purgeable_count)
-        return (app + UInt64(vm.wire_count) + UInt64(vm.compressor_page_count)) * page
-    }
-
-    private static func cpuTicks() -> (busy: UInt64, total: UInt64) {
-        var info: processor_info_array_t?
-        var count: mach_msg_type_number_t = 0
-        var cpus: natural_t = 0
-        guard host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &cpus, &info, &count) == KERN_SUCCESS, let info else { return (0, 0) }
-        defer { vm_deallocate(mach_task_self_, vm_address_t(bitPattern: info), vm_size_t(count) * vm_size_t(MemoryLayout<integer_t>.size)) }
-        var busy: UInt64 = 0, total: UInt64 = 0
-        for c in 0..<Int(cpus) {
-            let base = c * Int(CPU_STATE_MAX)
-            let user = UInt64(info[base + Int(CPU_STATE_USER)]), sys = UInt64(info[base + Int(CPU_STATE_SYSTEM)])
-            let nice = UInt64(info[base + Int(CPU_STATE_NICE)]), idle = UInt64(info[base + Int(CPU_STATE_IDLE)])
-            busy += user + sys + nice
-            total += user + sys + nice + idle
-        }
-        return (busy, total)
-    }
+    static func memory(_ b: UInt64) -> String { b > 1 << 30 ? "\(gb(b)) GB" : "\(b >> 20) MB" }
+    static func percent(_ cpu: Double) -> String { String(format: cpu < 10 ? "%.1f%%" : "%.0f%%", cpu) }
 }
 
 extension ViewerPane: PanelContent {

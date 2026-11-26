@@ -39,6 +39,7 @@
 
 ## Changelog
 
+- [Which session is using your Mac](https://www.runmaxwell.com/changelog/2026-11-26-system-details) (2026-11-26, v0.1.78)
 - [A calmer screen when no session is open](https://www.runmaxwell.com/changelog/2026-11-26-calmer-home) (2026-11-26, v0.1.77)
 - [Tool windows, a better file tree, and artifacts full size](https://www.runmaxwell.com/changelog/2026-11-26-tool-windows) (2026-11-26, v0.1.76)
 - [Restart to update installs the newest release](https://www.runmaxwell.com/changelog/2026-11-26-newest-update) (2026-11-26, v0.1.75)

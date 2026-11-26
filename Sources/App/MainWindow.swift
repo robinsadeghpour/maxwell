@@ -50,6 +50,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     let updater = Updater()
     let newPanel = NewSessionPanel(frame: .zero)
     let closeSheet = CloseSheet(frame: .zero)
+    let systemDetail = SystemDetail(frame: .zero)
+    let systemSampler = SystemSampler()
+    /// System Details was asked for while the System panel was hidden: open it with the panel's first reading.
+    var systemDetailWanted = false
     private lazy var settings = SettingsWindowController()
     /// The phone app's bridge (docs/phone.md); Settings › Phone shows it.
     var phone: PhoneBridge?
@@ -112,7 +116,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.delegate = self
         loadPanelLayout()
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
-        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges() }
+        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges(); self?.systemDetail.dismiss() }
         root.onSettled = { [weak self] in self?.updateDim() }
         root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
@@ -124,7 +128,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         wire()
         restoreShells()
         TerminalHarness.start(self)
-        actions = makeActions()
+        actions = makeActions() + systemActions
         setUpVoice()
         tooltips = Tooltips(window: w)
         Tooltips.shortcut = { [weak self] id in self?.actions.first { $0.id == id }?.shortcut?.display }
@@ -159,6 +163,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if let a = b.badge.action { self?.store.runPluginAction(b.plugin, a, session: id) }
         }
         store.onPluginsChanged = { [weak self] in self?.pluginsChanged() }
+        wireSystem()
         store.plugins.onStartSession = { [weak self] _, prompt, name, cwd, model, done in
             guard let self, self.startHere(prompt: prompt, name: name, cwd: cwd, model: model, done: done) else {
                 return done(.failure(.init(message: "No folder to start in. Open a session in the project first.")))
@@ -227,7 +232,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 self.dismiss(top)
                 return nil
             }
-            if top !== self.closeSheet, !top.frame.contains(top.superview!.convert(e.locationInWindow, from: nil)) { self.dismiss(top) }
+            if top !== self.closeSheet, !top.frame.contains(top.superview!.convert(e.locationInWindow, from: nil)), !self.clickTogglesSystemDetail(e, top) { self.dismiss(top) }
             return e
         }
         updater.onReady = { [weak self] v in self?.root.status.update = v; self?.refreshSettings() }
@@ -1343,10 +1348,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if settings.window?.isVisible == true { settings.view.update(settingsModel) }
     }
 
-    private var topOverlay: NSView? { [closeSheet, newPanel, search].first { $0.superview != nil } }
+    private var topOverlay: NSView? { [closeSheet, newPanel, search, systemDetail].first { $0.superview != nil } }
 
     private func dismiss(_ v: NSView) {
-        if v === search { search.dismiss() } else if v === newPanel { newPanel.dismiss() } else if v === closeSheet { closeSheet.dismiss() }
+        if v === search { search.dismiss() } else if v === newPanel { newPanel.dismiss() } else if v === closeSheet { closeSheet.dismiss() } else if v === systemDetail { systemDetail.dismiss() }
     }
 
     /// Where ⌘T starts: the open session's folder when it belongs to the project on screen,
@@ -1508,6 +1513,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if search.superview != nil { search.removeFromSuperview() }
         if newPanel.superview != nil { newPanel.removeFromSuperview() }
         if closeSheet.superview != nil { closeSheet.removeFromSuperview() }
+        if systemDetail.superview != nil { systemDetail.removeFromSuperview() }
     }
 
     func focusMain() {
@@ -1616,7 +1622,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Actions and the menu bar again, for plugins that came or went.
     func rebuildActions() {
-        actions = makeActions()
+        actions = makeActions() + systemActions
         NSApp.mainMenu = MenuBuilder.build(actions)
     }
 

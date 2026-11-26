@@ -172,6 +172,7 @@ private func reduce(agents snap: AgentsSnapshot, into s: inout AppState) {
         session.unverified = e.unverified
         session.runningTasks = e.runningTasks
         if let pid = e.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
+        if let pid = e.pid { session.pid = ProcessID(raw: Int32(pid)) }
         s.closed[e.sessionId] = nil
         if let t = e.title { session.tabTitle = t }
         if e.used { session.prompted = true }
@@ -224,6 +225,7 @@ private func reduce(hook h: Hook, into s: inout AppState) {
     if let cwd = h.cwd, !cwd.isEmpty { session.cwd = cwd }
     if let t = h.transcriptPath { session.transcriptPath = t }
     if let pid = h.pid, case .elsewhere = session.reach { session.reach = .elsewhere(pid: pid) }
+    if let pid = h.pid { session.pid = ProcessID(raw: Int32(pid)) }
     let reset = s.account(acct)?.limitResetsAt(now: h.at)
     applyHook(h.kind, at: h.at, to: &session, reset: reset)
     // A listing that already saw this moment (its status changed with it) knows more than the hook.
