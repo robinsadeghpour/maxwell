@@ -3,7 +3,7 @@ import AppKit
 final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWindowDelegate {
     let store: Store
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
-    private var terminals: [SessionID: TerminalView] = [:]
+    var terminals: [SessionID: TerminalView] = [:]
     private(set) var detached = Set<SessionID>()
     /// Voice mode (MainWindow+Voice): the mode, its orb, and its two shortcuts that work from any app.
     let voice = VoiceMode()
@@ -29,12 +29,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var shellOutputs: [String: String] = [:]
     /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
     var hosted: [SessionID: String] = [:]
-    private let terminalHosts = TerminalHosts()
+    let terminalHosts = TerminalHosts()
     /// The terminal a session runs in: its own attached one, or the Maxwell terminal hosting it.
     func terminal(for id: SessionID) -> TerminalView? { terminals[id] ?? hosted[id].flatMap(shell) }
     /// The terminal on screen when it is a plain one (test runs type into it).
     var shownShell: TerminalView? { shell(current) }
-    var visited: [SessionID] = []
+    /// The title bar's session and terminal tabs (MainWindow+Tabs).
+    var tabRow = TabRow()
     var current: SessionID?
     /// The conversation each session's `/resume` answer named and Maxwell already followed (MainWindow+ResumeElsewhere).
     var resumeFollowed: [SessionID: SessionID] = [:]
@@ -317,7 +318,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.status.counts = PhaseGroup.allCases.map { g in (g, all.first { $0.0 == g }?.1.count ?? 0) }
         root.status.warning = unverifiedWarning(state)
         let terminalTabs = Dictionary(uniqueKeysWithValues: shellRows().map { ($0.id, $0.title) })
-        root.titleBar.tabs = visited.compactMap { id in
+        root.titleBar.tabs = tabRow.order.compactMap { id in
             if let title = terminalTabs[id] { return TitleBar.Tab(id: id, title: title, group: nil) }
             return state.sessions[id].map { TitleBar.Tab(id: id, title: $0.title, group: state.group($0, now: now, rules: rules) ?? .idle) }
         }
@@ -580,19 +581,19 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func open(_ id: SessionID) {
         root.maximized = nil  // another session: show it, not a panel over it
         if let t = shell(id) {
-            current = id
             remember(id)
+            current = id
             render(store.state)
             syncViewer()
             window?.makeFirstResponder(t)
             return
         }
         guard let s = store.state.sessions[id] else { return }
+        remember(id)
         current = id
         // Opening a session from another project switches the rail to it, so its row is in the list.
         let p = store.state.project(s, in: projects)
         if let sc = scope, sc != p { scope = p; UserDefaults.standard.set(p, forKey: "Maxwell.project") }
-        remember(id)
         // A session Claude Code stopped while idle starts again only when you ask (Resume, ⌘R),
         // so moving through the list doesn't wake every session it passes.
         let resume = resuming.remove(id) != nil
@@ -642,43 +643,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if !due.isEmpty { mark("let go of \(due.count) terminal\(due.count == 1 ? "" : "s") off screen") }
     }
 
-    /// `claude` started in a Maxwell terminal: its row takes the terminal's place, and the pane
-    /// follows. When it exits, the terminal's row comes back and the pane goes back to it.
-    private func followHostedTerminals(_ state: AppState) {
-        let before = hosted
-        hosted = terminalHosts.hosts(Array(state.sessions.values), terminalIds: shells.map(\.id))
-        guard let c = current else { return }
-        if shell(c) != nil, let sid = hosted.first(where: { $0.value == c })?.key {
-            current = sid
-            visited.removeAll { $0 == sid }
-            visited.insert(sid, at: 0)
-        } else if hosted[c] == nil, let shellId = before[c], shell(shellId) != nil {
-            current = shellId
-        }
-    }
-
-    /// The tabs: what you opened last, newest first.
-    func remember(_ id: SessionID) {
-        visited.removeAll { $0 == id }
-        visited.insert(id, at: 0)
-        if visited.count > 8 { visited.removeLast() }
-    }
-
     func reattach(_ id: SessionID) {
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         detached.remove(id)
         resuming.insert(id)
         open(id)
-    }
-
-    /// Closing a tab frees its terminal; the session keeps running. A plain terminal keeps running
-    /// too, in its sidebar row.
-    func forget(_ id: SessionID) {
-        if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
-        visited.removeAll { $0 == id }
-        if current == id { current = visited.first }
-        render(store.state)
-        syncViewer()
     }
 
     func step(_ d: Int) {
@@ -1227,7 +1196,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 let acct = state.account(s.accountId)?.name ?? s.accountId
                 let project = state.project(s, in: projects)
                 let files = Transcripts.path(s, account: state.account(s.accountId)).map { TouchedFiles.shared.files($0) } ?? []
-                let recent = visited.firstIndex(of: s.id).map { 16 - $0 * 2 } ?? 0
+                let recent = tabRow.recent.firstIndex(of: s.id).map { 16 - $0 * 2 } ?? 0
                 let boost = (g == .needsYou ? 30 : g == .yourTurn ? 20 : g == .working ? 4 : 0) + recent
                 items.append(SearchItem(kind: .session, title: s.title, fields: [
                     (s.title, 3, ""), (project, 2, ""), (s.branch ?? s.doneCheck?.branch ?? "", 2, "branch"), (acct, 1, ""),

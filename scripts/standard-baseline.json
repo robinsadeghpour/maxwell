@@ -23,7 +23,7 @@
   "Sources/UI/Theme.swift": 1
  },
  "file-lines": {
-  "Sources/App/MainWindow.swift": 1801,
+  "Sources/App/MainWindow.swift": 1732,
   "Sources/App/Probes.swift": 543,
   "Sources/App/Store.swift": 630,
   "Sources/App/main.swift": 671,
@@ -33,7 +33,7 @@
   "Sources/UI/Terminal.swift": 603
  },
  "function-lines": {
-  "Sources/App/MainWindow.swift::makeActions": 140,
+  "Sources/App/MainWindow.swift::makeActions": 133,
   "Sources/App/MainWindow.swift::render": 89,
   "Sources/App/MainWindow.swift::wire": 104,
   "Sources/App/main.swift::runTestHooks": 388,
