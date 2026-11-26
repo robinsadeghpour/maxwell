@@ -61,7 +61,7 @@ final class FileTreeController: NSObject, NSOutlineViewDataSource, NSOutlineView
         outline.outlineTableColumn = col
         outline.headerView = nil
         outline.style = .plain
-        outline.rowHeight = 22
+        outline.rowHeight = 24
         outline.intercellSpacing = .zero
         outline.indentationPerLevel = 0
         outline.backgroundColor = .clear
@@ -235,11 +235,13 @@ final class TreeRow: NSTableRowView {
     override var isEmphasized: Bool { get { false } set {} }
 }
 
-/// One row: a thin line for each folder level it sits in, a chevron on folders, the file's kind,
-/// its name (dimmed when git ignores it).
+/// One row, the way VS Code, JetBrains and Warp draw a project tree: the system font, a chevron on
+/// folders, an outlined folder or the file's kind, its name (dimmed when git ignores it), and a faint
+/// line for each folder level it sits in.
 final class FileCell: NSView {
     static let id = NSUserInterfaceItemIdentifier("file")
-    static let indent: CGFloat = 12
+    static let indent: CGFloat = 16
+    static let font = NSFont.systemFont(ofSize: 13)
     var node: FileNode?
     var level = 0
     var expanded = false
@@ -252,28 +254,25 @@ final class FileCell: NSView {
         guard let node else { return }
         let t = Look.theme
         let midY = bounds.midY
-        t.fg3.withAlphaComponent(0.35).setFill()
-        for l in 0..<level { NSRect(x: 14 + CGFloat(l) * Self.indent, y: 0, width: 1, height: bounds.height).fill() }
+        t.fg3.withAlphaComponent(0.25).setFill()
+        for l in 0..<level { NSRect(x: 15 + CGFloat(l) * Self.indent, y: 0, width: 1, height: bounds.height).fill() }
         var x = 8 + CGFloat(level) * Self.indent
+        if node.isDir { Self.symbol(expanded ? "chevron.down" : "chevron.right", size: 9, weight: .semibold, at: NSPoint(x: x + 7, y: midY), color: t.fg3) }
+        x += 16
         let ink = dimmed ? t.fg3 : t.fg2
-        if node.isDir {
-            let p = NSBezierPath()
-            p.lineWidth = 1.2; p.lineCapStyle = .round; p.lineJoinStyle = .round
-            let c = NSPoint(x: x + 6, y: midY)
-            if expanded {
-                p.move(to: NSPoint(x: c.x - 3, y: c.y - 1.5)); p.line(to: NSPoint(x: c.x, y: c.y + 1.5)); p.line(to: NSPoint(x: c.x + 3, y: c.y - 1.5))
-            } else {
-                p.move(to: NSPoint(x: c.x - 1.5, y: c.y - 3)); p.line(to: NSPoint(x: c.x + 1.5, y: c.y)); p.line(to: NSPoint(x: c.x - 1.5, y: c.y + 3))
-            }
-            t.fg3.setStroke(); p.stroke()
-        }
-        x += 14
-        ViewerTabStrip.drawKind(node.isDir ? nil : ViewerPane.kind(node.url), at: NSPoint(x: x + 6, y: midY), color: ink)
-        x += 17
-        let name = node.url.lastPathComponent
+        if node.isDir { Self.symbol("folder", size: 13, weight: .regular, at: NSPoint(x: x + 8, y: midY), color: ink) }
+        else { ViewerTabStrip.drawKind(ViewerPane.kind(node.url), at: NSPoint(x: x + 8, y: midY), color: ink, size: 12) }
+        x += 22
         // Cut in the middle, so the extension stays ("passkeys-r…ollout.md").
-        ViewerTabStrip.drawName(name, in: NSRect(x: x, y: 0, width: max(0, bounds.width - x - 6), height: bounds.height),
-                                color: dimmed ? t.fg3 : t.fg, font: Fonts.mono(Metrics.fontSize - 0.5))
+        ViewerTabStrip.drawName(node.url.lastPathComponent, in: NSRect(x: x, y: 0, width: max(0, bounds.width - x - 8), height: bounds.height),
+                                color: dimmed ? t.fg3 : t.fg, font: Self.font)
+    }
+
+    private static func symbol(_ name: String, size: CGFloat, weight: NSFont.Weight, at p: NSPoint, color: NSColor) {
+        let cfg = NSImage.SymbolConfiguration(pointSize: size, weight: weight).applying(.init(paletteColors: [color]))
+        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(cfg) else { return }
+        let s = img.size
+        img.draw(in: NSRect(x: p.x - s.width / 2, y: p.y - s.height / 2, width: s.width, height: s.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 }
 
