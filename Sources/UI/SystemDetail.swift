@@ -91,7 +91,7 @@ final class SystemDetail: MXView, TipSource {
         guard let host else { return }
         let w = min(Self.width, host.bounds.width - 24)
         let below = anchor.minY > host.bounds.midY
-        let maxH = below ? anchor.minY - 6 - 44 : host.bounds.height - 56
+        let maxH = below ? anchor.minY - 6 - 44 : host.bounds.height - 74
         let extraLines = CGFloat(2 + (sample.otherClaude.processes > 0 ? 1 : 0))
         room = max(1, Int((maxH - Self.fixed - extraLines * Self.row) / Self.row))
         if rows.count <= room + 1 { room = rows.count }
@@ -99,7 +99,7 @@ final class SystemDetail: MXView, TipSource {
         let h = min(maxH, Self.fixed + lines * Self.row)
         var f = NSRect(x: min(max(12, anchor.minX), host.bounds.width - w - 12), y: anchor.minY - 6 - h, width: w, height: h)
         if !below {
-            f.origin.y = max(44, min(anchor.minY, host.bounds.height - h - 12))
+            f.origin.y = max(44, min(anchor.minY, host.bounds.height - h - 30))
             f.origin.x = anchor.maxX + 6 + w <= host.bounds.width ? anchor.maxX + 6 : max(12, anchor.minX - 6 - w)
         }
         if frame != f { frame = f; needsLayout = true }
@@ -156,7 +156,7 @@ final class SystemDetail: MXView, TipSource {
         guard extras.indices.contains(k) else { return nil }
         switch extras[k] {
         case .more: return (Tip("Sessions that don't fit").adding("Make the window taller to see each one"), rowRect(i))
-        case .otherClaude: return (Tip("Claude Code outside any session").adding("Its background service, and processes it keeps ready for new sessions"), rowRect(i))
+        case .otherClaude: return (Tip("Claude Code outside any session").adding("Processes Maxwell can't tie to one session: the background service,").adding("spare workers, agent teammates in tmux, sessions from other apps"), rowRect(i))
         case .restOfMac: return (Tip("Everything else on this Mac").adding("Other apps, and commands that kept running after their session ended").adding("Activity Monitor names them"), rowRect(i))
         }
     }
@@ -201,7 +201,7 @@ final class SystemDetail: MXView, TipSource {
         t.hair2.setFill()
         for f in [0.0, 0.5, 1.0] { NSRect(x: g.minX, y: g.maxY - g.height * f, width: g.width, height: 1).fill() }
         let now = sample.at
-        let span = max(30, min(SystemHistory.span, history.points.first.map { now.timeIntervalSince($0.at) } ?? 0))
+        let span = max(10, min(SystemHistory.span, history.points.first.map { now.timeIntervalSince($0.at) } ?? 0))
         func pt(_ at: Date, _ v: Double) -> NSPoint {
             NSPoint(x: g.maxX - g.width * CGFloat(now.timeIntervalSince(at) / span), y: g.maxY - g.height * CGFloat(min(100, max(0, v)) / 100))
         }
@@ -246,7 +246,7 @@ final class SystemDetail: MXView, TipSource {
             Text.draw("No Claude Code running", in: NSRect(x: 32, y: listTop, width: bounds.width - 46, height: Self.row), color: t.fg3, font: font)
         }
         for (i, row) in shownRows.enumerated() {
-            line(i, row.title, row.load, group: row.group, lit: row.id == selected || row.id == hovered, color: t.fg)
+            line(i, row.title, Load(cpu: smoothed[row.id] ?? row.load.cpu, memory: row.load.memory, processes: row.load.processes), group: row.group, lit: row.id == selected || row.id == hovered, color: t.fg)
         }
         for (k, extra) in extras.enumerated() {
             let i = (rows.isEmpty && sample.otherClaude.processes == 0 ? 1 : shownRows.count) + k

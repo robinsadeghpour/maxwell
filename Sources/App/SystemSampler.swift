@@ -11,6 +11,8 @@ final class SystemSampler {
     func take(sessions: [ProcessID: SessionID], _ done: @escaping (SystemSample) -> Void) {
         queue.async {
             var s = SystemSample()
+            // The first reading measures the machine across its own `ps` run, so it is never a made-up 0%.
+            let before = self.lastTicks ?? Self.cpuTicks()
             let procs = SystemUsage.parse(ps: ClaudeCLI.run("/bin/ps", ["-Ao", "pid=,ppid=,%cpu=,rss=,comm="], timeout: 5).out)
             (s.sessions, s.otherClaude) = SystemUsage.split(procs, sessions: sessions, cores: s.cores)
             if let me = procs.first(where: { $0.pid.raw == getpid() }) { s.maxwell.add(me, cores: s.cores) }
@@ -18,8 +20,8 @@ final class SystemSampler {
             s.memUsed = Self.memoryUsed()
             s.pressure = MemoryPressure(level: Self.pressureLevel())
             let ticks = Self.cpuTicks()
-            if let last = self.lastTicks, ticks.total > last.total {
-                s.machineCPU = Double(ticks.busy - last.busy) / Double(ticks.total - last.total) * 100
+            if ticks.total > before.total {
+                s.machineCPU = Double(ticks.busy - before.busy) / Double(ticks.total - before.total) * 100
             }
             self.lastTicks = ticks
             DispatchQueue.main.async { done(s) }
