@@ -13,6 +13,8 @@ import Carbon
 ///   letter, with cmd+, ctrl+, alt+, shift+ in front.
 /// - `dump <label>`: logs `terminal harness: <label>` with the terminal's row, folder, whether it
 ///   has the keyboard, and the lines on screen.
+/// - `dblclick doc`: a double-click on the first document tab in the title bar (fills the window
+///   with the viewer, or brings it back).
 enum TerminalHarness {
     static func start(_ main: MainWindowController) {
         guard quietTest, let spec = ProcessInfo.processInfo.environment["MAXWELL_TERMINAL_STEPS"] else { return }
@@ -31,6 +33,7 @@ enum TerminalHarness {
         case "type": for ch in rest { ch == "⏎" ? press("return", main) : type(ch, main) }
         case "key": for k in rest.split(separator: " ") { press(String(k), main) }
         case "dump": dump(rest, main)
+        case "dblclick": doubleClick(rest, main)
         default: mark("terminal harness: unknown step \(step)")
         }
     }
@@ -43,6 +46,22 @@ enum TerminalHarness {
             .map { $0.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression) }
         while shown.last?.isEmpty == true { shown.removeLast() }
         mark("terminal harness: \(label): row \(row?.title ?? "-") · \(row?.detail ?? "-") · \(focused ? "has" : "lost") keyboard\n" + shown.map { "  | " + $0 }.joined(separator: "\n"))
+    }
+
+    /// Queued, not sent: the tab follows the mouse until the button comes up, waiting for that event.
+    private static func doubleClick(_ what: String, _ main: MainWindowController) {
+        let strip = main.root.viewerPane.header.strip
+        guard what == "doc", let w = main.window, !strip.isHidden, strip.window != nil, !(strip.superview?.isHidden ?? true) else {
+            return mark("terminal harness: no \(what) tab to double-click")
+        }
+        let p = strip.convert(NSPoint(x: 30, y: strip.bounds.midY), to: nil)
+        for count in [1, 2] {
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: count, pressure: 1) { NSApp.postEvent(e, atStart: false) }
+            }
+        }
+        mark("terminal harness: double-clicked the \(what) tab")
     }
 
     private static func type(_ ch: Character, _ main: MainWindowController) {

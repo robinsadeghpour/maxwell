@@ -151,7 +151,8 @@ extension RootView {
             return true
         }
         let active = filling != nil || maxTween.isRunning
-        sessionPane.isHidden = active
+        // Shrinking back, the session shows under the area at once, so it can take the keyboard back.
+        sessionPane.isHidden = filling != nil
         sessionDim.isHidden = active || sessionDim.isHidden
         guard active, maxTween.value > 0 else { return false }
         let k = maxTween.value, v = docks[growing]!, a = v.frame

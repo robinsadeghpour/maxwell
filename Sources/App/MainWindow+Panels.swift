@@ -86,6 +86,8 @@ extension MainWindowController {
         let fr = window?.firstResponder as? NSView
         switch f {
         case nil:
+            // What was covered shows again first: a hidden view can't take the keyboard.
+            root.layoutSubtreeIfNeeded()
             if let v = focusBeforeFill, v.window != nil { window?.makeFirstResponder(v) } else { focusMain() }
             focusBeforeFill = nil
         case .session?:
