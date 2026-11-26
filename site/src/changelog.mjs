@@ -7,12 +7,24 @@ export default [
   {
     slug: "2026-11-26-tool-windows",
     date: "2026-11-26",
-    versions: "0.1.75",
+    versions: "0.1.76",
     title: "Tool windows, a better file tree, and artifacts full size",
     figure: "",
     body: "Each plugin's panel is now a tool window of its own, like in JetBrains IDEs: Linear and Slack each get a button beside the viewer, with a count of what needs you. The stripes of words down the window's sides are gone. A side only gets a slim row of icons when it holds two or more panels, Usage and System open from the status bar, and the title bar has a button for each side. Any panel can fill the window: press ⇧⌘↩, click ⤢ in its header, or double-click the header, so an artifact gets big without leaving Maxwell. The session's folder (⇧⌘T) now sits beside the page as a column you drag to size, follows files as they are written, previews a file on click and keeps it on double-click.",
     fixes: [
       "The folder no longer opens or closes by itself when the window gets wider or narrower",
+    ],
+  },
+  {
+    slug: "2026-11-26-newest-update",
+    date: "2026-11-26",
+    versions: "0.1.75",
+    title: "Restart to update installs the newest release",
+    figure: "",
+    body: "",
+    fixes: [
+      "Restart to update now installs the newest release. Before, once an update had downloaded, Maxwell stopped looking: left open for days, it kept offering that first update while newer ones, with their fixes, came out",
+      "Maxwell now deletes the updates it downloaded once they are installed or replaced. Before, each one stayed in the cache, about 45 MB each",
     ],
   },
   {
