@@ -5,6 +5,15 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-one-row-of-tabs",
+    date: "2026-11-26",
+    versions: "0.1.82",
+    title: "One row of tabs, and one way to go big",
+    figure: "",
+    body: `The viewer's tabs move up into the title bar, right of the line where the viewer begins, so the window has one row of tabs and the page starts right under it. ${k("⇧ ⌘ ↩")} fills the window with what you're in: the session, the viewer or a plugin panel. A double-click on a session's tab or a document's tab does the same, and again, or ${k("Esc")}, brings everything back. Session tabs stay where they opened: a new one goes next to the tab on show, and going back to one no longer moves it to the front. The viewer stays on the right, beside its session.`,
+    fixes: [],
+  },
+  {
     slug: "2026-11-26-file-tree-look",
     date: "2026-11-26",
     versions: "0.1.81",
