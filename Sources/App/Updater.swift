@@ -24,7 +24,9 @@ final class Updater {
     }
 
     /// Looks for a newer release, also while one is waiting: a newer one takes its place.
+    /// A check asked for while one runs gets that one's answer.
     func check(done: ((Check) -> Void)? = nil) {
+        if let done { waiters.append(done) }
         guard !busy else { return }
         busy = true
         let waiting = ready?.version
@@ -36,15 +38,21 @@ final class Updater {
                     self.ready = r
                     self.onReady?(r.version)
                 }
-                Self.dropDownloads(except: self.ready?.version)
+                let keep = self.ready?.version
+                DispatchQueue.global(qos: .utility).async { Self.dropDownloads(except: keep) }
+                let answer: Check
                 switch (result, self.ready) {
-                case (_, let r?): done?(.ready(r.version))
-                case (.success, nil): done?(.upToDate)
-                case (.failure(let e), nil): done?(.failed(e.message))
+                case (_, let r?): answer = .ready(r.version)
+                case (.success, nil): answer = .upToDate
+                case (.failure(let e), nil): answer = .failed(e.message)
                 }
+                let waiters = self.waiters
+                self.waiters = []
+                waiters.forEach { $0(answer) }
             }
         }
     }
+    private var waiters: [(Check) -> Void] = []
 
     /// Replaces this app with the downloaded one after it quits, then opens it again.
     /// Sessions keep running: they are Claude Code background sessions.
