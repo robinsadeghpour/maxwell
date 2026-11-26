@@ -1400,7 +1400,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             for a in store.state.accounts {
                 let status = ClaudeWeb.shared.status[a.name] ?? .unknown
                 if status == .unknown { ClaudeWeb.shared.refresh(a) }
-                let title = many ? "claude.ai · \(a.name)" : "claude.ai"
+                // The account first: it is what tells the rows apart when the card is narrow.
+                let title = many ? "\(a.name) · claude.ai" : "claude.ai"
                 let email = ClaudeWeb.expectedEmail(a)
                 steps.append(status == .signedIn
                     ? SetupStep(title: title, detail: "Artifacts open signed in, beside the session.", done: true)
