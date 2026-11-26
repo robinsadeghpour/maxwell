@@ -5,6 +5,19 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-calmer-home",
+    date: "2026-11-26",
+    versions: "0.1.77",
+    title: "A calmer screen when no session is open",
+    figure: "",
+    body: "",
+    fixes: [
+      "With no session open, Maxwell now shows one centred column: what's left to set up, how many sessions need you, and two buttons, Next that needs you (⌘J) and New session (⌘N). Before, the pane listed every setup step including the finished ones, a row per state with zeros, and the same keys as the status bar",
+      "Set up Maxwell now lists only the steps left. Finished steps fill the progress bar instead of taking a row each, and in a short window the steps that don't fit wait in Settings",
+      "The count of sessions that need you on the empty screen now covers every project, as ⌘J and the status bar do, and says how many are in the project you're looking at. Before, it counted only that project, so it could say 1 while the status bar said 7",
+    ],
+  },
+  {
     slug: "2026-11-26-tool-windows",
     date: "2026-11-26",
     versions: "0.1.76",
