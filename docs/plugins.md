@@ -36,6 +36,7 @@ Maxwell picks it up without a restart.
   "version": "0.1.0",
   "description": "Shows the ticket each session works on and keeps its status current.",
   "protocol": 1,
+  "icon": "icon.svg",
   "run": ["./linear"],
   "settings": [
     { "key": "api-key", "title": "API key", "type": "secret",
@@ -61,6 +62,7 @@ Maxwell picks it up without a restart.
 | `settings` | Fields Maxwell draws in Settings › Plugins. Types: `string`, `bool`, `choice`, `secret`. |
 | `actions` | Commands. Each gets a menu item, a search entry in ⌘K and an optional default shortcut. |
 | `panels` | Panels Maxwell draws with its own components. Each is a tool window of its own. |
+| `icon` | Optional. A one-colour logo in the folder (SVG, PDF or PNG), drawn in the label's colour before the panel's name on the window's edge. |
 
 Everything a plugin can show is declared here, so Maxwell can list it in Settings, the menu and
 ⌘K before the program has started, and can keep it listed (as unavailable) while it's stopped.
@@ -325,3 +327,5 @@ and evidence they stop giving turns into unknown.
   answers `initialize` again. No wire change.
 - **1, clarified** (25 Nov 2026): each panel is its own tool window instead of a tab of one shared
   Plugins panel. A panel's `key` was never read and is gone from the examples. No wire change.
+- **1, additions** (26 Nov 2026): manifest `icon`, a one-colour logo shown before the panel's name on
+  the window's edge. Optional; older plugins are unaffected.

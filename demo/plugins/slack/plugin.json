@@ -3,7 +3,7 @@
   "name": "Slack",
   "version": "0.0.0-demo",
   "description": "Demo: invented people waiting on a reply. Never talks to Slack.",
-  "protocol": 1,
+  "protocol": 1, "icon": "icon.svg",
   "run": ["./slack"],
   "panels": [{ "id": "waiting", "title": "Slack" }]
 }

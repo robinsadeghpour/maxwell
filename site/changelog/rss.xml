@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Panel names on the window's edge again</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-26-edge-labels</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-26-edge-labels</guid>
+<pubDate>Thu, 26 Nov 2026 12:00:00 GMT</pubDate>
+<description>The buttons on the window's edge show each panel's full name again, written along the edge, with the Linear and Slack logos before theirs and the count of what needs you after it. Plugins can ship a logo of their own with the new icon field in plugin.json.</description>
+</item>
+<item>
 <title>The tab on show is never cut off</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-26-whole-tab</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-26-whole-tab</guid>

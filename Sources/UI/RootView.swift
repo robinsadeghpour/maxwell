@@ -229,7 +229,7 @@ final class RootView: MXView {
         let ps = panels.panels(side, among: present)
         guard ps.count >= 2 else { return [] }
         let open = shown(side)
-        return ps.map { Stripe.Item(panel: $0, title: title($0), open: open.contains($0), badge: open.contains($0) ? nil : badges[$0]) }
+        return ps.map { Stripe.Item(panel: $0, title: title($0), icon: pluginPanels[$0]?.icon, open: open.contains($0), badge: open.contains($0) ? nil : badges[$0]) }
     }
 
     // MARK: layout
