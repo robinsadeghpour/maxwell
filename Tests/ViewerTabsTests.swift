@@ -97,3 +97,15 @@ func viewerTabsTests() {
     t.setTitle("Something else", for: link)
     check(t.tabs == [.artifact(link, title: "Ada owns the goal")], "a title only fills in a tab without one")
 }
+
+/// The tab strip's widths: the tab on show is never cut at the strip's edge.
+func tabWidthsTests() {
+    let roomy = TabWidths.fit([120, 150], active: 1, in: 400, least: 96)
+    check(roomy == [120, 150], "tabs that fit keep their natural widths")
+    let tight = TabWidths.fit([200, 200], active: 1, in: 330, least: 96)
+    check(tight[1] == 200 && tight[0] == 130, "the others shrink first; the tab on show keeps its title")
+    // A long artifact title in a narrow viewer: 220 pt of tab in 191 pt of strip.
+    let narrow = TabWidths.fit([120, 220], active: 1, in: 191, least: 96)
+    check(narrow[1] <= 191, "the tab on show is never wider than the strip, so it is never cut off at the left")
+    check(TabWidths.fit([220], active: 0, in: 150, least: 96) == [150], "a single tab fills a narrow strip")
+}
