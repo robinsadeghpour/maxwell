@@ -13,6 +13,8 @@ struct PluginManifest: Equatable, Decodable {
     var settings: [Setting] = []
     var actions: [ActionDecl] = []
     var panels: [PanelDecl] = []
+    /// A one-colour logo (SVG, PDF or PNG) in the plugin's folder, shown beside its panels' names.
+    var icon: String?
     /// The folder the manifest came from; set by discovery.
     var dir: URL = URL(fileURLWithPath: "/")
     var bundled = false
@@ -47,7 +49,7 @@ struct PluginManifest: Equatable, Decodable {
         var title: String
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, version, description, `protocol`, run, settings, actions, panels }
+    enum CodingKeys: String, CodingKey { case id, name, version, description, `protocol`, run, settings, actions, panels, icon }
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -59,6 +61,13 @@ struct PluginManifest: Equatable, Decodable {
         settings = try c.decodeIfPresent([Setting].self, forKey: .settings) ?? []
         actions = try c.decodeIfPresent([ActionDecl].self, forKey: .actions) ?? []
         panels = try c.decodeIfPresent([PanelDecl].self, forKey: .panels) ?? []
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
+    }
+
+    /// The logo's file, only inside the plugin's folder.
+    var iconURL: URL? {
+        guard let icon, !icon.isEmpty, !icon.hasPrefix("/"), !icon.split(separator: "/").contains("..") else { return nil }
+        return dir.appendingPathComponent(icon)
     }
 
     static let protocolVersion = 1

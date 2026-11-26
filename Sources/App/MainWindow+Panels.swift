@@ -103,7 +103,7 @@ extension MainWindowController {
         for m in host.manifests where store.config.pluginEnabled(m) && host.status[m.id].map({ $0.run != .off }) ?? false {
             for p in m.panels {
                 let id = PanelID.plugin(m.id, p.id)
-                let v = root.pluginPanels[id] ?? makePluginPanel(m.id, p.id, title: p.title)
+                let v = root.pluginPanels[id] ?? makePluginPanel(m, p.id, title: p.title)
                 v.update(host: host)
                 next[id] = v
             }
@@ -112,8 +112,9 @@ extension MainWindowController {
         updateBadges()
     }
 
-    private func makePluginPanel(_ plugin: PluginID, _ panel: String, title: String) -> PluginPanel {
-        let v = PluginPanel(plugin: plugin, panel: panel, title: title)
+    private func makePluginPanel(_ m: PluginManifest, _ panel: String, title: String) -> PluginPanel {
+        let v = PluginPanel(plugin: m.id, panel: panel, title: title)
+        v.icon = m.iconURL.flatMap(NSImage.init(contentsOf:))
         v.onRun = { [weak self] plugin, action, session, item in self?.store.runPluginAction(plugin, action, session: session, item: item) }
         v.onSelectSession = { [weak self] in self?.open($0) }
         v.onOpenURL = { NSWorkspace.shared.open($0) }

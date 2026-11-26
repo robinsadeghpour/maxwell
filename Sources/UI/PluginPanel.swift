@@ -8,6 +8,8 @@ final class PluginPanel: MXView, PanelContent, TipSource {
     let panel: String
     let id: PanelID
     private(set) var title: String
+    /// The plugin's logo, beside the panel's name on the stripe.
+    var icon: NSImage?
     private var view: PluginView?
     private var count = 0
     private var status = PluginStatus()

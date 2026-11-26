@@ -61,6 +61,15 @@ func pluginTests() {
     check(PluginManifest.parse(Data(good.replacingOccurrences(of: "\"linear\"", with: "\"Lin ear\"").utf8), dir: dir) == .failure(.badId("Lin ear")), "ids are a-z, 0-9 and -")
     check(PluginManifest.parse(Data(good.replacingOccurrences(of: "\"protocol\":1", with: "\"protocol\":2").utf8), dir: dir) == .failure(.newerProtocol(2)), "a newer protocol is refused with the reason")
     check(PluginManifest.parse(Data(#"{"id":"x","name":"X","version":"1","protocol":1}"#.utf8), dir: dir) == .failure(.unreadable("missing \"run\"")), "a missing field is named")
+    do {
+        func logo(_ icon: String) -> URL? {
+            let json = #"{"id":"x","name":"X","version":"1","protocol":1,"run":["./x"],"icon":"\#(icon)"}"#
+            guard case .success(let m) = PluginManifest.parse(Data(json.utf8), dir: dir) else { return nil }
+            return m.iconURL
+        }
+        check(logo("icon.svg") == dir.appendingPathComponent("icon.svg"), "a plugin's logo is a file in its folder")
+        check(logo("../x.svg") == nil && logo("/etc/x.svg") == nil, "a logo outside the plugin's folder is ignored")
+    }
 
     let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("mx-plugins-\(getpid())")
     defer { try? FileManager.default.removeItem(at: root) }

@@ -39,6 +39,7 @@
 
 ## Changelog
 
+- [Panel names on the window's edge again](https://www.runmaxwell.com/changelog/2026-11-26-edge-labels) (2026-11-26, v0.1.80)
 - [The tab on show is never cut off](https://www.runmaxwell.com/changelog/2026-11-26-whole-tab) (2026-11-26, v0.1.79)
 - [Which session is using your Mac](https://www.runmaxwell.com/changelog/2026-11-26-system-details) (2026-11-26, v0.1.78)
 - [A calmer screen when no session is open](https://www.runmaxwell.com/changelog/2026-11-26-calmer-home) (2026-11-26, v0.1.77)

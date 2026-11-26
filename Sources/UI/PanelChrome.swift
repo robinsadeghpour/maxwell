@@ -100,19 +100,22 @@ final class RailHandle: MXView, TipSource {
     }
 }
 
-/// A side's tool window bar, JetBrains New UI style: one icon per panel, lit while it shows, a
-/// count of what needs you in it. Only a side with two or more panels has one.
+/// A side's tool window bar, the way JetBrains drew it before its New UI: each panel's name written
+/// along the edge, a plugin's logo before it, a count of what needs you after it, lit while it shows.
+/// Only a side with two or more panels has one.
 final class Stripe: MXView, TipSource {
     var tipsBeside: Bool { true }
     enum Badge: Equatable { case count(Int), dot, warning }
-    struct Item: Equatable { var panel: PanelID; var title: String; var open: Bool; var badge: Badge? }
-    static let width: CGFloat = 28
+    struct Item: Equatable { var panel: PanelID; var title: String; var icon: NSImage?; var open: Bool; var badge: Badge? }
+    static let width: CGFloat = 22
     let side: Dock
     var items: [Item] = [] { didSet { if items != oldValue { needsDisplay = true } } }
     var onToggle: ((PanelID) -> Void)?
     var onMenu: ((PanelID, NSEvent) -> Void)?
     private var hover: Int?
     private var pressed: Int?
+    private let font = Fonts.mono(Metrics.fontSize - 1)
+    private static let pad: CGFloat = 9, logo: CGFloat = 12, gap: CGFloat = 6
 
     init(side: Dock) {
         self.side = side
@@ -121,14 +124,27 @@ final class Stripe: MXView, TipSource {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Along the edge: logo, name, count, in reading order.
+    private func length(_ it: Item) -> CGFloat {
+        var l = 2 * Self.pad + Text.width(it.title, font: font)
+        if it.icon != nil { l += Self.logo + Self.gap }
+        if let b = it.badge { l += PanelGlyph.badgeWidth(b) + Self.gap }
+        return l
+    }
+
     private func rects() -> [NSRect] {
-        items.indices.map { NSRect(x: 3, y: Metrics.header / 2 - 12 + CGFloat($0) * 28, width: bounds.width - 6, height: 24) }
+        var y: CGFloat = 4
+        return items.map { it in
+            let h = length(it)
+            defer { y += h + 2 }
+            return NSRect(x: 2, y: y, width: bounds.width - 4, height: h)
+        }
     }
 
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         guard let i = index(at: p) else { return nil }
         let it = items[i]
-        var tip = Tip(it.title, action: "panel-\(it.panel.rawValue)")
+        var tip = Tip("\(it.open ? "Hide" : "Show") \(it.title)", action: "panel-\(it.panel.rawValue)")
         if case .count(let n)? = it.badge { tip = tip.adding("\(n) waiting for you") }
         if it.badge == .dot { tip = tip.adding("Something new opened here") }
         if it.badge == .warning { tip = tip.adding("The plugin stopped") }
@@ -137,11 +153,54 @@ final class Stripe: MXView, TipSource {
 
     override func draw(_ r: NSRect) {
         t.plane.setFill(); bounds.fill()
+        // The right edge reads top to bottom, the left bottom to top, as in JetBrains' IDEs.
+        let angle: CGFloat = side == .left ? -90 : 90
         for (i, (it, rr)) in zip(items, rects()).enumerated() {
             if pressed == i || it.open { t.rowSel.setFill(); NSBezierPath(roundedRect: rr, xRadius: 4, yRadius: 4).fill() }
             else if hover == i { t.hover.setFill(); NSBezierPath(roundedRect: rr, xRadius: 4, yRadius: 4).fill() }
-            PanelGlyph.draw(it.panel, title: it.title, in: rr, color: hover == i || it.open ? t.fg : t.fg2, theme: t)
-            if let b = it.badge { PanelGlyph.badge(b, at: NSPoint(x: rr.maxX - 3, y: rr.minY + 4), theme: t) }
+            let ink = hover == i || it.open ? t.fg : t.fg2
+            NSGraphicsContext.saveGraphicsState()
+            let xf = NSAffineTransform()
+            xf.translateX(by: rr.midX, yBy: rr.midY)
+            xf.rotate(byDegrees: angle)
+            xf.concat()
+            var x = -rr.height / 2 + Self.pad
+            if let icon = it.icon {
+                // Logos stand upright, the way they are drawn everywhere else.
+                upright(at: NSPoint(x: x + Self.logo / 2, y: 0), angle: angle) {
+                    Self.tinted(icon, ink).draw(in: NSRect(x: -Self.logo / 2, y: -Self.logo / 2, width: Self.logo, height: Self.logo),
+                                                from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                }
+                x += Self.logo + Self.gap
+            }
+            let w = Text.width(it.title, font: font)
+            Text.draw(it.title, in: NSRect(x: x, y: -8, width: w + 2, height: 16), color: ink, font: font)
+            x += w + Self.gap
+            if let b = it.badge {
+                let bw = PanelGlyph.badgeWidth(b)
+                upright(at: NSPoint(x: x + bw / 2, y: 0), angle: angle) { PanelGlyph.badge(b, centeredAt: .zero, theme: t) }
+            }
+            NSGraphicsContext.restoreGraphicsState()
+        }
+    }
+
+    private func upright(at p: NSPoint, angle: CGFloat, _ draw: () -> Void) {
+        NSGraphicsContext.saveGraphicsState()
+        let xf = NSAffineTransform()
+        xf.translateX(by: p.x, yBy: p.y)
+        xf.rotate(byDegrees: -angle)
+        xf.concat()
+        draw()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    /// A one-colour logo in the label's colour.
+    private static func tinted(_ img: NSImage, _ c: NSColor) -> NSImage {
+        NSImage(size: NSSize(width: logo, height: logo), flipped: false) { r in
+            img.draw(in: r)
+            c.set()
+            r.fill(using: .sourceAtop)
+            return true
         }
     }
 
@@ -188,7 +247,7 @@ final class PressElement: NSAccessibilityElement {
     override func accessibilityPerformPress() -> Bool { press(); return true }
 }
 
-/// The small line icons that stand for a panel on a stripe and in the status bar. A plugin's
+/// The small line icons that stand for a bottom panel in the status bar. A plugin's
 /// panel has no drawing of its own: it gets the first letter of its title.
 enum PanelGlyph {
     static func draw(_ p: PanelID, title: String, in r: NSRect, color: NSColor, theme t: Theme) {
@@ -236,6 +295,16 @@ enum PanelGlyph {
 
     /// The corner mark on a panel's icon: a count in the "needs you" colour, a dot for something
     /// new, a warning colour when its plugin stopped.
+    static func badgeWidth(_ b: Stripe.Badge) -> CGFloat {
+        guard case .count(let n) = b else { return 9 }
+        return max(12, Text.width(n > 99 ? "99+" : "\(n)", font: Fonts.mono(8.5, .semibold)) + 6)
+    }
+
+    static func badge(_ b: Stripe.Badge, centeredAt c: NSPoint, theme t: Theme) {
+        let w = badgeWidth(b)
+        badge(b, at: b == .dot || b == .warning ? c : NSPoint(x: c.x + w / 2 - 4, y: c.y - 0.5), theme: t)
+    }
+
     static func badge(_ b: Stripe.Badge, at p: NSPoint, theme t: Theme) {
         switch b {
         case .dot, .warning:

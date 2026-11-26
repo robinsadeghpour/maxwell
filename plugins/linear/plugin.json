@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Shows each session's Linear ticket and its status, and can move the ticket along as the session works.",
   "protocol": 1,
+  "icon": "icon.svg",
   "run": [
     "./linear"
   ],

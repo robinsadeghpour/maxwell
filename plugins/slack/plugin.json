@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Who is waiting on a reply from you. Reads your DMs, mentions and threads; never posts.",
   "protocol": 1,
+  "icon": "icon.svg",
   "run": [
     "./maxwell-slack"
   ],

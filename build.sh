@@ -73,7 +73,7 @@ fi
 cp -R Resources/web Resources/themes Resources/fonts "$APP/Contents/Resources/"
 # Plugins that ship with Maxwell: each is a folder with plugin.json and its program.
 mkdir -p "$APP/Contents/Resources/plugins/linear"
-cp plugins/linear/plugin.json "$APP/Contents/Resources/plugins/linear/"
+cp plugins/linear/{plugin.json,icon.svg} "$APP/Contents/Resources/plugins/linear/"
 swiftc -O -swift-version 5 -target arm64-apple-macos14.0 -o "$APP/Contents/Resources/plugins/linear/linear" plugins/sdk/MaxwellPlugin.swift plugins/linear/*.swift
 cp -R "$(plugins/slack/build.sh)" "$APP/Contents/Resources/plugins/slack"
 # Ghostty finds its shell integration + terminfo next to the binary (Contents/Resources/{ghostty,terminfo}).

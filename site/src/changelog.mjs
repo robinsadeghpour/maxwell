@@ -5,6 +5,15 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-edge-labels",
+    date: "2026-11-26",
+    versions: "0.1.80",
+    title: "Panel names on the window's edge again",
+    figure: "",
+    body: "The buttons on the window's edge show each panel's full name again, written along the edge, with the Linear and Slack logos before theirs and the count of what needs you after it. Plugins can ship a logo of their own with the new icon field in plugin.json.",
+    fixes: [],
+  },
+  {
     slug: "2026-11-26-whole-tab",
     date: "2026-11-26",
     versions: "0.1.79",
