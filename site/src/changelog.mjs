@@ -5,6 +5,18 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-newest-update",
+    date: "2026-11-26",
+    versions: "0.1.75",
+    title: "Restart to update installs the newest release",
+    figure: "",
+    body: "",
+    fixes: [
+      "Restart to update now installs the newest release. Before, once an update had downloaded, Maxwell stopped looking: left open for days, it kept offering that first update while newer ones, with their fixes, came out",
+      "Maxwell now deletes the updates it downloaded once they are installed or replaced. Before, each one stayed in the cache, about 45 MB each",
+    ],
+  },
+  {
     slug: "2026-11-26-close-from-the-list",
     date: "2026-11-26",
     versions: "0.1.74",

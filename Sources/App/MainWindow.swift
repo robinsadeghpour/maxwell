@@ -118,6 +118,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.onFocusChange = { [weak self] in self?.updateDim() }
         wire()
         restoreShells()
+        TerminalHarness.start(self)
         actions = makeActions()
         setUpVoice()
         tooltips = Tooltips(window: w)

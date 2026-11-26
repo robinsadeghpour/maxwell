@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>Restart to update installs the newest release</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-26-newest-update</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-26-newest-update</guid>
+<pubDate>Thu, 26 Nov 2026 12:00:00 GMT</pubDate>
+<description>&lt;h4&gt;Fixes and improvements&lt;/h4&gt;&lt;ul&gt;&lt;li&gt;Restart to update now installs the newest release. Before, once an update had downloaded, Maxwell stopped looking: left open for days, it kept offering that first update while newer ones, with their fixes, came out&lt;/li&gt;&lt;li&gt;Maxwell now deletes the updates it downloaded once they are installed or replaced. Before, each one stayed in the cache, about 45 MB each&lt;/li&gt;&lt;/ul&gt;</description>
+</item>
+<item>
 <title>⌘⌫ closes from the session list</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-26-close-from-the-list</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-26-close-from-the-list</guid>
