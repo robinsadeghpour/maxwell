@@ -5,15 +5,39 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
-    slug: "2026-11-25-newest-update",
-    date: "2026-11-25",
-    versions: "0.1.73",
+    slug: "2026-11-26-newest-update",
+    date: "2026-11-26",
+    versions: "0.1.75",
     title: "Restart to update installs the newest release",
     figure: "",
     body: "",
     fixes: [
       "Restart to update now installs the newest release. Before, once an update had downloaded, Maxwell stopped looking: left open for days, it kept offering that first update while newer ones, with their fixes, came out",
       "Maxwell now deletes the updates it downloaded once they are installed or replaced. Before, each one stayed in the cache, about 45 MB each",
+    ],
+  },
+  {
+    slug: "2026-11-26-close-from-the-list",
+    date: "2026-11-26",
+    versions: "0.1.74",
+    title: "⌘⌫ closes from the session list",
+    figure: "",
+    body: "",
+    fixes: [
+      "⌘⌫ now closes the session or terminal under the cursor in the session list. Before, the right-click menu showed ⌘⌫ beside Close Session, but only ⇧⌘⌫ closed one. In the terminal ⌘⌫ still deletes the line you're typing, and ⇧⌘⌫ closes from anywhere",
+    ],
+  },
+  {
+    slug: "2026-11-25-rail-keeps-projects",
+    date: "2026-11-25",
+    versions: "0.1.73",
+    title: "Projects you keep stay on the rail",
+    figure: "",
+    body: "",
+    fixes: [
+      "Projects you keep in the rail now stay there even when none of their sessions ran this week. Before, a kept project with no recent sessions dropped off the rail",
+      "A session in a folder outside any project, such as Downloads, now keeps its key on the rail while it is open. Before, the key went away once the session stopped needing you, and the session could only be found under All projects",
+      "When the rail is too short for every key, Maxwell now keeps the open project and the ones waiting on you, and the rest stay in the ⋯ menu. Before, keys ran under the ⋯ key",
     ],
   },
   {

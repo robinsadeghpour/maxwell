@@ -1,15 +1,17 @@
 import AppKit
 
-/// The project rail, Dock-like: All, the pinned projects, then unpinned ones only while they
-/// need him. Click or ⌘0–⌘9; right-click to keep or remove; drag to reorder, drag out to remove.
+/// The project rail, Dock-like: All, the kept projects (with or without sessions), then the others
+/// while a session in them is open. Keys that don't fit stay in the ⋯ menu.
+/// Click or ⌘0–⌘9; right-click to keep or remove; drag to reorder, drag out to remove.
 final class ProjectRail: MXView, TipSource {
-    /// `entries[0]` is All; then pinned projects in order; then unpinned ones that need him.
-    var entries: [ProjectEntry] = [] {
-        didSet { if entries != oldValue { monograms = Self.unique(entries.map(\.name)); needsDisplay = true } }
-    }
+    /// `entries[0]` is All; then kept projects in order; then the others with an open session.
+    var entries: [ProjectEntry] = [] { didSet { if entries != oldValue { fit() } } }
+    /// The entries that have a key: all of them when they fit above the ⋯ key. When they don't,
+    /// All, the open project and every one waiting on you come first; the rest are in the ⋯ menu.
+    private var keys: [ProjectEntry] = []
     /// Every project, for the overflow menu (pinned or not, needing him or not).
     var everyProject: [ProjectEntry] = []
-    var selected: String? { didSet { needsDisplay = true } }
+    var selected: String? { didSet { if selected != oldValue { fit() } } }
     /// Drawn over the sidebar (auto-hide) rather than beside it.
     var overlay = false { didSet { needsDisplay = true } }
     var onSelect: ((String?) -> Void)?
@@ -59,7 +61,29 @@ final class ProjectRail: MXView, TipSource {
 
     // MARK: geometry
 
-    private var pinnedCount: Int { entries.dropFirst().filter(\.pinned).count }
+    private var pinnedCount: Int { keys.dropFirst().filter(\.pinned).count }
+
+    override func setFrameSize(_ size: NSSize) {
+        let changed = size.height != frame.height
+        super.setFrameSize(size)
+        if changed { fit() }
+    }
+
+    private func fit() {
+        // Slots above the ⋯ key, counting both hairlines: keys whose rect ends above it.
+        let room = moreRect.minY - 6 - 7 - 18 - Self.key
+        let slots = max(1, Int((room / Self.pitch).rounded(.down)) + 1)
+        if entries.count <= slots || bounds.height == 0 {
+            keys = entries
+        } else {
+            let urgent = { (e: ProjectEntry) in e.name == nil || e.name == self.selected || e.needsYou + e.yourTurn > 0 }
+            var keep = Set(entries.indices.filter { urgent(entries[$0]) }.prefix(slots))
+            for i in entries.indices where keep.count < slots { keep.insert(i) }
+            keys = entries.indices.filter(keep.contains).map { entries[$0] }
+        }
+        monograms = Self.unique(keys.map(\.name))
+        needsDisplay = true
+    }
 
     /// Slot positions: All, a hairline, pinned, a hairline, the rest. The overflow key sits at the bottom.
     private func rect(_ i: Int) -> NSRect {
@@ -70,7 +94,7 @@ final class ProjectRail: MXView, TipSource {
     }
     private var dividers: [CGFloat] {
         var out = [rect(0).maxY + 6]
-        if pinnedCount > 0, entries.count > pinnedCount + 1 { out.append(rect(pinnedCount).maxY + 6) }
+        if pinnedCount > 0, keys.count > pinnedCount + 1 { out.append(rect(pinnedCount).maxY + 6) }
         return out
     }
     private var moreRect: NSRect { NSRect(x: (bounds.width - Self.key) / 2, y: bounds.height - Self.key - 7, width: Self.key, height: Self.key) }
@@ -81,7 +105,7 @@ final class ProjectRail: MXView, TipSource {
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
         guard !isBusy, let i = index(at: p) else { return nil }
         if i == -1 { return (Tip("Every project, and rail settings"), moreRect) }
-        let e = entries[i]
+        let e = keys[i]
         var counts: [String] = []
         if e.needsYou > 0 { counts.append("\(e.needsYou) \(e.needsYou == 1 ? "needs" : "need") you") }
         if e.yourTurn > 0 { counts.append("\(e.yourTurn) your turn") }
@@ -89,7 +113,7 @@ final class ProjectRail: MXView, TipSource {
         if e.name == nil {
             detail = counts.isEmpty ? "What needs you, from every project" : counts.joined(separator: ", ") + ", across all projects"
         } else {
-            let state = e.pinned ? "Kept in the rail" : "Shows while it needs you"
+            let state = e.pinned ? "Kept in the rail" : "Shows while a session is open"
             detail = counts.isEmpty ? state : counts.joined(separator: ", ") + ". " + state
         }
         let action = e.name == nil ? "project-all" : e.key.map { "project-\($0)" }
@@ -102,8 +126,8 @@ final class ProjectRail: MXView, TipSource {
         if overlay { t.panel.withAlphaComponent(0.97).setFill(); bounds.fill() }
         t.hair.setFill()
         for y in dividers { NSRect(x: 12, y: y, width: bounds.width - 24, height: 1).fill() }
-        for (i, e) in entries.enumerated() where drag?.index != i {
-            drawKey(i, e, in: rect(i), alpha: 1)
+        for i in keys.indices where drag?.index != i {
+            drawKey(i, keys[i], in: rect(i), alpha: 1)
         }
         if let d = drag {
             if !d.out, let slot = dropSlot(d.y) {
@@ -111,7 +135,7 @@ final class ProjectRail: MXView, TipSource {
                 NSRect(x: 8, y: rect(slot + 1).minY - 3, width: bounds.width - 16, height: 1.5).fill()
             }
             let k = NSRect(x: (bounds.width - Self.key) / 2, y: d.y - Self.key / 2, width: Self.key, height: Self.key)
-            drawKey(d.index, entries[d.index], in: k, alpha: d.out ? 0.35 : 0.9)
+            drawKey(d.index, keys[d.index], in: k, alpha: d.out ? 0.35 : 0.9)
         }
         let mk = moreRect
         if hover == -1 || pressed == -1 { (pressed == -1 ? t.rowSel : t.hover).setFill(); NSBezierPath(roundedRect: mk, xRadius: 4, yRadius: 4).fill() }
@@ -151,13 +175,24 @@ final class ProjectRail: MXView, TipSource {
 
     private func index(at p: NSPoint) -> Int? {
         if moreRect.insetBy(dx: -6, dy: -2).contains(p) { return -1 }
-        return entries.indices.first { rect($0).insetBy(dx: -7, dy: -2).contains(p) }
+        return keys.indices.first { rect($0).insetBy(dx: -7, dy: -2).contains(p) }
     }
 
-    /// Where a dragged key would land among the pinned: 0 … pinnedCount.
+    /// Where a dragged key would land among the pinned keys: 0 … pinnedCount.
     private func dropSlot(_ y: CGFloat) -> Int? {
         let slot = Int(((y - rect(1).minY) / Self.pitch).rounded())
         return max(0, min(pinnedCount, slot))
+    }
+
+    /// The place in the whole kept list (without the moved project) for a drop at `slot` among the
+    /// pinned keys: before the key there, else just after the last pinned key, never past kept
+    /// projects that have no key.
+    private func pinIndex(_ slot: Int, moving name: String) -> Int {
+        let kept = entries.dropFirst().filter(\.pinned).compactMap(\.name).filter { $0 != name }
+        let onRail = keys.dropFirst().filter(\.pinned).compactMap(\.name).filter { $0 != name }
+        let before = keys.dropFirst().filter(\.pinned).compactMap(\.name)[slot...].first { $0 != name }
+        if let before, let i = kept.firstIndex(of: before) { return i }
+        return onRail.last.flatMap { kept.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
     }
 
     override func mouseMoved(with e: NSEvent) {
@@ -180,23 +215,23 @@ final class ProjectRail: MXView, TipSource {
             guard dragging else { continue }
             let out = p.x > bounds.width + 30
             drag = (i, max(Self.key / 2, min(bounds.height - Self.key / 2, p.y)), out)
-            (out && entries[i].pinned ? NSCursor.disappearingItem : NSCursor.closedHand).set()
+            (out && keys[i].pinned ? NSCursor.disappearingItem : NSCursor.closedHand).set()
             needsDisplay = true
         }
         NSCursor.arrow.set()
         defer { pressed = nil; drag = nil; needsDisplay = true }
-        if let d = drag, let name = entries[d.index].name {
-            if d.out { if entries[d.index].pinned { onPin?(name, false, nil) } }
-            else { onPin?(name, true, dropSlot(d.y)) }
+        if let d = drag, let name = keys[d.index].name {
+            if d.out { if keys[d.index].pinned { onPin?(name, false, nil) } }
+            else if let slot = dropSlot(d.y) { onPin?(name, true, pinIndex(slot, moving: name)) }
             return
         }
-        if index(at: convert(e.window?.mouseLocationOutsideOfEventStream ?? start, from: nil)) == i { onSelect?(entries[i].name) }
+        if index(at: convert(e.window?.mouseLocationOutsideOfEventStream ?? start, from: nil)) == i { onSelect?(keys[i].name) }
     }
 
     override func rightMouseDown(with e: NSEvent) {
         guard let i = index(at: convert(e.locationInWindow, from: nil)) else { return }
         if i == -1 { return showOverflow(e) }
-        let entry = entries[i]
+        let entry = keys[i]
         let m = NSMenu()
         if let name = entry.name {
             m.addItem(MenuAction("Open \(name)") { [weak self] in self?.onSelect?(name) })
@@ -270,7 +305,7 @@ final class ProjectRail: MXView, TipSource {
     // MARK: dropping a session on a project
 
     private func target(_ info: NSDraggingInfo) -> Int? {
-        guard let i = index(at: convert(info.draggingLocation, from: nil)), i > 0, entries[i].name != nil else { return nil }
+        guard let i = index(at: convert(info.draggingLocation, from: nil)), i > 0, keys[i].name != nil else { return nil }
         return i
     }
     override func draggingEntered(_ info: NSDraggingInfo) -> NSDragOperation { draggingUpdated(info) }
@@ -281,7 +316,7 @@ final class ProjectRail: MXView, TipSource {
     override func draggingExited(_ info: NSDraggingInfo?) { dropTarget = nil }
     override func performDragOperation(_ info: NSDraggingInfo) -> Bool {
         defer { dropTarget = nil }
-        guard let i = target(info), let name = entries[i].name,
+        guard let i = target(info), let name = keys[i].name,
               let id = info.draggingPasteboard.string(forType: .maxwellSession) else { return false }
         onDropSession?(id, name)
         return true
