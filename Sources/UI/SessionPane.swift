@@ -52,6 +52,11 @@ final class SessionPane: MXView {
         get { overview.onHideSetup }
         set { overview.onHideSetup = newValue }
     }
+    /// The overview's buttons: next session that needs you, new session.
+    func onOverview(next: @escaping () -> Void, new: @escaping () -> Void) {
+        overview.onNext = next
+        overview.onNew = new
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -65,7 +70,7 @@ final class SessionPane: MXView {
     required init?(coder: NSCoder) { fatalError() }
 
     func show(_ s: Session?, group: PhaseGroup?, blockers: [String], project projectName: String?, account: Account?,
-              terminal: TerminalView?, summary: [(PhaseGroup, Int)]) {
+              terminal: TerminalView?, needsYou: (all: Int, here: Int), scope: String?) {
         session = s
         self.account = account
         shellShown = false
@@ -76,7 +81,8 @@ final class SessionPane: MXView {
         if !(s?.isCloud ?? false) { cloudPage.isHidden = true; cloudPage.hide() }
         guard let s else {
             [glyph, title, project, pills, agents, banner, empty, headerLine].forEach { $0.isHidden = true }
-            overview.counts = summary
+            overview.needsYou = needsYou
+            overview.scope = scope
             needsLayout = true
             return
         }

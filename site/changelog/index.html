@@ -34,14 +34,64 @@
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><header class="ph">
   <div><h1>Changelog</h1><p>New features, fixes and improvements in Maxwell. Installed copies offer each release as Restart to update.</p></div>
   <div class="subs"><a class="pill" href="/changelog/rss.xml"><svg aria-hidden="true"><use href="#rss"/></svg>RSS</a><a class="pill" href="https://github.com/robinsadeghpour/maxwell/releases"><svg aria-hidden="true"><use href="#gh"/></svg>Releases</a></div>
-</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-25-system-details">
-  <aside><div><time datetime="2026-11-25">Nov 25, 2026</time><span class="ver">v0.1.73</span></div></aside>
+</header></div></div><div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-26-system-details">
+  <aside><div><time datetime="2026-11-26">Nov 26, 2026</time><span class="ver">v0.1.78</span></div></aside>
   <article>
-    <h2><a href="/changelog/2026-11-25-system-details">Which session is using your Mac</a></h2>
+    <h2><a href="/changelog/2026-11-26-system-details">Which session is using your Mac</a></h2>
     
     <div class="prose">Click the System panel, or choose Panels › System Details, and a card opens over it: the last five minutes of CPU for the whole Mac and for Claude Code, then every running session with the CPU and memory it uses, counting the commands and MCP servers it runs. Click a session to open it. The footer shows memory pressure and opens Activity Monitor.</div>
     
     <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>The claude row in the System panel now counts the commands each session runs, as its tooltip always said</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-26-calmer-home">
+  <aside><div><time datetime="2026-11-26">Nov 26, 2026</time><span class="ver">v0.1.77</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-26-calmer-home">A calmer screen when no session is open</a></h2>
+    
+    <div class="prose"></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>With no session open, Maxwell now shows one centred column: what's left to set up, how many sessions need you, and two buttons, Next that needs you (⌘J) and New session (⌘N). Before, the pane listed every setup step including the finished ones, a row per state with zeros, and the same keys as the status bar</span></li><li><span>Set up Maxwell now lists only the steps left. Finished steps fill the progress bar instead of taking a row each, and in a short window the steps that don't fit wait in Settings</span></li><li><span>The count of sessions that need you on the empty screen now covers every project, as ⌘J and the status bar do, and says how many are in the project you're looking at. Before, it counted only that project, so it could say 1 while the status bar said 7</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-26-tool-windows">
+  <aside><div><time datetime="2026-11-26">Nov 26, 2026</time><span class="ver">v0.1.76</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-26-tool-windows">Tool windows, a better file tree, and artifacts full size</a></h2>
+    
+    <div class="prose">Each plugin's panel is now a tool window of its own, like in JetBrains IDEs: Linear and Slack each get a button beside the viewer, with a count of what needs you. The stripes of words down the window's sides are gone. A side only gets a slim row of icons when it holds two or more panels, Usage and System open from the status bar, and the title bar has a button for each side. Any panel can fill the window: press ⇧⌘↩, click ⤢ in its header, or double-click the header, so an artifact gets big without leaving Maxwell. The session's folder (⇧⌘T) now sits beside the page as a column you drag to size, follows files as they are written, previews a file on click and keeps it on double-click.</div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>The folder no longer opens or closes by itself when the window gets wider or narrower</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-26-newest-update">
+  <aside><div><time datetime="2026-11-26">Nov 26, 2026</time><span class="ver">v0.1.75</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-26-newest-update">Restart to update installs the newest release</a></h2>
+    
+    <div class="prose"></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Restart to update now installs the newest release. Before, once an update had downloaded, Maxwell stopped looking: left open for days, it kept offering that first update while newer ones, with their fixes, came out</span></li><li><span>Maxwell now deletes the updates it downloaded once they are installed or replaced. Before, each one stayed in the cache, about 45 MB each</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-26-close-from-the-list">
+  <aside><div><time datetime="2026-11-26">Nov 26, 2026</time><span class="ver">v0.1.74</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-26-close-from-the-list">⌘⌫ closes from the session list</a></h2>
+    
+    <div class="prose"></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>⌘⌫ now closes the session or terminal under the cursor in the session list. Before, the right-click menu showed ⌘⌫ beside Close Session, but only ⇧⌘⌫ closed one. In the terminal ⌘⌫ still deletes the line you're typing, and ⇧⌘⌫ closes from anywhere</span></li></ul></div>
+  </article>
+</section></div></div>
+<div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-25-rail-keeps-projects">
+  <aside><div><time datetime="2026-11-25">Nov 25, 2026</time><span class="ver">v0.1.73</span></div></aside>
+  <article>
+    <h2><a href="/changelog/2026-11-25-rail-keeps-projects">Projects you keep stay on the rail</a></h2>
+    
+    <div class="prose"></div>
+    
+    <div class="fixes"><h4>Fixes and improvements</h4><ul><li><span>Projects you keep in the rail now stay there even when none of their sessions ran this week. Before, a kept project with no recent sessions dropped off the rail</span></li><li><span>A session in a folder outside any project, such as Downloads, now keeps its key on the rail while it is open. Before, the key went away once the session stopped needing you, and the session could only be found under All projects</span></li><li><span>When the rail is too short for every key, Maxwell now keeps the open project and the ones waiting on you, and the rest stay in the ⋯ menu. Before, keys ran under the ⋯ key</span></li></ul></div>
   </article>
 </section></div></div>
 <div class="band"><div class="frame"><i class="x l"></i><i class="x r"></i><section class="entry" id="2026-11-25-steady-usage">
@@ -351,11 +401,10 @@
     <h2><a href="/changelog/2026-11-15-setup-and-all-projects">Set up in one place, and All projects adds up</a></h2>
     <figure class="fig"><div class="plate" aria-hidden="true"><div class="w mid">
   <div class="wh"><span class="tl"><i></i><i></i><i></i></span><b>Set up Maxwell</b><span class="sp"></span><span>2 of 4 done</span></div>
-  <ul class="checks" style="margin:10px 14px 12px">
-    <li><i>✓</i><span>Claude Code</span><span>~/.local/bin/claude</span></li>
-    <li><i>✓</i><span>Session hooks</span><span>installed</span></li>
-    <li><i style="color:var(--faint)">○</i><span>claude.ai, for artifacts</span><span style="color:var(--ink)">Sign in…</span></li>
-    <li><i style="color:var(--faint)">○</i><span>Notifications</span><span style="color:var(--ink)">Open Settings…</span></li>
+  <div style="margin:10px 14px 0;height:2px;background:var(--line);border-radius:1px"><div style="width:50%;height:2px;background:var(--dim);border-radius:1px"></div></div>
+  <ul class="checks" style="margin:8px 14px 12px">
+    <li><i style="color:var(--faint)">○</i><span>claude.ai</span><span style="color:var(--ink)">Sign in…</span></li>
+    <li><i style="color:var(--faint)">○</i><span>Notifications</span><span style="color:var(--ink)">System Settings…</span></li>
   </ul>
 </div></div><figcaption>Each step checks itself, and the list goes away when everything is done.</figcaption></figure>
     <div class="prose"><p>With no session open, Maxwell now starts with <strong>Set up Maxwell</strong>. It checks four things: that Claude Code is installed, the session hooks, a claude.ai sign-in for each account so artifacts open beside the session, and notifications. Each step that's left has one button. Steps tick themselves off as you go, and the list goes away once everything is done. <strong>Hide</strong> puts it away early. Everything in it is also in Settings.</p>

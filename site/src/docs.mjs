@@ -26,7 +26,7 @@ export const pages = {
 <h2>Install</h2>
 <ol class="steps">
 <li>Install with <a href="https://brew.sh">Homebrew</a>:<pre><code>brew install --cask robinsadeghpour/maxwell/maxwell</code></pre>Or <a href="${GH}/releases/latest/download/Maxwell.dmg">download Maxwell</a>, open the DMG and drag Maxwell to Applications. Older versions are on <a href="${GH}/releases">Releases</a>. Maxwell is signed and notarized by Apple, so it opens without a warning.</li>
-<li>Open Maxwell. With no session open, <strong>Set up Maxwell</strong> lists what's left: Claude Code, the session hooks, a claude.ai sign-in for artifacts, and notifications. Each step has one button and ticks itself off. The list goes away once everything is done.</li>
+<li>Open Maxwell. With no session open, <strong>Set up Maxwell</strong> lists what's left: Claude Code, the session hooks, a claude.ai sign-in for artifacts, and notifications. Each step has one button; a finished step leaves the list and fills the progress bar. The list goes away once everything is done.</li>
 </ol>
 <p>The session hooks are how Maxwell learns what your sessions are doing. You can also install them with <strong>Maxwell › Install Hooks</strong> (${k("⇧ ⌘ H")}).</p>
 <p class="note">Install Hooks backs up each account's <code>settings.json</code> before it adds anything. <code>Maxwell uninstall-hooks</code> restores them exactly. See <a href="/docs/privacy">What Maxwell touches</a>.</p>
@@ -248,12 +248,15 @@ keybind = cmd+shift+j=next-needs-you</code></pre>
 <p>A path you click gets a tab of its own. Files you click in the folder tree open in the preview tab. Click × or middle-click to close a tab, or press ${k("⌘ W")} while you're in the viewer. Drag tabs to reorder them. Right-click a tab for Close Others, Close All, Reveal in Finder and Copy Path.</p>
 <p>Each tab keeps your place: go back to it and it's scrolled where you left it. A tab that gets something new while you're on another one shows a purple dot. When the tabs don't fit, ${k("⌄")} at the end of the strip lists them all, and turns purple when a tab out of sight has something new. ${k("⌥ ⌘ ←")} and ${k("⌥ ⌘ →")} step through the tabs. Tabs come back when Maxwell restarts.</p>
 <h2>The folder</h2>
-<p>${k("⇧ ⌘ T")} shows the session's folder. In a wide viewer it sits beside the page and stays. In a narrow one it slides over the page, and goes away once you pick a file, press ${k("Esc")} or click the page. The file on show is selected in it.</p>
+<p>${k("⇧ ⌘ T")} shows the session's folder beside the page, and stays until you hide it. Drag its edge to size it; double-click the edge for the default width. Click a file to preview it, double-click it or press ${k("↩")} to give it a tab of its own, and click a folder to open or close it. Files a session writes appear as they land, files git ignores are dimmed, and the file on show is selected.</p>
+<h2>Full size</h2>
+<p>Press ${k("⇧ ⌘ ↩")}, click ⤢ in the viewer's header or double-click the header, and the viewer fills the window: a wide artifact, a long plan, without leaving Maxwell. The same again, or ${k("Esc")}, brings it back. The session keeps running behind it, at its own size. Any panel can do this, Linear and Slack included.</p>
 <p>TSV and CSV files show as a table.</p>
 <h2>Artifacts</h2>
 <p>When a session publishes a claude.ai artifact, it opens in the viewer signed in as that session's account. Publishing it again reloads its tab in place. Click an artifact link in the terminal to open it the same way.</p>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌥ ⌘ R")}</td><td>Reload the artifact</td></tr>
+<tr><td>${k("⇧ ⌘ ↩")}</td><td>Fill the window with it, or come back</td></tr>
 <tr><td>${k("⇧ ⌘ O")}</td><td>Open it in the account's browser</td></tr>
 <tr><td>${k("⌥ ⌘ P")}</td><td>Keep the tab open</td></tr>
 <tr><td>${k("⌥ ⌘ ←")} ${k("⌥ ⌘ →")}</td><td>Previous or next tab</td></tr>
@@ -410,6 +413,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⌥ ⌘ ↑")}</td><td>Send the session to the cloud (asks first)</td></tr>
 <tr><td>${k("⌥ ⌘ ↓")}</td><td>Bring a cloud session to this Mac</td></tr>
 <tr><td>${k("⇧ ⌘ ⌫")}</td><td>Close the session: at once when it's safe, otherwise after saying what's still open</td></tr>
+<tr><td>${k("⌘ ⌫")}</td><td>The same, in the session list, for the session or terminal under the cursor. In the terminal it deletes the line you're typing</td></tr>
 <tr><td>${k("⇧ ⌘ X")}</td><td>Close all safe (asks first)</td></tr>
 <tr><td>${k("⌘ Z")}</td><td>Undo the last close</td></tr>
 <tr><td>${k("⇧ ⌘ I")}</td><td>Show or hide Idle</td></tr>
@@ -432,7 +436,9 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <h2>Panels and viewer</h2>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌘ B")}, ${k("⌥ ⌘ B")}, ${k("⌥ ⌘ J")}</td><td>Toggle left, right, bottom panels</td></tr>
-<tr><td>${k("⌥ ⌘ 6")}</td><td>Plugins panel</td></tr>
+<tr><td>${k("⌥ ⌘ 6")} – ${k("⌥ ⌘ 9")}</td><td>Plugin panels, in their order on the stripe (every one is in the Panels menu and ⌘K)</td></tr>
+<tr><td>${k("⇧ ⌘ ↩")}</td><td>The panel you're in fills the window, or comes back (also Esc, or double-click its header)</td></tr>
+<tr><td>${k("⇧ ⌘ T")}</td><td>Show or hide the session's folder beside the viewer's page</td></tr>
 <tr><td>${k("⌥ ⌘ P")}</td><td>Keep the viewer tab open</td></tr>
 <tr><td>${k("⌥ ⌘ ←")} ${k("⌥ ⌘ →")}</td><td>Previous or next viewer tab</td></tr>
 <tr><td>${k("⌘ W")}</td><td>Close the viewer tab, when the viewer has focus</td></tr>

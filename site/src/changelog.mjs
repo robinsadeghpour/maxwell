@@ -5,14 +5,74 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
-    slug: "2026-11-25-system-details",
-    date: "2026-11-25",
-    versions: "0.1.73",
+    slug: "2026-11-26-system-details",
+    date: "2026-11-26",
+    versions: "0.1.78",
     title: "Which session is using your Mac",
     figure: "",
     body: "Click the System panel, or choose Panels › System Details, and a card opens over it: the last five minutes of CPU for the whole Mac and for Claude Code, then every running session with the CPU and memory it uses, counting the commands and MCP servers it runs. Click a session to open it. The footer shows memory pressure and opens Activity Monitor.",
     fixes: [
       "The claude row in the System panel now counts the commands each session runs, as its tooltip always said",
+    ],
+  },
+  {
+    slug: "2026-11-26-calmer-home",
+    date: "2026-11-26",
+    versions: "0.1.77",
+    title: "A calmer screen when no session is open",
+    figure: "",
+    body: "",
+    fixes: [
+      "With no session open, Maxwell now shows one centred column: what's left to set up, how many sessions need you, and two buttons, Next that needs you (⌘J) and New session (⌘N). Before, the pane listed every setup step including the finished ones, a row per state with zeros, and the same keys as the status bar",
+      "Set up Maxwell now lists only the steps left. Finished steps fill the progress bar instead of taking a row each, and in a short window the steps that don't fit wait in Settings",
+      "The count of sessions that need you on the empty screen now covers every project, as ⌘J and the status bar do, and says how many are in the project you're looking at. Before, it counted only that project, so it could say 1 while the status bar said 7",
+    ],
+  },
+  {
+    slug: "2026-11-26-tool-windows",
+    date: "2026-11-26",
+    versions: "0.1.76",
+    title: "Tool windows, a better file tree, and artifacts full size",
+    figure: "",
+    body: "Each plugin's panel is now a tool window of its own, like in JetBrains IDEs: Linear and Slack each get a button beside the viewer, with a count of what needs you. The stripes of words down the window's sides are gone. A side only gets a slim row of icons when it holds two or more panels, Usage and System open from the status bar, and the title bar has a button for each side. Any panel can fill the window: press ⇧⌘↩, click ⤢ in its header, or double-click the header, so an artifact gets big without leaving Maxwell. The session's folder (⇧⌘T) now sits beside the page as a column you drag to size, follows files as they are written, previews a file on click and keeps it on double-click.",
+    fixes: [
+      "The folder no longer opens or closes by itself when the window gets wider or narrower",
+    ],
+  },
+  {
+    slug: "2026-11-26-newest-update",
+    date: "2026-11-26",
+    versions: "0.1.75",
+    title: "Restart to update installs the newest release",
+    figure: "",
+    body: "",
+    fixes: [
+      "Restart to update now installs the newest release. Before, once an update had downloaded, Maxwell stopped looking: left open for days, it kept offering that first update while newer ones, with their fixes, came out",
+      "Maxwell now deletes the updates it downloaded once they are installed or replaced. Before, each one stayed in the cache, about 45 MB each",
+    ],
+  },
+  {
+    slug: "2026-11-26-close-from-the-list",
+    date: "2026-11-26",
+    versions: "0.1.74",
+    title: "⌘⌫ closes from the session list",
+    figure: "",
+    body: "",
+    fixes: [
+      "⌘⌫ now closes the session or terminal under the cursor in the session list. Before, the right-click menu showed ⌘⌫ beside Close Session, but only ⇧⌘⌫ closed one. In the terminal ⌘⌫ still deletes the line you're typing, and ⇧⌘⌫ closes from anywhere",
+    ],
+  },
+  {
+    slug: "2026-11-25-rail-keeps-projects",
+    date: "2026-11-25",
+    versions: "0.1.73",
+    title: "Projects you keep stay on the rail",
+    figure: "",
+    body: "",
+    fixes: [
+      "Projects you keep in the rail now stay there even when none of their sessions ran this week. Before, a kept project with no recent sessions dropped off the rail",
+      "A session in a folder outside any project, such as Downloads, now keeps its key on the rail while it is open. Before, the key went away once the session stopped needing you, and the session could only be found under All projects",
+      "When the rail is too short for every key, Maxwell now keeps the open project and the ones waiting on you, and the rest stay in the ⋯ menu. Before, keys ran under the ⋯ key",
     ],
   },
   {

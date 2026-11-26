@@ -64,10 +64,25 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// The project the sidebar shows; nil is "All" (only what needs you, every project).
     private(set) var scope: String? = UserDefaults.standard.string(forKey: "Maxwell.project")
     private(set) var projectNames: [String] = []
+    /// Each project's repo folders, kept after its last session ends so its logo stays.
     private var projectRoots: [String: [String]] = [:]
+    /// Repos in the usual code folders by project, read once per set of project rules: logos for
+    /// kept projects with no sessions this week.
+    private var reposOnDiskCache: [String: [String]]?
+    private var reposOnDisk: [String: [String]] {
+        if let c = reposOnDiskCache { return c }
+        let c = Dictionary(grouping: ProjectFolders.all(used: [], projects: projects), by: \.project).mapValues { $0.map(\.path) }
+        reposOnDiskCache = c
+        return c
+    }
     private var projects = Projects(rules: [])
     /// ⌘\ overrides the viewer for the current session; nil follows "is a file open".
-    private var viewerForced: Bool?
+    var viewerForced: Bool?
+    var loadingLayout = false
+    /// A session opened a file or artifact while another panel had the right side.
+    var viewerNews = false
+    /// Where the keyboard was before a panel filled the window.
+    weak var focusBeforeMaximize: NSView?
 
     init(store: Store) {
         self.store = store
@@ -101,7 +116,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.delegate = self
         loadPanelLayout()
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
-        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.systemDetail.dismiss() }
+        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges(); self?.systemDetail.dismiss() }
         root.onSettled = { [weak self] in self?.updateDim() }
         root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
@@ -112,6 +127,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.onFocusChange = { [weak self] in self?.updateDim() }
         wire()
         restoreShells()
+        TerminalHarness.start(self)
         actions = makeActions() + systemActions
         setUpVoice()
         tooltips = Tooltips(window: w)
@@ -128,12 +144,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func wire() {
         root.sidebar.list.onOpen = { [weak self] in self?.open($0) }
         root.sidebar.list.onCloseShell = { [weak self] in self?.requestCloseShell($0) }
+        root.sidebar.list.onClose = { [weak self] in self?.close($0) }
         root.sidebar.list.shellMenuFor = { [weak self] in self?.shellMenu($0) }
         root.sidebar.list.onRenameShell = { [weak self] in self?.renameShell($0) }
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
         root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
         root.sessionPane.onHideSetup = { [weak self] in self?.hideSetup() }
+        root.sessionPane.onOverview(next: { [weak self] in self?.nextNeedsYou() }, new: { [weak self] in self?.showNewSession() })
         NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: nil, queue: .main) { [weak self] _ in self?.refreshSetup() }
         root.sidebar.list.onReopen = { [weak self] in self?.reopen($0) }
         root.sidebar.list.onNotSafe = { [weak self] in self?.notSafe($0) }
@@ -145,17 +163,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             if let a = b.badge.action { self?.store.runPluginAction(b.plugin, a, session: id) }
         }
         store.onPluginsChanged = { [weak self] in self?.pluginsChanged() }
-        root.pluginPanel.onRun = { [weak self] plugin, action, session, item in self?.store.runPluginAction(plugin, action, session: session, item: item) }
         wireSystem()
-        root.pluginPanel.onSelectSession = { [weak self] in self?.open($0) }
-        root.pluginPanel.onOpenURL = { NSWorkspace.shared.open($0) }
-        root.pluginPanel.onRestart = { [weak self] in self?.store.plugins.restart($0) }
         store.plugins.onStartSession = { [weak self] _, prompt, name, cwd, model, done in
             guard let self, self.startHere(prompt: prompt, name: name, cwd: cwd, model: model, done: done) else {
                 return done(.failure(.init(message: "No folder to start in. Open a session in the project first.")))
             }
         }
-        root.pluginPanel.onSettings = { [weak self] _ in self?.showSettings(.plugins) }
         root.sidebar.list.onDragSession = { [weak self] on in
             guard let self else { return }
             self.root.rail.sessionDrag = on
@@ -173,11 +186,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.titleBar.plus.action = { [weak self] in self?.showNewSession() }
         root.titleBar.palette.action = { [weak self] in self?.showSearch() }
         root.titleBar.gear.action = { [weak self] in self?.showSettings() }
+        root.titleBar.leftToggle.action = { [weak self] in self?.toggleSide(.left) }
+        root.titleBar.rightToggle.action = { [weak self] in self?.toggleSide(.right) }
+        root.onMaximized = { [weak self] in self?.maximizedChanged($0) }
         root.sessionPane.delegate = self
         root.viewerPane.pin.action = { [weak self] in self?.togglePin() }
         root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
-        // Browsing the tree previews, as in VS Code's explorer; double-click the tab to keep it.
-        root.viewerPane.onTreeSelect = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
+        // Browsing the tree previews, as in VS Code's explorer; a double-click or ⏎ keeps the tab.
+        root.viewerPane.onTreeSelect = { [weak self] url, keep in self?.show(.file(url), for: self?.current, keep: keep) }
         root.viewerPane.onTab = { [weak self] in self?.tabAction($0) }
         root.viewerPane.onKeepToggle = { [weak self] in self?.togglePin() }
         root.viewerPane.onArtifactTitle = { [weak self] link, title in
@@ -236,22 +252,16 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func render(_ state: AppState) {
         let now = Date(), rules = store.config.rules
         if let c = current, terminals[c] != nil { lastShown[c] = now }
-        if projects.rules != store.config.projects { projects = Projects(rules: store.config.projects) }
+        if projects.rules != store.config.projects { projects = Projects(rules: store.config.projects); reposOnDiskCache = nil }
         followHostedTerminals(state)
         let all = state.grouped(now: now, rules: rules)
-        // One rail entry per project with live sessions; config rules first, in config order.
         var byProject: [String: [(PhaseGroup, Session)]] = [:]
         for (g, list) in all { for s in list { byProject[state.project(s, in: projects), default: []].append((g, s)) } }
-        // ⌘1–⌘9 follow the pinned order, then the rest alphabetically, so a key never moves
-        // when an unpinned project appears on or leaves the rail.
-        let pins = pinnedNames
+        // ⌘1–⌘9 follow the kept order, then the rest by rule and name, so a key never moves
+        // when an unpinned project appears on or leaves the rail. Kept projects count with no sessions.
         let ruleOrder = store.config.projects.map(\.name)
-        projectNames = byProject.keys.sorted { a, b in
-            let pa = pins.firstIndex(of: a) ?? Int.max, pb = pins.firstIndex(of: b) ?? Int.max
-            if pa != pb { return pa < pb }
-            let ia = ruleOrder.firstIndex(of: a) ?? Int.max, ib = ruleOrder.firstIndex(of: b) ?? Int.max
-            return ia != ib ? ia < ib : a.localizedCaseInsensitiveCompare(b) == .orderedAscending
-        }
+        let pins = store.config.pinned.isEmpty ? RailPlan.order(live: Array(byProject.keys), pinned: [], ruleOrder: ruleOrder) : RailPlan.spelled(store.config.pinned, like: Array(byProject.keys))
+        projectNames = RailPlan.order(live: Array(byProject.keys), pinned: pins, ruleOrder: ruleOrder)
         if let s = scope, !projectNames.contains(s), !byProject.isEmpty { scope = nil }
         func entry(_ name: String?, _ items: [(PhaseGroup, Session)]) -> ProjectEntry {
             var e = ProjectEntry(name: name, needsYou: items.filter { $0.0 == .needsYou }.count, yourTurn: items.filter { $0.0 == .yourTurn }.count, total: items.count)
@@ -259,17 +269,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 e.pinned = pins.contains(name)
                 e.key = projectNames.firstIndex(of: name).flatMap { $0 < 9 ? $0 + 1 : nil }
                 // A session moved here from another project's folder says nothing about this one's logo.
-                e.roots = Array(Set(items.filter { state.moved[$0.1.id] == nil }.map { self.repoRoot($0.1.cwd) ?? $0.1.cwd })).sorted()
+                let live = Array(Set(items.filter { state.moved[$0.1.id] == nil }.map { self.repoRoot($0.1.cwd) ?? $0.1.cwd })).sorted()
+                // A kept project with no sessions keeps the logo it had, or its repo's on disk.
+                e.roots = live.isEmpty ? self.projectRoots[name] ?? self.reposOnDisk[name] ?? [] : live
             }
             return e
         }
         let every = projectNames.map { entry($0, byProject[$0] ?? []) }
-        projectRoots = Dictionary(uniqueKeysWithValues: every.compactMap { e in e.name.map { ($0, e.roots) } })
+        for e in every { if let n = e.name, !e.roots.isEmpty { projectRoots[n] = e.roots } }
         let allEntry = entry(nil, all.flatMap { g, l in l.map { (g, $0) } })
-        // Pinned projects always; others while they need him, or while they are the open scope.
-        let onRail = every.filter { $0.pinned }
-            + every.filter { !$0.pinned && ($0.needsYou + $0.yourTurn > 0 || $0.name == scope) }.sorted { $0.needsYou + $0.yourTurn > $1.needsYou + $1.yourTurn }
-        root.rail.entries = [allEntry] + onRail
+        let onRail = RailPlan.onRail(projectNames, pinned: pins, counts: byProject.mapValues { RailPlan.Counts($0.map(\.0)) }, scope: scope)
+        root.rail.entries = [allEntry] + onRail.compactMap { n in every.first { $0.name == n } }
         root.rail.everyProject = every
         root.sidebar.elsewhere = scope == nil ? 0 : every.filter { $0.name != scope }.reduce(0) { $0 + $1.needsYou }
         titleProjectMenu()
@@ -320,7 +330,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                               // A plain terminal too: a pane told to show none hides the one being typed
                               // in, and AppKit takes keyboard focus from a hidden view for good.
                               terminal: current.flatMap { detached.contains($0) ? nil : terminal(for: $0) ?? shell($0) },
-                              summary: PhaseGroup.allCases.filter { !$0.folds }.map { g in (g, (scope == nil ? all : shown).first { $0.0 == g }?.1.count ?? 0) })
+                              // ⌘J reaches every project, so the overview counts all of them and names this one's share.
+                              needsYou: (all: all.first { $0.0 == .needsYou }?.1.count ?? 0, here: shown.first { $0.0 == .needsYou }?.1.count ?? 0),
+                              scope: scope)
         if let t = shell(current) {
             let row = shellRows().first { $0.id == current }
             root.sessionPane.showShell(title: row?.title ?? "", path: row?.detail ?? "", terminal: t)
@@ -501,7 +513,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let fr = w.firstResponder as? NSView
         let inViewer = fr.map { $0.isDescendant(of: root.viewerPane) } ?? false
         let inSession = fr.map { $0.isDescendant(of: root.sessionPane) } ?? false
-        root.sessionDim.isHidden = inSession || current == nil
+        root.sessionDim.isHidden = inSession || current == nil || root.maximized != nil
         root.viewerDim.isHidden = inViewer || !root.isShown(.viewer)
     }
 
@@ -522,60 +534,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         MXWindow.clipCorners([glass, root], fullScreen: false)
     }
 
-    // MARK: panels
-
-    private var screenKey: String { window?.screen.map(WindowPlacement.key) ?? "default" }
-    private var loadingLayout = false
-    private func loadPanelLayout() {
-        loadingLayout = true
-        root.panels = PanelLayout.load(screen: screenKey)
-        loadingLayout = false
-    }
-    /// Test runs (--snap) arrange panels for a capture and must not change the saved layout.
-    private func savePanelLayout() {
-        if !loadingLayout, !CommandLine.arguments.contains("--snap") { root.panels.save(screen: screenKey) }
-    }
-
-    /// ⌥⌘ number, JetBrains style: shows a hidden panel and focuses it; hides a focused one.
-    /// A stripe tab: an open panel closes, a closed one opens and takes focus.
-    private func stripeClicked(_ p: PanelID) {
-        guard root.isShown(p) else { return togglePanel(p) }
-        root.setHidden(p, true)
-        if p == .viewer { viewerForced = nil }
-        focusMain()
-    }
-
-    func togglePanel(_ p: PanelID) {
-        if !root.isShown(p) {
-            root.setHidden(p, false)
-            if p == .viewer, !root.viewerOpen { viewerForced = true; syncViewer() }
-            focusPanel(p)
-        } else if p == .usage || p == .system || isFocused(p) {
-            root.setHidden(p, true)
-            focusMain()
-        } else {
-            focusPanel(p)
-        }
-    }
-
-    private func isFocused(_ p: PanelID) -> Bool {
-        guard let fr = window?.firstResponder as? NSView else { return false }
-        return fr.isDescendant(of: root.content(p))
-    }
-
-    func focusPanel(_ p: PanelID) {
-        switch p {
-        case .sessions: focus(1)
-        case .viewer: focus(3)
-        case .usage, .system, .plugins: break
-        }
-    }
-
-    func movePanel(_ p: PanelID, to d: Dock) {
-        root.panels.move(p, to: d)
-        toast("\(p.title) moved to the \(d.rawValue).")
-    }
-
     /// The Dock's "Keep in Dock". With no pins in the config yet, every project counts as pinned,
     /// so the first unpin keeps the rest where they were.
     func pin(_ name: String, _ on: Bool, at index: Int?) {
@@ -587,7 +545,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     /// Pinned projects in rail order; every known project while the config pins none.
     private var pinnedNames: [String] {
-        store.config.pinned.isEmpty ? projectNames : store.config.pinned
+        store.config.pinned.isEmpty ? projectNames : RailPlan.spelled(store.config.pinned, like: projectNames)
     }
     func windowDidEndLiveResize(_ n: Notification) { if let w = window { WindowPlacement.save(w) } }
     func windowDidBecomeKey(_ n: Notification) { updateDim() }
@@ -620,6 +578,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     // MARK: sessions
 
     func open(_ id: SessionID) {
+        root.maximized = nil  // another session: show it, not a panel over it
         if let t = shell(id) {
             current = id
             remember(id)
@@ -835,7 +794,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
     }
 
-    /// ⇧⌘⌫ (⌘⌫ itself belongs to the terminal: delete to line start), the row menu and the banner button. Safe sessions close at once; any other asks
+    /// ⇧⌘⌫ anywhere, ⌘⌫ in the session list (in the terminal ⌘⌫ deletes the line being typed), the row menu and the banner button. Safe sessions close at once; any other asks
     /// first and says what is still open, unless `confirm-close` is off. Either way it is `claude stop`, with Undo.
     func close(_ id: SessionID) {
         if shell(id) != nil { return requestCloseShell(id) }
@@ -1024,6 +983,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.show(v, account: current.flatMap(account(of:)), reload: reload)
         root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
         updateDim()
+        updateBadges()
     }
 
     /// The account a session runs on: its artifacts open signed in to it.
@@ -1069,6 +1029,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewers[id] = v
         if id == current {
             if moved { viewerForced = nil }
+            if !root.isShown(.viewer) { viewerNews = true }
             syncViewer()
         }
     }
@@ -1079,7 +1040,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     func show(_ item: ViewerItem, for id: SessionID?, keep: Bool = true) {
         guard let id else { return }
         viewers[id, default: ViewerTabs()].open(item, keep: keep)
-        if id == current { viewerForced = nil; syncViewer() }
+        guard id == current else { return }
+        viewerForced = nil
+        syncViewer()
+        // You opened it: it shows, even over Slack or with the right side hidden.
+        if !root.isShown(.viewer) { root.setHidden(.viewer, false); updateBadges() }
     }
 
     /// A click, drag or menu choice on a viewer tab.
@@ -1184,10 +1149,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         return fr.isDescendant(of: root.viewerPane)
     }
 
-    /// Beside the page the folder stays until hidden (saved in the config); in a narrow viewer it
-    /// slides over the page for one pick.
+    /// The folder beside the page stays until hidden (saved in the config).
     func toggleTree() {
-        root.viewerPane.toggleTree { [weak self] on in self?.onConfigEdit?("file-tree", on ? "true" : "false") }
+        var on = false
+        root.viewerPane.toggleTree { [weak self] in on = $0; self?.onConfigEdit?("file-tree", $0 ? "true" : "false") }
+        // The folder lives in the viewer: turning it on with the viewer away brings the viewer.
+        if on, !root.isShown(.viewer) { togglePanel(.viewer) }
     }
 
     /// Test runs: as if the session on show wrote or named it.
@@ -1228,13 +1195,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     private func pluginsChanged() {
         let host = store.plugins
         let sig = host.manifests.filter { store.config.pluginEnabled($0) }.map { "\($0.id)@\($0.version)" }.joined(separator: ",")
+        syncPluginPanels()
         if sig != pluginSignature { pluginSignature = sig; rebuildActions() }
         for (id, st) in host.status {
             if case .failed(let why) = st.run, pluginRun[id] != st.run { toast("\(host.manifest(id)?.name ?? id) stopped: \(why). Settings › Plugins can restart it.") }
             pluginRun[id] = st.run
         }
-        root.pluginPanel.update(host: host, state: store.state)
-        root.setPluginPanels(!host.panels.isEmpty || host.manifests.contains { !$0.panels.isEmpty && store.config.pluginEnabled($0) })
         refreshSettings()
         render(store.state)
     }
@@ -1439,11 +1405,12 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             for a in store.state.accounts {
                 let status = ClaudeWeb.shared.status[a.name] ?? .unknown
                 if status == .unknown { ClaudeWeb.shared.refresh(a) }
-                let title = many ? "claude.ai · \(a.name)" : "claude.ai"
+                // The account first: it is what tells the rows apart when the card is narrow.
+                let title = many ? "\(a.name) · claude.ai" : "claude.ai"
                 let email = ClaudeWeb.expectedEmail(a)
                 steps.append(status == .signedIn
                     ? SetupStep(title: title, detail: "Artifacts open signed in, beside the session.", done: true)
-                    : SetupStep(title: title, detail: "Sign in\(email.map { " as \($0)" } ?? "") so artifacts open beside the session.", done: false, button: "Sign in…") { [weak self] in
+                    : SetupStep(title: title, detail: email ?? "Sign in so artifacts open beside the session.", done: false, button: "Sign in…") { [weak self] in
                         SignInWindow.show(a, near: self?.window)
                     })
             }
@@ -1451,7 +1418,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         switch notificationsAllowed {
         case true?: steps.append(SetupStep(title: "Notifications", detail: "A session that needs you taps you on the shoulder.", done: true))
         case false?:
-            steps.append(SetupStep(title: "Notifications", detail: "Allow them so a session that needs you can tell you.", done: false, button: "Open Settings…") {
+            steps.append(SetupStep(title: "Notifications", detail: "Get told when a session needs you.", done: false, button: "System Settings…") {
                 let id = Bundle.main.bundleIdentifier ?? "dev.maxwell.app"
                 if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") { NSWorkspace.shared.open(url) }
             })
@@ -1724,8 +1691,10 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 self?.root.sidebar.list.toggleIdle()
             },
             Action(id: "focus-terminal", title: "Focus Terminal", menu: "Panels", shortcut: Shortcut("cmd+alt+2")) { [weak self] in self?.focus(2) },
-            Action(id: "toggle-left", title: "Show or Hide Left Panels", menu: "Panels", shortcut: Shortcut("cmd+b")) { [weak self] in self?.root.toggleArea(.left) },
-            Action(id: "toggle-right", title: "Show or Hide Right Panels", menu: "Panels", shortcut: Shortcut("cmd+alt+b")) { [weak self] in self?.root.toggleArea(.right) },
+            Action(id: "toggle-left", title: "Show or Hide Left Panels", menu: "Panels", shortcut: Shortcut("cmd+b")) { [weak self] in self?.toggleSide(.left) },
+            Action(id: "toggle-right", title: "Show or Hide Right Panels", menu: "Panels", shortcut: Shortcut("cmd+alt+b")) { [weak self] in self?.toggleSide(.right) },
+            Action(id: "maximize-panel", title: "Fill the Window with the Panel", menu: "Panels", shortcut: Shortcut("cmd+shift+return"),
+                   isChecked: { [weak self] in self?.root.maximized != nil }) { [weak self] in self?.toggleMaximize() },
             Action(id: "toggle-bottom", title: "Show or Hide Bottom Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+j")) { [weak self] in self?.root.toggleArea(.bottom) },
             Action(id: "reset-panels", title: "Reset Panel Layout", menu: "Panels") { [weak self] in self?.root.panels = PanelLayout() },
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
@@ -1747,16 +1716,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 guard let self else { return }; self.onConfigEdit?("terminal-font-size", "\(Int(max(8, self.store.config.terminalFontSize - 1)))")
             },
         ]
-        let pluginPanel: () -> Bool = { [weak self] in self?.root.hasPluginPanels == true }
-        for p in PanelID.allCases {
-            list.append(Action(id: "panel-\(p.rawValue)", title: "\(p.title) Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+\(p.key)"),
-                               isEnabled: p == .plugins ? pluginPanel : { true }) { [weak self] in self?.togglePanel(p) })
-        }
-        for p in PanelID.allCases {
-            for d in Dock.allCases {
-                list.append(Action(id: "move-\(p.rawValue)-\(d.rawValue)", title: "Move \(p.title) to \(d.title)", menu: "Panels") { [weak self] in self?.movePanel(p, to: d) })
-            }
-        }
+        list += panelActions()
         for n in 1...9 {
             list.append(Action(id: "project-\(n)", title: "Project \(n)", menu: "Projects", shortcut: Shortcut("cmd+\(n)")) { [weak self] in self?.selectProject(n) })
         }

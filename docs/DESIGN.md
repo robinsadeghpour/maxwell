@@ -2,6 +2,16 @@
 
 Only what Robin has said or picked. Each entry has his words and the reason. Newest first.
 
+## 25 Nov 2026: tool windows, the file tree, and making things big
+
+- **The side stripes go.** "I hate the plugins and viewer tabs on the right side, also usage system and session on the left always visible are ugly waste space there."
+  So: a side gets a stripe only when it has two or more panels, and it shows icons, not words. Bottom panels (Usage, System) are toggled from the status bar, and each side has a button in the title bar.
+- **Each plugin is its own tool window.** "Right should just be file viewer, and then not "plugins" but each plugin … like the right window is a concept thats coherent … thats at least how jetbrains used to work."
+- **The file tree has to work like Cursor, VS Code or JetBrains.** "The filetree is super duper bad … it randomly opens if I open widen the window … dont think its linear grade UI UX."
+  So: the tree is a column you switch on or off and drag to size. The window's width never changes it.
+- **Artifacts get big inside Maxwell.** "I hate that I cant open artifacts wider or open in big without opening the browser and leaving maxwell … jetbrains didnt work that way."
+  So: any panel fills the window (⇧⌘↩, its ⤢ button, or a double-click on its header), like JetBrains' Maximize Tool Window.
+
 ## 13 Nov 2026, late night: picked the Slack-style rail (variant A), with changes
 
 - **Rail: yes to the idea, no to how it was drawn.** "I like the slack rail on the left, though the way you designed it doesn't fit the rest, like it wastes a lot of space ... doesn't fit the rest of the style with the roundness".

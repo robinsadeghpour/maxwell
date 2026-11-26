@@ -23,27 +23,25 @@
   "Sources/UI/Theme.swift": 1
  },
  "file-lines": {
-  "Sources/App/MainWindow.swift": 1758,
-  "Sources/App/Probes.swift": 540,
-  "Sources/App/Store.swift": 601,
-  "Sources/App/main.swift": 659,
-  "Sources/UI/ArtifactView.swift": 518,
-  "Sources/UI/Layout.swift": 898,
-  "Sources/UI/SettingsWindow.swift": 1161,
-  "Sources/UI/Sidebar.swift": 767,
-  "Sources/UI/Terminal.swift": 622
+  "Sources/App/MainWindow.swift": 1801,
+  "Sources/App/Probes.swift": 543,
+  "Sources/App/Store.swift": 630,
+  "Sources/App/main.swift": 671,
+  "Sources/UI/ArtifactView.swift": 522,
+  "Sources/UI/SettingsWindow.swift": 1180,
+  "Sources/UI/Sidebar.swift": 778,
+  "Sources/UI/Terminal.swift": 603
  },
  "function-lines": {
-  "Sources/App/MainWindow.swift::makeActions": 128,
+  "Sources/App/MainWindow.swift::makeActions": 140,
   "Sources/App/MainWindow.swift::render": 89,
-  "Sources/App/MainWindow.swift::wire": 98,
-  "Sources/App/main.swift::runTestHooks": 386,
-  "Sources/Model/Reducer.swift::reduce": 91,
+  "Sources/App/MainWindow.swift::wire": 104,
+  "Sources/App/main.swift::runTestHooks": 388,
+  "Sources/Model/Reducer.swift::reduce": 99,
   "Sources/UI/ProjectLogo.swift::extract": 90
  },
  "hand-made-controls": {
   "Sources/App/MainWindow.swift": 1,
-  "Sources/UI/FileTree.swift": 1,
   "Sources/UI/Search.swift": 1,
   "Sources/UI/SettingsWindow.swift": 1
  },
@@ -57,13 +55,13 @@
  "remembered-state": {
   "Sources/App/MainWindow.swift": 5,
   "Sources/UI/IconArt.swift": 3,
-  "Sources/UI/Layout.swift": 2,
-  "Sources/UI/PluginPanel.swift": 2,
+  "Sources/UI/PanelLayout.swift": 2,
   "Sources/UI/Window.swift": 3
  },
  "test-flags": {
   "Sources/App/ClaudeWeb.swift": 1,
-  "Sources/App/MainWindow.swift": 2,
+  "Sources/App/MainWindow+Panels.swift": 1,
+  "Sources/App/MainWindow.swift": 1,
   "Sources/App/main.swift": 80,
   "Sources/UI/IconArt.swift": 1
  },

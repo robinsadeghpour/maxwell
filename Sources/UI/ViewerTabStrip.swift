@@ -117,7 +117,10 @@ final class ViewerTabStrip: MXView, TipSource {
     }
 
     /// One line, cut in the middle so the extension stays ("decisi…ons.tsv").
-    private func drawTitle(_ s: String, in r: NSRect, color: NSColor, font: NSFont) {
+    private func drawTitle(_ s: String, in r: NSRect, color: NSColor, font: NSFont) { Self.drawName(s, in: r, color: color, font: font) }
+
+    /// A file name on one line, cut in the middle; shared with the file tree.
+    static func drawName(_ s: String, in r: NSRect, color: NSColor, font: NSFont) {
         let p = NSMutableParagraphStyle(); p.lineBreakMode = .byTruncatingMiddle
         let a = NSAttributedString(string: s, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: p])
         let h = font.ascender - font.descender
@@ -150,9 +153,12 @@ final class ViewerTabStrip: MXView, TipSource {
         }
     }
 
-    private func drawIcon(_ k: Kind, at p: NSPoint, color: NSColor) {
+    private func drawIcon(_ k: Kind, at p: NSPoint, color: NSColor) { Self.drawKind(k, at: p, color: color) }
+
+    /// A file's kind as a small symbol, shared with the file tree; nil is a folder.
+    static func drawKind(_ k: Kind?, at p: NSPoint, color: NSColor) {
         let cfg = NSImage.SymbolConfiguration(pointSize: 10, weight: .regular).applying(.init(paletteColors: [color]))
-        guard let img = NSImage(systemSymbolName: Self.symbol(k), accessibilityDescription: nil)?.withSymbolConfiguration(cfg) else { return }
+        guard let img = NSImage(systemSymbolName: k.map(symbol) ?? "folder", accessibilityDescription: nil)?.withSymbolConfiguration(cfg) else { return }
         let s = img.size
         img.draw(in: NSRect(x: p.x - s.width / 2, y: p.y - s.height / 2, width: s.width, height: s.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
