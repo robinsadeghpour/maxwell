@@ -148,8 +148,8 @@ final class ViewerTabStrip: MXView, TipSource {
     private func drawIcon(_ k: Kind, at p: NSPoint, color: NSColor) { Self.drawKind(k, at: p, color: color) }
 
     /// A file's kind as a small symbol, shared with the file tree; nil is a folder.
-    static func drawKind(_ k: Kind?, at p: NSPoint, color: NSColor) {
-        let cfg = NSImage.SymbolConfiguration(pointSize: 10, weight: .regular).applying(.init(paletteColors: [color]))
+    static func drawKind(_ k: Kind?, at p: NSPoint, color: NSColor, size: CGFloat = 10) {
+        let cfg = NSImage.SymbolConfiguration(pointSize: size, weight: .regular).applying(.init(paletteColors: [color]))
         guard let img = NSImage(systemSymbolName: k.map(symbol) ?? "folder", accessibilityDescription: nil)?.withSymbolConfiguration(cfg) else { return }
         let s = img.size
         img.draw(in: NSRect(x: p.x - s.width / 2, y: p.y - s.height / 2, width: s.width, height: s.height), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)

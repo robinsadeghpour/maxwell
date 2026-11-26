@@ -6,6 +6,13 @@
 <atom:link href="https://www.runmaxwell.com/changelog/rss.xml" rel="self" type="application/rss+xml"/>
 <description>New features, fixes and improvements in Maxwell.</description>
 <item>
+<title>A file tree that looks like your editor's</title>
+<link>https://www.runmaxwell.com/changelog/2026-11-26-file-tree-look</link>
+<guid>https://www.runmaxwell.com/changelog/2026-11-26-file-tree-look</guid>
+<pubDate>Thu, 26 Nov 2026 12:00:00 GMT</pubDate>
+<description>The folder beside the viewer now looks like the project tree in VS Code, JetBrains IDEs and Warp: names in the system font, roomier rows, outlined folders and chevrons.</description>
+</item>
+<item>
 <title>Panel names on the window's edge again</title>
 <link>https://www.runmaxwell.com/changelog/2026-11-26-edge-labels</link>
 <guid>https://www.runmaxwell.com/changelog/2026-11-26-edge-labels</guid>

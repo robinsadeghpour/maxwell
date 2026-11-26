@@ -5,6 +5,15 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-26-file-tree-look",
+    date: "2026-11-26",
+    versions: "0.1.81",
+    title: "A file tree that looks like your editor's",
+    figure: "",
+    body: "The folder beside the viewer now looks like the project tree in VS Code, JetBrains IDEs and Warp: names in the system font, roomier rows, outlined folders and chevrons.",
+    fixes: [],
+  },
+  {
     slug: "2026-11-26-edge-labels",
     date: "2026-11-26",
     versions: "0.1.80",
