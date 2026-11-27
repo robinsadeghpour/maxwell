@@ -5,6 +5,18 @@ import { k } from "./build-helpers.mjs";
 
 export default [
   {
+    slug: "2026-11-27-continue-on-another-account",
+    date: "2026-11-27",
+    versions: "0.1.82",
+    title: "Limited sessions continue on another account, conversation and all",
+    figure: "",
+    body: "A session at its usage limit now continues on another account as the same session: same row, same name, pin and project, and the whole conversation. Maxwell stops it on its account, picks it up on the other one and sends \"continue\", so it carries on where the limit stopped it. Press ⇧⌘M or the banner's Continue on button for the account with the most room, pick another account from the ▾ beside it or under Continue on in a row's right-click menu, or press the Limited header's button to move every limited session in the list to the account with the most room.",
+    fixes: [
+      "Moving a session to another account no longer starts a new session that has to read the old one's transcript, and no longer leaves the old one behind at its limit",
+      "Limit reset times further away than today now show the day, like Mon 16:00, in the list and on Resume at. Before, a weekly limit showed only the time",
+    ],
+  },
+  {
     slug: "2026-11-26-file-tree-look",
     date: "2026-11-26",
     versions: "0.1.81",

@@ -213,6 +213,9 @@ struct Session: Equatable {
     /// When Claude Code stopped this background session's process while it waited on you, to free
     /// memory. The conversation is kept and attaching resumes it. Nil while its process runs.
     var parkedAt: Date?
+    /// The account Maxwell is continuing it on, until it starts there. Meanwhile its old account
+    /// stops it: that account's end hook and listings no longer speak for it.
+    var movingTo: AccountID?
 }
 
 extension Session {
@@ -364,6 +367,13 @@ struct AppState: Equatable {
     func roomiest(now: Date, excluding: AccountID? = nil) -> Account? {
         accounts.filter { $0.id != excluding && $0.limitResetsAt(now: now) == nil }
             .min { ($0.usedPercent ?? 50) < ($1.usedPercent ?? 50) }
+    }
+
+    /// Where limited work can go: the account with the most room among those whose usage Maxwell
+    /// has read. One it knows nothing about may be at its limit too, and the move would stop there.
+    func roomiestToContinue(now: Date, excluding: AccountID? = nil) -> Account? {
+        accounts.filter { $0.id != excluding && $0.usedPercent != nil && $0.limitResetsAt(now: now) == nil }
+            .min { ($0.usedPercent ?? 0) < ($1.usedPercent ?? 0) }
     }
 
     /// True when no other session in another terminal, on the same account and folder, was active

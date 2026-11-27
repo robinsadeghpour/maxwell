@@ -17,6 +17,9 @@ enum Event: Equatable {
     case cloudStarting(SessionID, AccountID, title: String, cwd: String, at: Date)
     case doneCheck(SessionID, DoneCheck)
     case started(SessionID, AccountID, name: String, cwd: String, shortId: String, at: Date)
+    /// Maxwell is continuing the session on another account (`AccountMove`); nil when that ended
+    /// without a start there (it failed, and the session stays on its own account).
+    case moving(SessionID, to: AccountID?)
     case judged(hash: String, Judgment)
     case closed(ClosedSession)
     case reopened(SessionID, at: Date)

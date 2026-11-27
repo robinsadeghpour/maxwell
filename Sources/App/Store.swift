@@ -7,7 +7,7 @@ final class Store {
     private(set) var state: AppState
     private(set) var config: Config
     private let log: EventLog
-    private var agents: AgentsProbe?
+    private(set) var agents: AgentsProbe?
     /// Cloud sessions and sending local ones there (StoreCloud.swift).
     var cloud: CloudProbe?
     var handoffs: [SessionID: CloudHandoff] = [:]
@@ -600,16 +600,9 @@ final class Store {
         return Paths.stateDir.appendingPathComponent("false-safe")
     }
 
-    /// Moves limited work to another account: a new background session there with a short
-    /// handover prompt that points at the old transcript.
-    func move(_ s: Session, to account: Account, done: @escaping (Swift.Result<SessionID, ClaudeCLI.StartError>) -> Void) {
-        let transcript = Transcripts.path(s, account: state.account(s.accountId)) ?? "(unknown)"
-        let prompt = """
-        Continue the work of session "\(s.title)" (\(s.id)), which stopped at a usage limit on another account. \
-        Its transcript is \(transcript). Read the end of it to see what was asked and where it stopped, then carry on. \
-        Same folder, same branch.
-        """
-        newSession(account: account, cwd: s.cwd, name: String((s.name + "-moved").prefix(40)), prompt: prompt, done: done)
+    func cancelResume(_ id: SessionID) {
+        resumeTimers.removeValue(forKey: id)?.invalidate()
+        scheduledResumes[id] = nil
     }
 
     /// Sends "continue" when the limit resets (now, if it already has).
