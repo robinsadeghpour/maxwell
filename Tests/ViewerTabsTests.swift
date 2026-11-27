@@ -116,7 +116,7 @@ func tabLayoutTests() {
     check(!two.overflow && two.shown == 0..<2 && two.widths[0] >= 90 && two.widths[1] == 140, "two docs in 300 pt: both show, the other one cut down, nothing in ⌄")
     let many = TabWidths.layout([150, 150, 150, 150, 150], active: 4, in: 330, least: 90, list: 26)
     check(many.overflow && many.shown.contains(4) && many.shown.count == 2, "too many: a run that holds the tab on show")
-    check(abs(many.widths.reduce(0, +) - (330 - 26)) < 0.5, "they fill the room up to ⌄, no empty strip")
+    check(many.widths[4] == 150 && many.widths.reduce(0, +) <= 330 - 26, "each at most its own width: the tab on show doesn't stretch, ⌄ follows the last")
     let first = TabWidths.layout([150, 150, 150, 150], active: 0, in: 330, least: 90, list: 26)
     check(first.shown == 0..<2, "the run starts at the first tab when that reaches the one on show")
     let long = TabWidths.layout([400, 120], active: 0, in: 250, least: 90, list: 26)

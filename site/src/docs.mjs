@@ -249,7 +249,7 @@ keybind = cmd+shift+j=next-needs-you</code></pre>
 <h2>Markdown files</h2>
 <p>When a session writes or mentions a Markdown file, it opens in the viewer, rendered. Click any file path in a session's terminal to open it there too: the pointer turns into a hand and the path is underlined when Maxwell can find the file. Relative paths are looked up from the session's folder. In a terminal you opened yourself, ${k("⌘")}-click a path.</p>
 <h2>Tabs</h2>
-<p>The viewer keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. They sit in the title bar, right of the line where the viewer begins, followed by reload for an artifact, the folder and ${k("⋯")}. They stay within the viewer's width: when they don't all fit, the others get narrower first, then wait in ${k("⌄")}, and a name too long for the room is shortened in the middle. A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Press ${k("⌥ ⌘ P")}, double-click the tab, or choose Keep Open from its menu or ${k("⋯")} to keep it. While you're reading a tab you kept, the session's next file waits in a preview tab behind it.</p>
+<p>The viewer keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. They sit in the title bar, right of the line where the viewer begins, followed by reload for an artifact, the folder and ${k("⋯")}. When they don't all fit, the others get narrower first, then wait in ${k("⌄")}. In a narrow window the folder and reload buttons move into ${k("⋯")}, the tabs may use empty title bar to the left, and only then is a long name shortened in the middle. A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Press ${k("⌥ ⌘ P")}, double-click the tab, or choose Keep Open from its menu or ${k("⋯")} to keep it. While you're reading a tab you kept, the session's next file waits in a preview tab behind it.</p>
 <p>A path you click gets a tab of its own. Files you click in the folder tree open in the preview tab. Click × or middle-click to close a tab, or press ${k("⌘ W")} while you're in the viewer. Drag tabs to reorder them. Right-click a tab for Close Others, Close All, Reveal in Finder and Copy Path.</p>
 <p>Each tab keeps your place: go back to it and it's scrolled where you left it. A tab that gets something new while you're on another one shows a purple dot. When the tabs don't fit, ${k("⌄")} at the end of the strip lists them all, and turns purple when a tab out of sight has something new. ${k("⌥ ⌘ ←")} and ${k("⌥ ⌘ →")} step through the tabs. Tabs come back when Maxwell restarts.</p>
 <h2>The folder</h2>
@@ -332,7 +332,7 @@ motion = on                 <span class="c"># off: no slides or fades</span></co
 <p>First by branch: <code>robin/acme-56-billing-totals</code> is ACME-56. Linear's own branch format works, or any branch segment that starts with one of your team keys. When the branch says nothing, the plugin reads the transcript and links the ticket the session clearly worked on.</p>
 <h2>What it shows</h2>
 <ul>
-<li><strong>Row badge</strong>, like <code>ACME-56 · In Progress</code>. Green when done, amber when a move is suggested. Click opens the ticket, and so does ${k("⇧ ⌘ O")}.</li>
+<li><strong>Row badge</strong>, like <code>ACME-56 · In Progress</code>. Green when done, amber when a move is suggested. Click opens the ticket, and so does <strong>Open Ticket in Linear</strong> in ${k("⌘ K")}.</li>
 <li><strong>Safe to close</strong> gets "Linear ticket done". It passes when the ticket is Done, Canceled or Duplicate.</li>
 <li><strong>Linear panel</strong>: suggested moves first, then your tickets by status. Each line says how its sessions stand.</li>
 </ul>
@@ -448,7 +448,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⌥ ⌘ ←")} ${k("⌥ ⌘ →")}</td><td>Previous or next viewer tab</td></tr>
 <tr><td>${k("⌘ W")}</td><td>Close the viewer tab, when the viewer has focus</td></tr>
 <tr><td>${k("⌥ ⌘ R")}</td><td>Reload the artifact</td></tr>
-<tr><td>${k("⇧ ⌘ O")}</td><td>Open the artifact in the account's browser, or the session's Linear ticket</td></tr>
+<tr><td>${k("⇧ ⌘ O")}</td><td>Open the artifact in the account's browser</td></tr>
 <tr><td>${k("Esc")}</td><td>Close search, the palette or a panel</td></tr>
 </tbody></table>
 <h2>App</h2>

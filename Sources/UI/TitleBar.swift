@@ -99,7 +99,7 @@ final class TitleBar: MXView, TipSource {
     }
 
     private func makePlan() -> Plan {
-        let end = buttonsStart - Self.gap, least = docTabs?.leastWidth ?? 0
+        let end = buttonsStart - Self.gap, least = docTabs?.leastWidth(folded: true) ?? 0
         let h = bounds.height - 1
         switch docs {
         case .filling:
@@ -120,6 +120,13 @@ final class TitleBar: MXView, TipSource {
             if fit.overflow {
                 plan.list = NSRect(x: leftInset + CGFloat(fit.shown.count) * fit.width, y: 0, width: TitleRow.list, height: h)
                 plan.hidden = tabs.indices.filter { !fit.shown.contains($0) }.map { tabs[$0] }
+            }
+            if case .beside(let line) = docs, let d = docTabs {
+                // Short of room, the folder and reload buttons fold into ⋯ first; then the docs take
+                // empty title bar left of the pane line; only then is the name cut.
+                d.folded = end - line < d.leastWidth(folded: false)
+                let tabsEnd = ((plan.list ?? plan.rects.last)?.maxX ?? leftInset) + Self.plusWidth
+                plan.split = TitleRow.split(line: line, tabsEnd: tabsEnd, end: end, docsLeast: least)
             }
             return plan
         }

@@ -40,9 +40,15 @@ final class ViewerHeader: MXView {
     required init?(coder: NSCoder) { fatalError() }
 
     var hasTabs: Bool { !tabs.tabs.isEmpty }
-    /// The least room the row needs: the tab on show whole, ⌄ for the others, and the buttons.
-    var leastWidth: CGFloat {
-        strip.leastWidth + CGFloat([reload, treeButton, more].filter { !$0.isHidden }.count) * Self.button + 4
+    /// In a narrow window the folder and reload buttons fold into ⋯, so the doc on show keeps its name.
+    var folded = false { didSet { if folded != oldValue { refresh() } } }
+    private var isArtifact: Bool { tabs.item?.artifact != nil }
+
+    /// The least room the row needs: the tab on show whole, ⌄ for the others, and the buttons,
+    /// with the folder and reload buttons in ⋯ or beside it.
+    func leastWidth(folded f: Bool) -> CGFloat {
+        let buttons = peek ? 0 : 1 + (f ? 0 : (isArtifact ? 1 : 0) + (folder.has ? 1 : 0))
+        return strip.leastWidth + CGFloat(buttons) * Self.button + 4
     }
 
     func show(_ tabs: ViewerTabs, account: Account?, hasFolder: Bool, folderShown: Bool) {
@@ -57,15 +63,21 @@ final class ViewerHeader: MXView {
         if peek, let a = tabs.active {
             var lone = all[a]
             lone.unseen = lone.unseen || peekNews
+            // The dot says something is new; the tip says which file.
+            let news = tabs.tabs.indices.filter { $0 != a && tabs.isUnseen($0) }.map { all[$0].title }
+            if peekNews, !news.isEmpty { lone.detail += "\nNew: " + news.joined(separator: ", ") }
             strip.tabs = [lone]; strip.active = 0
         } else {
             strip.tabs = all; strip.active = tabs.active
         }
         strip.closes = !peek
         strip.isHidden = tabs.tabs.isEmpty
-        more.tip.text = tabs.item?.artifact != nil ? "Keep, open in browser, hide or fill the window" : "Keep, hide or fill the window"
-        reload.isHidden = peek || tabs.item?.artifact == nil
-        treeButton.isHidden = peek || !folder.has
+        let offers = [folded && folder.has ? "the folder" : nil, folded && isArtifact ? "reload" : nil,
+                      tabs.active.map(tabs.isPreview) == true ? "keep" : nil, isArtifact ? "open in browser" : nil, "hide or fill the window"]
+        let tip = offers.compactMap { $0 }.joined(separator: ", ")
+        more.tip.text = tip.prefix(1).uppercased() + tip.dropFirst()
+        reload.isHidden = peek || folded || !isArtifact
+        treeButton.isHidden = peek || folded || !folder.has
         more.isHidden = peek
         treeButton.isOn = folder.shown
         treeButton.tip.text = folder.shown ? "Hide the folder" : "Show the folder"
@@ -153,6 +165,18 @@ final class ViewerHeader: MXView {
             }
             m.addItem(.separator())
         }
+        // Folded into ⋯ in a narrow window.
+        if folded, folder.has {
+            let tree = MenuAction(folder.shown ? "Hide the Folder" : "Show the Folder") { [weak self] in self?.treeButton.action?() }
+            tree.keyEquivalent = "t"; tree.keyEquivalentModifierMask = [.command, .shift]
+            m.addItem(tree)
+        }
+        if folded, isArtifact {
+            let again = MenuAction("Reload") { [weak self] in self?.reload.action?() }
+            again.keyEquivalent = "r"; again.keyEquivalentModifierMask = [.command, .option]
+            m.addItem(again)
+        }
+        if folded, folder.has || isArtifact { m.addItem(.separator()) }
         for item in panelMenu?().items ?? [] {
             item.menu?.removeItem(item)
             m.addItem(item)

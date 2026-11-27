@@ -85,7 +85,8 @@ final class ViewerTabStrip: MXView, TipSource {
     private var overflows: Bool { plan.overflow }
     /// Room for the tabs: the ⌄ list takes the right end when they don't all fit.
     private var tabRoom: CGFloat { overflows ? bounds.width - Self.listW : bounds.width }
-    private var listRect: NSRect { NSRect(x: bounds.width - Self.listW, y: 0, width: Self.listW, height: bounds.height) }
+    /// ⌄ follows the last tab on show.
+    private var listRect: NSRect { NSRect(x: min(bounds.width - Self.listW, plan.widths.reduce(0, +)), y: 0, width: Self.listW, height: bounds.height) }
 
     /// Where each tab sits, in tab order. While a tab is dragged the others close the gap and open one
     /// at the slot it would land in.

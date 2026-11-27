@@ -1,13 +1,22 @@
 import CoreGraphics
 
 /// How the title bar's one row of tabs is shared between the session tabs (left of the line) and
-/// the current session's documents (right of it). Beside the viewer the line is the pane line: the
-/// documents live within the viewer's width, and a name too long for it is cut in the middle.
-/// Session tabs keep `sessionLeast`; those that don't fit wait in ⌄.
+/// the current session's documents (right of it). Beside the viewer the line is the pane line, so
+/// the documents head the viewer. In a narrow window, when the document on show can't be read
+/// there, the documents may take empty title bar to the left, never a session tab, ⌄ or +; past
+/// that its name is cut in the middle. Session tabs keep `sessionLeast`; those that don't fit wait in ⌄.
 enum TitleRow {
     static let sessionLeast: CGFloat = 120, sessionMost: CGFloat = 220
     /// The ⌄ that lists the session tabs out of sight.
     static let list: CGFloat = 26
+
+    /// Where the line goes beside the viewer: the pane line (`line`) while the documents get the
+    /// least they need (`docsLeast`) between it and `end`; otherwise left of it, as far as they
+    /// need, but never past `tabsEnd`, where the session tabs and + end.
+    static func split(line: CGFloat, tabsEnd: CGFloat, end: CGFloat, docsLeast: CGFloat) -> CGFloat {
+        guard end - line < docsLeast else { return line }
+        return min(line, max(tabsEnd, end - docsLeast))
+    }
 
     /// Where the line goes while the session fills the window and its document on show waits after
     /// the session tabs: as far right as the document needs (`docsLeast`), leaving at least one

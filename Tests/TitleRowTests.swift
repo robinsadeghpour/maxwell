@@ -13,6 +13,9 @@ func titleRowTests() {
     check(one.shown == [2] && one.overflow, "at the narrowest, only the tab on show")
     check(TitleRow.sessions(count: 0, current: nil, room: 500).shown.isEmpty, "no tabs, nothing to show")
 
+    check(TitleRow.split(line: 1000, tabsEnd: 700, end: 1340, docsLeast: 250) == 1000, "beside the viewer the line is the pane line while the docs fit")
+    check(TitleRow.split(line: 600, tabsEnd: 400, end: 800, docsLeast: 300) == 500, "too narrow: the docs take empty title bar to the left")
+    check(TitleRow.split(line: 600, tabsEnd: 560, end: 800, docsLeast: 300) == 560, "but never a session tab, its ⌄ or +")
     check(TitleRow.peekSplit(start: 114, end: 1340, docsLeast: 200, reserve: 30) == 1140, "the waiting document takes what it needs at the right")
     check(TitleRow.peekSplit(start: 114, end: 700, docsLeast: 600, reserve: 30) == 264, "but never more than leaves one session tab and +")
 }

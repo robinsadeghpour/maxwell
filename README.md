@@ -109,7 +109,7 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌥⌘R, ⇧⌘O | Reload the artifact, open it in the account's browser |
 | ⇧⌘I | Show or hide Idle |
 | ⇧⌘L | Switch light and dark (View › Appearance: Light, Dark, Follow System) |
-| ⇧⌘O | Open the session's Linear ticket |
+| ⌘K › Open Ticket in Linear | Open the session's Linear ticket (⇧⌘O belongs to Open in Browser) |
 | ⌘, | Settings: General, Appearance, Accounts, Projects, Plugins, Keys, Advanced (⌘1–7 inside) |
 
 Every key can be changed with a `keybind` line in the config.

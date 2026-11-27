@@ -1156,7 +1156,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: overlays, focus, toast
 
-    func toast(_ s: String) { root.status.show(toast: s) }
+    func toast(_ s: String, failed: Bool = false) { root.status.show(toast: s, failed: failed) }
 
     private var pluginSignature = ""
     private var pluginRun: [PluginID: PluginStatus.Run] = [:]

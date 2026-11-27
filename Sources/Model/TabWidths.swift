@@ -28,8 +28,8 @@ enum TabWidths {
 
     /// Which tabs show in `width`, and how wide. All of them while each can keep `least` (the tab on
     /// show its whole title). Otherwise as many neighbours of the tab on show as fit at `least`,
-    /// from the first tab when that reaches it, beside ⌄; they share all of that room, so no empty
-    /// strip sits next to ⌄.
+    /// from the first tab when that reaches it, beside ⌄, each up to its own width: ⌄ follows the
+    /// last one, and the tab on show never stretches past its name.
     static func layout(_ natural: [CGFloat], active: Int?, in width: CGFloat, least: CGFloat, list: CGFloat) -> Layout {
         let n = natural.count
         guard n > 0 else { return Layout(shown: 0..<0, widths: [], overflow: false) }
@@ -47,9 +47,8 @@ enum TabWidths {
         }
         hi = max(hi, lo + 1)
         let fitted = fit(Array(natural[lo..<hi]), active: a.map { $0 - lo }, in: room, least: least)
-        let spare = max(0, room - fitted.reduce(0, +)) / CGFloat(fitted.count)
         var widths = [CGFloat](repeating: 0, count: n)
-        for (k, w) in fitted.enumerated() { widths[lo + k] = w + spare }
+        for (k, w) in fitted.enumerated() { widths[lo + k] = w }
         return Layout(shown: lo..<hi, widths: widths, overflow: true)
     }
 }
