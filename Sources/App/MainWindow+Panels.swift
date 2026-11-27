@@ -26,7 +26,6 @@ extension MainWindowController {
     func togglePanel(_ p: PanelID) {
         if root.isShown(p), root.fillHides(p) {
             // Hidden by what fills the window: everything comes back and it takes the keyboard.
-            root.filling = nil
             focusPanel(p)
         } else if !root.isShown(p) {
             root.setHidden(p, false)
@@ -61,39 +60,6 @@ extension MainWindowController {
         return fr.isDescendant(of: v)
     }
 
-    /// The keyboard to the session's terminal (the session list when there is none). While a panel
-    /// fills the window the terminal is hidden, so the keyboard stays in that panel.
-    func focusMain() {
-        if root.fillHides(nil), let p = root.filling?.dock.flatMap({ root.shown($0).first(where: \.canFill) }) { return focusPanel(p) }
-        if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
-        else { window?.makeFirstResponder(root.sidebar.list) }
-    }
-
-    /// ⌥⌘1, ⌥⌘2, ⌥⌘3: the session list, the terminal, the viewer. Aimed at something the fill
-    /// hides, it ends the fill first, so the keyboard never lands in a hidden view.
-    func focus(_ pane: Int) {
-        let target: PanelID? = pane == 1 ? .sessions : pane == 2 ? nil : .viewer
-        if root.fillHides(target) { root.filling = nil }
-        switch pane {
-        case 1: window?.makeFirstResponder(root.sidebar.list)
-        case 2: focusMain()
-        default:
-            let page = root.viewerPane.viewer.container.subviews.first { !$0.isHidden }
-            let hasPage = root.viewerPane.viewer.current != nil || root.viewerPane.viewer.currentArtifact != nil
-            // An empty viewer takes the keyboard itself, so ⇧⌘↩ and Esc then act on it.
-            window?.makeFirstResponder(hasPage ? page : root.viewerPane)
-        }
-    }
-
-    func focusPanel(_ p: PanelID) {
-        if root.fillHides(p) { root.filling = nil }
-        switch p {
-        case .sessions: focus(1)
-        case .viewer: focus(3)
-        default: if let v = root.content(p) as? PluginPanel { window?.makeFirstResponder(v) }
-        }
-    }
-
     func movePanel(_ p: PanelID, to d: Dock) {
         root.move(p, to: d)
         toast("\(root.title(p)) moved to the \(d.rawValue).")
@@ -110,32 +76,6 @@ extension MainWindowController {
         if let d = holding { return root.toggleFill(.panel(d)) }
         if current != nil { return root.toggleFill(.session) }
         if let d = [Dock.right, .bottom, .left].first(where: { root.shown($0).contains(where: \.canFill) }) { root.toggleFill(.panel(d)) }
-    }
-
-    /// The keyboard follows: into what fills the window (what it covers is hidden and must not
-    /// keep the keyboard, or AppKit takes it away for good), and back to where it was afterwards.
-    func fillingChanged(_ f: WindowFill?) {
-        let fr = window?.firstResponder as? NSView
-        switch f {
-        case nil:
-            // What was covered shows again first: a hidden view can't take the keyboard.
-            root.layoutSubtreeIfNeeded()
-            if let v = focusBeforeFill, v.window != nil { window?.makeFirstResponder(v) } else { focusMain() }
-            focusBeforeFill = nil
-        case .session?:
-            if focusBeforeFill == nil { focusBeforeFill = fr }
-            if fr?.isDescendant(of: root.sessionPane) != true {
-                if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) } else { window?.makeFirstResponder(nil) }
-            }
-        case .panel(let d)?:
-            if focusBeforeFill == nil { focusBeforeFill = fr }
-            let fills = root.shown(d).first(where: \.canFill) ?? .viewer
-            let isInside = { [root] (v: NSView?) in root.shown(d).contains { p in root.content(p).map { v?.isDescendant(of: $0) == true } ?? false } }
-            if !isInside(fr) { focusPanel(fills) }
-            // A panel with nothing to focus (an empty viewer) still takes the keyboard from what it covers.
-            if !isInside(window?.firstResponder as? NSView) { window?.makeFirstResponder(root.content(fills)) }
-        }
-        updateDim()
     }
 
     // MARK: plugin panels

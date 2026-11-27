@@ -84,6 +84,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var viewerNews = false
     /// Where the keyboard was before something filled the window.
     weak var focusBeforeFill: NSView?
+    var pendingKeyboard: (target: KeyboardTarget, from: NSResponder?)?
 
     init(store: Store) {
         self.store = store
@@ -118,7 +119,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         loadPanelLayout()
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
         root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges(); self?.systemDetail.dismiss() }
-        root.onSettled = { [weak self] in self?.updateDim() }
+        root.onSettled = { [weak self] in self?.applyPendingKeyboard(); self?.updateDim() }
         root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
             guard let self else { return }
