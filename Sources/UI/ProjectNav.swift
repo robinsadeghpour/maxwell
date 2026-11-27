@@ -47,15 +47,12 @@ final class ProjectTabs: MXView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func rects(width: CGFloat) -> [NSRect] {
-        var x: CGFloat = 8, y: CGFloat = 6, out: [NSRect] = []
-        for e in entries {
+        let widths = entries.map { e -> CGFloat in
             let n = e.needsYou + e.yourTurn
-            let w = Text.width(e.title, font: font) + 16 + (n > 0 ? max(14, Text.width("\(n)", font: font) + 6) + 4 : 0)
-            if x + w > width - 8, x > 8 { x = 8; y += 26 }
-            out.append(NSRect(x: x, y: y, width: w, height: 21))
-            x += w + 4
+            return Text.width(e.title, font: font) + 16 + (n > 0 ? max(14, Text.width("\(n)", font: font) + 6) + 4 : 0)
         }
-        return out
+        let at = LineWrap.origins(widths: widths, left: 8, right: width - 8, gap: 4, lineHeight: 26)
+        return zip(at, widths).map { p, w in NSRect(x: p.x, y: p.y + 6, width: w, height: 21) }
     }
 
     func preferredHeight(width: CGFloat) -> CGFloat { (rects(width: width).last?.maxY ?? 0) + 6 }

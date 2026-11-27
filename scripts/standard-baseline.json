@@ -23,22 +23,23 @@
   "Sources/UI/Theme.swift": 1
  },
  "file-lines": {
-  "Sources/App/MainWindow.swift": 1710,
+  "Sources/App/MainWindow.swift": 1721,
   "Sources/App/Probes.swift": 543,
-  "Sources/App/Store.swift": 630,
+  "Sources/App/Store.swift": 623,
   "Sources/App/main.swift": 671,
   "Sources/UI/ArtifactView.swift": 522,
   "Sources/UI/SettingsWindow.swift": 1180,
-  "Sources/UI/Sidebar.swift": 778,
+  "Sources/UI/Sidebar.swift": 818,
   "Sources/UI/Terminal.swift": 603
  },
  "function-lines": {
-  "Sources/App/MainWindow.swift::makeActions": 133,
-  "Sources/App/MainWindow.swift::render": 86,
-  "Sources/App/MainWindow.swift::wire": 93,
+  "Sources/App/MainWindow.swift::makeActions": 137,
+  "Sources/App/MainWindow.swift::render": 88,
+  "Sources/App/MainWindow.swift::wire": 94,
   "Sources/App/main.swift::runTestHooks": 388,
-  "Sources/Model/Reducer.swift::reduce": 99,
-  "Sources/UI/ProjectLogo.swift::extract": 90
+  "Sources/Model/Reducer.swift::reduce": 98,
+  "Sources/UI/ProjectLogo.swift::extract": 90,
+  "Sources/UI/SessionPane.swift::show": 82
  },
  "hand-made-controls": {
   "Sources/App/MainWindow.swift": 1,

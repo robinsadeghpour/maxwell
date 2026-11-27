@@ -9,6 +9,10 @@ protocol SessionPaneDelegate: AnyObject {
     func notSafe(_ id: SessionID)
     func reopen(_ id: SessionID)
     func roomiest(for id: SessionID) -> Account?
+    /// The account a session is continuing on, while that runs.
+    func movingTo(_ id: SessionID) -> Account?
+    /// Every other account it can continue on, with its room: the banner's ▾.
+    func continueAccounts(_ id: SessionID) -> NSMenu?
     func scheduledResume(_ id: SessionID) -> Date?
     func bringIn(_ id: SessionID, force: Bool)
     func bringInQueued(_ id: SessionID) -> Bool
@@ -125,6 +129,11 @@ final class SessionPane: MXView {
             } else {
                 banner.add(MXButton("Bring into Maxwell", primary: true) { [weak self] in self?.delegate?.bringIn(s.id, force: false) })
             }
+        } else if let to = delegate?.movingTo(s.id), terminal == nil {
+            empty.isHidden = true
+            message.scroll.isHidden = false
+            message.show(note: "Claude Code stops it on \(account?.name ?? s.accountId) and resumes it on \(to.name) with the whole conversation. It opens here once it runs there.",
+                         text: s.lastMessage ?? "No reply yet.", asReply: s.lastMessage != nil, quiet: true)
         } else if s.parkedAt != nil && terminal == nil {
             empty.isHidden = true
             message.scroll.isHidden = false
@@ -228,16 +237,31 @@ final class SessionPane: MXView {
             guard case .limited(let reset) = s.phase else { break }
             let name = account?.name ?? s.accountId
             let when = reset.map { $0 > now ? "resets \(Format.reset($0, now: now))" : "limit has reset" } ?? "waiting for the reset time"
-            banner.configure(group: group, text: "Hit the usage limit on \(name) · \(when)", tint: { $0.fg3 })
+            banner.configure(group: group, text: "Usage limit on \(name) · \(when)", tint: { $0.fg3 })
+            if let to = delegate?.movingTo(s.id) {
+                banner.configure(group: .working, text: "Continuing on \(to.name) with the whole conversation…", tint: { $0.fg3 })
+                break
+            }
             if let scheduled = delegate?.scheduledResume(s.id) {
                 banner.add(MXButton("Resumes \(Format.clock.string(from: scheduled)) ✓", small: false))
             } else if case .background = s.reach {
-                let label = reset.map { $0 > now ? "Resume at \(Format.clock.string(from: $0))" : "Resume now" } ?? "Resume now"
+                let label = reset.map { $0 > now ? "Resume at reset" : "Resume now" } ?? "Resume now"
                 banner.add(MXButton(label, hint: "⇧⌘R") { [weak self] in self?.delegate?.resume(s.id) })
             }
-            if let other = delegate?.roomiest(for: s.id) {
+            let other = delegate?.roomiest(for: s.id)
+            if let other {
                 let left = other.usedPercent.map { " · \(100 - Int($0))% left" } ?? ""
-                banner.add(MXButton("Move to \(other.name)\(left)", hint: "⇧⌘M", primary: true) { [weak self] in self?.delegate?.move(s.id) })
+                banner.add(MXButton("Continue on \(other.name)\(left)", hint: "⇧⌘M", primary: true) { [weak self] in self?.delegate?.move(s.id) })
+            }
+            // A split button: the main one takes the account with the most room, ▾ picks another.
+            if case .background = s.reach {
+                let pick = MXButton(other == nil ? "Continue on ▾" : "▾")
+                pick.tip = Tip("Continue on another account")
+                pick.action = { [weak self, weak pick] in
+                    guard let pick, let menu = self?.delegate?.continueAccounts(s.id) else { return }
+                    menu.popUp(positioning: nil, at: NSPoint(x: 0, y: pick.bounds.height + 2), in: pick)
+                }
+                banner.add(pick)
             }
         case .working:
             // A running turn needs no strip; a finished one still waiting on its background work does.

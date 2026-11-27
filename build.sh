@@ -42,7 +42,7 @@ if [[ ${1:-} == test ]]; then
   mkdir -p build
   plugins/slack/build.sh test
   swiftc -swift-version 5 -o build/linear-plugin plugins/sdk/MaxwellPlugin.swift plugins/linear/*.swift
-  swiftc -swift-version 5 -o build/reducer-tests Sources/Model/*.swift Sources/Plugins/*.swift Sources/UI/{ProjectLogo,Theme,IconArt,PanelLayout}.swift Sources/App/TerminalHosts.swift Sources/Install/*.swift \
+  swiftc -swift-version 5 -o build/reducer-tests Sources/Model/*.swift Sources/Plugins/*.swift Sources/UI/{ProjectLogo,Theme,IconArt,PanelLayout,LineWrap}.swift Sources/App/TerminalHosts.swift Sources/Install/*.swift \
     plugins/linear/{LinearCore,LinearAPI}.swift Tests/*.swift
   exec build/reducer-tests fixtures/events
 fi

@@ -49,7 +49,13 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
     private static let header: CGFloat = 36
     private var listTop: CGFloat { Self.header + 36 }
     private var listBottom: CGFloat { listTop + CGFloat(maxRows) * Metrics.row }
-    private var height: CGFloat { listBottom + 30 + 24 + 34 + 34 + 34 + 46 }
+    private var height: CGFloat { listBottom + 30 + 24 + accountsHeight + 34 + 34 + 46 }
+    private static let x0: CGFloat = 94
+    /// Where each account chip goes, wrapped onto as many lines of 34 as the panel's width needs.
+    private var accountOrigins: [CGPoint] {
+        LineWrap.origins(widths: accountButtons.map(\.intrinsicContentSize.width), left: Self.x0, right: Self.width - 14, gap: 6, lineHeight: 34)
+    }
+    private var accountsHeight: CGFloat { CGFloat(LineWrap.lines(accountOrigins, lineHeight: 34)) * 34 }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -157,7 +163,7 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         accountButtons.forEach { $0.removeFromSuperview() }
         accountButtons = choice.accounts.enumerated().map { i, a in
             let left = a.usedPercent.map { " \(100 - Int(min($0, 100)))% left" } ?? ""
-            let b = MXButton(a.name + left, hint: "⌘\(i + 1)") { [weak self] in self?.account = a.id; self?.refreshAccounts() }
+            let b = MXButton(a.name + left, hint: i < 9 ? "⌘\(i + 1)" : nil) { [weak self] in self?.account = a.id; self?.refreshAccounts() }
             addSubview(b)
             return b
         }
@@ -241,7 +247,7 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         if k == "o" { chooseFolder(); return true }
         if e.modifierFlags.contains(.option), e.keyCode == 126 { setCloud(true); return true }
         if e.modifierFlags.contains(.option), e.keyCode == 125 { setCloud(false); return true }
-        if let n = Int(k), (1...choice.accounts.count).contains(n) { account = choice.accounts[n - 1].id; refreshAccounts(); return true }
+        if let n = Int(k), choice.accounts.indices.contains(n - 1) { account = choice.accounts[n - 1].id; refreshAccounts(); return true }
         return false
     }
 
@@ -249,17 +255,16 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
 
     override func layout() {
         super.layout()
-        let x0: CGFloat = 94
+        let x0 = Self.x0
         query.frame = NSRect(x: x0, y: Self.header + 8, width: bounds.width - x0 - 14, height: 22)
         let fs = folderButton.intrinsicContentSize
         folderButton.frame = NSRect(x: x0, y: listBottom + 6, width: fs.width, height: fs.height)
-        var y = listBottom + 30 + 24, x = x0
-        for b in accountButtons {
+        var y = listBottom + 30 + 24
+        for (b, p) in zip(accountButtons, accountOrigins) {
             let s = b.intrinsicContentSize
-            b.frame = NSRect(x: x, y: y + 6, width: s.width, height: s.height)
-            x += s.width + 6
+            b.frame = NSRect(x: p.x, y: y + p.y + 6, width: s.width, height: s.height)
         }
-        y += 34
+        y += accountsHeight
         let hs = here.intrinsicContentSize, ts = there.intrinsicContentSize
         here.frame = NSRect(x: x0, y: y + 6, width: hs.width, height: hs.height)
         there.frame = NSRect(x: x0 + hs.width + 6, y: y + 6, width: ts.width, height: ts.height)
@@ -291,7 +296,7 @@ final class NewSessionPanel: MXView, NSTextFieldDelegate {
         }
         var y = listBottom + 30 + 24
         Text.draw("account", in: NSRect(x: 14, y: y, width: 80, height: 34), color: t.fg2)
-        y += 34
+        y += accountsHeight
         Text.draw("where", in: NSRect(x: 14, y: y, width: 80, height: 34), color: t.fg2)
         y += 34
         Text.draw(cloud ? "task" : "name", in: NSRect(x: 14, y: y, width: 80, height: 32), color: t.fg2)

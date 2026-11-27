@@ -68,7 +68,7 @@ export const pages = {
 <tr><td>Needs you</td><td>A permission prompt or question is open, or the turn ended on something only you can give: its status line says Needs you, or Claude Code marks it blocked. You get a notification.</td></tr>
 <tr><td>Your turn</td><td>The turn is over and nothing runs. Read it, reply or close it.</td></tr>
 <tr><td>Working</td><td>A turn or subagent is running, or the reply is in and background work it started is still running. Leave it alone.</td></tr>
-<tr><td>Limited</td><td>It hit a usage limit. Resume when the window resets, or move it to the account with the most room.</td></tr>
+<tr><td>Limited</td><td>It hit a usage limit. Resume when the window resets, or continue it on the account with the most room, with its whole conversation.</td></tr>
 <tr><td>Safe to close</td><td>Every check passed. Expand the row to see each one.</td></tr>
 <tr><td>Idle</td><td>Stopped and quiet for a day, or a question nobody answered for 3 days. Folded away.</td></tr>
 </tbody></table>
@@ -293,7 +293,7 @@ account = personal ~/.claude-personal</code></pre>
 <p>Run <strong>Maxwell › Install Hooks</strong> again after adding one, so its sessions report in.</p>
 <h2>Usage</h2>
 <p>The Usage panel shows 5-hour and weekly use for every account, with reset times. The System panel shows CPU and memory for Claude Code, Maxwell and the whole Mac. Click it, or choose Panels › System Details, for the last five minutes of CPU and what each session uses with the commands it runs; click a session there to open it.</p>
-<p>New sessions from ${k("⌘ T")} go to the account with the most room. A session that hits its limit moves to <strong>Limited</strong>. Resume it when the window resets, or press ${k("⇧ ⌘ M")} to move it to the account with the most room.</p>`,
+<p>New sessions from ${k("⌘ T")} go to the account with the most room. A session that hits its limit moves to <strong>Limited</strong>. Resume it when the window resets, or press ${k("⇧ ⌘ M")} to continue it on the account with the most room. It stays the same session, with its whole conversation: Maxwell stops it on its account, resumes it on the other one and sends "continue". To pick the account, press ▾ beside the banner's button, or right-click the row and choose <strong>Continue on</strong>. The Limited header's button moves every limited session in the list at once.</p>`,
   },
 
   appearance: {
@@ -423,7 +423,7 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <tr><td>${k("⌘ Z")}</td><td>Undo the last close</td></tr>
 <tr><td>${k("⇧ ⌘ I")}</td><td>Show or hide Idle</td></tr>
 <tr><td>${k("⇧ ⌘ G")}</td><td>Open the session's agent list</td></tr>
-<tr><td>${k("⇧ ⌘ M")}</td><td>Move a limited session to the account with the most room</td></tr>
+<tr><td>${k("⇧ ⌘ M")}</td><td>Continue a limited session on the account with the most room, with its whole conversation</td></tr>
 </tbody></table>
 <h2>Projects</h2>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
