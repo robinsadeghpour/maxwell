@@ -14,7 +14,7 @@ import Carbon
 /// - `dump <label>`: logs `terminal harness: <label>` with the terminal's row, folder, whether it
 ///   has the keyboard, and the lines on screen.
 /// - `click <what>`, `dblclick <what>`: a click or a double-click on `doc` (the first document tab
-///   in the title bar), `session` (the first session tab) or `folder` (the viewer's folder button).
+///   in the title bar), `session` (the first session tab), or the `folder`, `plus` or `search` button.
 /// - `where <label>`: logs which part of the window has the keyboard, whether it is on screen, and
 ///   what fills the window.
 enum TerminalHarness {
@@ -60,7 +60,6 @@ enum TerminalHarness {
         mark("terminal harness: \(label): keyboard in \(part), \(onScreen ? "on screen" : "hidden"), fill \(root.filling.map { "\($0)" } ?? "none")")
     }
 
-    /// Queued, not sent: the tab follows the mouse until the button comes up, waiting for that event.
     private static func click(_ what: String, times: Int, _ main: MainWindowController) {
         let root = main.root, strip = root.viewerPane.header.strip
         // Where each target is: the first document tab, the first session tab, the folder button.
@@ -68,16 +67,25 @@ enum TerminalHarness {
             "doc": (strip, NSPoint(x: 30, y: strip.bounds.midY)),
             "session": (root.titleBar, NSPoint(x: root.titleBar.fullScreen ? 60 : 150, y: root.titleBar.bounds.midY)),
             "folder": (root.viewerPane.header.treeButton, NSPoint(x: 14, y: 11)),
+            "plus": (root.titleBar.plus, NSPoint(x: 13, y: 11)),
+            "search": (root.titleBar.palette, NSPoint(x: 13, y: 11)),
         ]
         guard let (v, at) = spots[what], let w = main.window, v.window != nil, !v.isHiddenOrHasHiddenAncestor else {
             return mark("terminal harness: no \(what) to click")
         }
         let p = v.convert(at, to: nil)
+        func event(_ type: NSEvent.EventType, _ count: Int) -> NSEvent? {
+            NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                               windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: count, pressure: 1)
+        }
+        // Sent straight to the window: a posted event's point is moved onto a screen, and a quiet
+        // run's window is past every screen's edge. The release waits in the queue for a view that
+        // follows the mouse until the button comes up; one that doesn't gets it sent after.
         for count in 1...times {
-            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                if let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                              windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: count, pressure: 1) { NSApp.postEvent(e, atStart: false) }
-            }
+            guard let down = event(.leftMouseDown, count), let up = event(.leftMouseUp, count) else { continue }
+            NSApp.postEvent(up, atStart: true)
+            w.sendEvent(down)
+            if NSApp.nextEvent(matching: .leftMouseUp, until: .distantPast, inMode: .default, dequeue: true) != nil { w.sendEvent(up) }
         }
         mark("terminal harness: \(times == 2 ? "double-clicked" : "clicked") the \(what)")
     }

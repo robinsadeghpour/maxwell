@@ -118,7 +118,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.delegate = self
         loadPanelLayout()
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
-        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges(); self?.systemDetail.dismiss() }
+        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.keepKeyboardVisible(); self?.updateBadges(); self?.systemDetail.dismiss() }
         root.onSettled = { [weak self] in self?.applyPendingKeyboard(); self?.updateDim() }
         root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
@@ -566,15 +566,17 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: sessions
 
-    func open(_ id: SessionID) {
+    /// `keepingFill`: the session's terminal changed under it (reattached after a move); what fills
+    /// the window stays, and the terminal takes the keyboard only when it is on screen.
+    func open(_ id: SessionID, keepingFill: Bool = false) {
         // Another session, or this one from under a panel: it shows. Filling the window, it stays big.
-        if root.filling != .session || id != current { root.filling = nil }
+        if !keepingFill, root.filling != .session || id != current { root.filling = nil }
         if let t = shell(id) {
             remember(id)
             current = id
             render(store.state)
             syncViewer()
-            window?.makeFirstResponder(t)
+            if !root.fillHides(nil) { giveKeyboard(.view(t)) }
             return
         }
         guard let s = store.state.sessions[id] else { return }
@@ -597,7 +599,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewerForced = nil
         render(store.state)
         showViewer(for: id)
-        if let t = terminal(for: id), !detached.contains(id) { window?.makeFirstResponder(t) }
+        if let t = terminal(for: id), !detached.contains(id), !root.fillHides(nil) { giveKeyboard(.view(t)) }
     }
 
     private func attach(_ s: Session, short: String, account a: Account) {
@@ -637,7 +639,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         detached.remove(id)
         resuming.insert(id)
-        open(id)
+        open(id, keepingFill: true)
     }
 
     /// A session that now runs elsewhere (another account): its open terminal is attached to the old
@@ -942,7 +944,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let v = current.flatMap { viewers[$0] } ?? ViewerTabs()
         root.viewerPane.show(v, account: current.flatMap(account(of:)), reload: reload)
         root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
-        updateDim()
+        keepKeyboardVisible()
         updateBadges()
     }
 

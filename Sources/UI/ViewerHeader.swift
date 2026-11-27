@@ -101,6 +101,7 @@ final class ViewerHeader: MXView {
         if e.clickCount == 2 { window?.performZoom(nil) } else { window?.performDrag(with: e) }
     }
     override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
 
     override func draw(_ r: NSRect) {
         // The tabs draw their own bottom line, open under the active one; the buttons' part has one too.

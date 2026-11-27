@@ -53,6 +53,18 @@ extension MainWindowController {
         }
     }
 
+    /// A panel that hid or emptied while it had the keyboard (the last doc closed, a side hidden,
+    /// a plugin switched off) hands it to the terminal: AppKit leaves it with the window, where
+    /// typing goes nowhere. Called after anything that can hide or empty a panel.
+    func keepKeyboardVisible() {
+        defer { updateDim() }
+        guard let w = window, pendingKeyboard == nil else { return }
+        root.layoutSubtreeIfNeeded()
+        let fr = w.firstResponder
+        let lost = fr == nil || fr === w || (fr as? NSView).map { $0.isHiddenOrHasHiddenAncestor || $0.window == nil } ?? false
+        if lost { focusMain() }
+    }
+
     /// Back to the session's terminal (the session list when there is none), as after an overlay
     /// closes. While a panel fills the window the terminal is hidden, so the keyboard stays in it.
     func focusMain() {

@@ -93,6 +93,7 @@ extension MainWindowController {
             }
         }
         root.setPluginPanels(next)
+        keepKeyboardVisible()
         updateBadges()
     }
 

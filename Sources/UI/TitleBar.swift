@@ -92,7 +92,6 @@ final class TitleBar: MXView, TipSource {
         }
         buttonsStart = x
         plan = makePlan()
-        plus.isHidden = docs == .filling
         plus.frame = NSRect(x: (plan.list ?? plan.rects.last)?.maxX ?? leftInset, y: y, width: 26, height: Metrics.control).offsetBy(dx: 2, dy: 0)
         docTabs?.isHidden = plan.split == nil
         if let s = plan.split { docTabs?.frame = NSRect(x: s + 1, y: 0, width: max(0, buttonsStart - Self.gap - s - 1), height: bounds.height) }
@@ -105,7 +104,7 @@ final class TitleBar: MXView, TipSource {
         switch docs {
         case .filling:
             let mine = tabs.filter { $0.id == current }
-            return Plan(split: leftInset + (mine.isEmpty ? 0 : TitleRow.sessionMost), shown: mine,
+            return Plan(split: leftInset + (mine.isEmpty ? 0 : TitleRow.sessionMost) + Self.plusWidth, shown: mine,
                         rects: mine.map { _ in NSRect(x: leftInset, y: 0, width: TitleRow.sessionMost, height: h) })
         case .none, .beside, .peek:
             var plan = Plan()
@@ -250,4 +249,6 @@ final class TitleBar: MXView, TipSource {
 
     override func mouseDragged(with e: NSEvent) {}
     override var mouseDownCanMoveWindow: Bool { false }
+    /// A tab works on the first click even while another app is in front, as in Safari's tab bar.
+    override func acceptsFirstMouse(for e: NSEvent?) -> Bool { true }
 }
