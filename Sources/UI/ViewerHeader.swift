@@ -2,26 +2,27 @@ import AppKit
 
 /// The viewer's tabs and buttons. They sit in the title bar, right of the line where the viewer
 /// begins (`TitleBar.Docs`), the way an editor group's tabs head its documents: the current
-/// session's files and artifacts, then keep, folder, and for an artifact reload and open in
-/// browser, then ⋯ for the viewer's menu.
+/// session's files and artifacts, then reload for an artifact, the folder, and ⋯ for the rest
+/// (keep, open in browser, hide, fill the window).
 final class ViewerHeader: MXView {
     let strip = ViewerTabStrip(frame: .zero)
-    let pin = IconButton(.pin, tip: Tip("Keep this tab open", action: "pin"))
     let treeButton = IconButton(.tree, tip: Tip("Show the folder", action: "toggle-tree"))
     let reload = IconButton(.reload, tip: Tip("Reload the artifact", action: "reload-artifact"))
-    let external = IconButton(.external, tip: Tip("Open in browser", action: "open-in-browser"))
-    let more = IconButton(.more, tip: Tip("Hide the viewer or fill the window"))
+    let more = IconButton(.more, tip: Tip("Keep, open in browser, hide or fill the window"))
     var onTab: ((ViewerTabAction) -> Void)?
-    /// ⌥⌘P from the tab's menu: keep the tab, or let the session's next file replace it again.
+    /// ⌥⌘P from a menu: keep the tab, or let the session's next file replace it again.
     var onKeepToggle: (() -> Void)?
+    /// The viewer's panel menu (hide, fill the window), which ⋯ ends with.
+    var panelMenu: (() -> NSMenu)?
     private var tabs = ViewerTabs()
-    private static let button: CGFloat = 26
+    static let button: CGFloat = 28
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        [strip, pin, treeButton, reload, external, more].forEach(addSubview)
+        [strip, treeButton, reload, more].forEach(addSubview)
         strip.onAction = { [weak self] in self?.onTab?($0) }
         strip.menuFor = { [weak self] in self?.menu(for: $0) ?? NSMenu() }
+        more.action = { [weak self] in self?.showMore() }
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -30,15 +31,7 @@ final class ViewerHeader: MXView {
         strip.tabs = Self.stripTabs(tabs, account: account)
         strip.active = tabs.active
         strip.isHidden = tabs.tabs.isEmpty
-        let item = tabs.item
-        let what = item?.artifact != nil ? "artifact" : "file"
-        pin.isHidden = item == nil
-        pin.isOn = tabs.kept
-        pin.tip.text = tabs.kept
-            ? "Kept open\nThe next \(what) the session opens gets a tab of its own. Click to let it replace this one"
-            : "Keep this tab open\nNow the next file or artifact the session opens replaces it"
-        reload.isHidden = item?.artifact == nil
-        external.isHidden = item?.artifact == nil
+        reload.isHidden = tabs.item?.artifact == nil
         treeButton.isHidden = !hasFolder
         treeButton.isOn = folderShown
         treeButton.tip.text = folderShown ? "Hide the folder" : "Show the folder"
@@ -49,7 +42,7 @@ final class ViewerHeader: MXView {
         super.layout()
         let y = (bounds.height - Metrics.control) / 2
         var x = bounds.width
-        for b in [more, external, reload, treeButton, pin] where !b.isHidden {
+        for b in [more, treeButton, reload] where !b.isHidden {
             x -= Self.button
             b.frame = NSRect(x: x, y: y, width: Self.button, height: Metrics.control)
         }
@@ -95,6 +88,28 @@ final class ViewerHeader: MXView {
         if ["png", "jpg", "jpeg", "gif", "webp", "heic", "svg", "tiff"].contains(ext) { return .image }
         let lang = ViewerController.codeLangs[ext]
         return lang != nil && lang != "plaintext" ? .code : .other
+    }
+
+    /// ⋯: keep or let go of the tab on show, open an artifact in the browser, then the panel's menu.
+    private func showMore() {
+        let m = NSMenu()
+        if let a = tabs.active {
+            let send = { [weak self] (x: ViewerTabAction) -> () -> Void in { self?.onTab?(x) } }
+            let keep = tabs.isPreview(a) ? MenuAction("Keep Open", send(.keep(a))) : MenuAction("Let the Session Replace It") { [weak self] in self?.onKeepToggle?() }
+            keep.keyEquivalent = "p"; keep.keyEquivalentModifierMask = [.command, .option]
+            m.addItem(keep)
+            if tabs.tabs[a].artifact != nil {
+                let open = MenuAction("Open in Browser", send(.openInBrowser(a)))
+                open.keyEquivalent = "o"; open.keyEquivalentModifierMask = [.command, .shift]
+                m.addItem(open)
+            }
+            m.addItem(.separator())
+        }
+        for item in panelMenu?().items ?? [] {
+            item.menu?.removeItem(item)
+            m.addItem(item)
+        }
+        m.popUp(positioning: nil, at: NSPoint(x: 0, y: more.bounds.maxY + 4), in: more)
     }
 
     private func menu(for i: Int) -> NSMenu {

@@ -16,10 +16,8 @@ extension MainWindowController {
         let docs = root.viewerPane.header
         docs.onTab = { [weak self] in self?.tabAction($0) }
         docs.onKeepToggle = { [weak self] in self?.togglePin() }
-        docs.pin.action = { [weak self] in self?.togglePin() }
         docs.treeButton.action = { [weak self] in self?.toggleTree() }
         docs.reload.action = { [weak self] in self?.reloadArtifact() }
-        docs.external.action = { [weak self] in self?.openInBrowser() }
     }
 
     /// Each tab with its session's title and state; a plain terminal's with its name.

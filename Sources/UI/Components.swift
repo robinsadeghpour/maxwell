@@ -236,7 +236,7 @@ final class MXButton: MXView, TipSource {
 
 /// Square icon button for the title bar (plus, palette, gear), drawn as line art.
 final class IconButton: MXView, TipSource {
-    enum Icon { case plus, gear, palette, pin, tree, close, search, more, reload, external, sidebarLeft, sidebarRight }
+    enum Icon { case plus, gear, palette, tree, close, search, more, reload, sidebarLeft, sidebarRight }
     let icon: Icon
     var tip: Tip
     var action: (() -> Void)?
@@ -291,10 +291,6 @@ final class IconButton: MXView, TipSource {
             p.appendRoundedRect(NSRect(x: c.x - 6, y: c.y - 5, width: 12, height: 10), xRadius: 2, yRadius: 2)
             p.move(to: NSPoint(x: c.x - 3.5, y: c.y - 1.5)); p.line(to: NSPoint(x: c.x - 1.5, y: c.y)); p.line(to: NSPoint(x: c.x - 3.5, y: c.y + 1.5))
             p.move(to: NSPoint(x: c.x, y: c.y + 2)); p.line(to: NSPoint(x: c.x + 3, y: c.y + 2))
-        case .pin:
-            p.move(to: NSPoint(x: c.x, y: c.y + 6)); p.line(to: NSPoint(x: c.x, y: c.y + 1))
-            p.appendRoundedRect(NSRect(x: c.x - 3, y: c.y - 6, width: 6, height: 5), xRadius: 1, yRadius: 1)
-            p.move(to: NSPoint(x: c.x - 5, y: c.y + 1)); p.line(to: NSPoint(x: c.x + 5, y: c.y + 1))
         case .tree:
             p.move(to: NSPoint(x: c.x - 5, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y + 4)); p.line(to: NSPoint(x: c.x - 1, y: c.y + 4))
             p.move(to: NSPoint(x: c.x - 5, y: c.y - 1)); p.line(to: NSPoint(x: c.x - 1, y: c.y - 1))
@@ -315,11 +311,6 @@ final class IconButton: MXView, TipSource {
             p.appendArc(withCenter: c, radius: 5, startAngle: 20, endAngle: 290)
             let tip = NSPoint(x: c.x + 1.7, y: c.y - 4.7)
             p.move(to: NSPoint(x: c.x - 0.6, y: c.y - 7.4)); p.line(to: tip); p.line(to: NSPoint(x: c.x - 0.9, y: c.y - 2.6))
-        case .external:
-            p.move(to: NSPoint(x: c.x - 1, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y + 5))
-            p.line(to: NSPoint(x: c.x + 5, y: c.y + 5)); p.line(to: NSPoint(x: c.x + 5, y: c.y + 1))
-            p.move(to: NSPoint(x: c.x - 1, y: c.y + 1)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5))
-            p.move(to: NSPoint(x: c.x + 1.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 1.5))
         case .sidebarLeft, .sidebarRight:
             drawSideIcon(p, at: c)
         case .close:

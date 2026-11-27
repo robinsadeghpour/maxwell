@@ -44,6 +44,8 @@ final class TitleBar: MXView, TipSource {
     var fullScreen = false { didSet { needsDisplay = true; needsLayout = true } }
     private var leftInset: CGFloat { (fullScreen ? 8 : 84) + (leftToggle.isHidden ? 0 : 30) }
     private static let maxTab: CGFloat = 220, plusWidth: CGFloat = 30
+    /// Between the viewer's buttons and search, settings and the right side's button.
+    private static let gap: CGFloat = 10
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -78,7 +80,7 @@ final class TitleBar: MXView, TipSource {
         plus.isHidden = docs == .filling
         plus.frame = NSRect(x: (rects.last?.maxX ?? leftInset) + 2, y: y, width: 26, height: Metrics.control)
         docTabs?.isHidden = split == nil
-        if let s = split { docTabs?.frame = NSRect(x: s + 1, y: 0, width: max(0, buttonsStart - 4 - s - 1), height: bounds.height) }
+        if let s = split { docTabs?.frame = NSRect(x: s + 1, y: 0, width: max(0, buttonsStart - Self.gap - s - 1), height: bounds.height) }
     }
 
     private func tabRects() -> [NSRect] {

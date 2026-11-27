@@ -120,8 +120,7 @@ final class RootView: MXView {
         status.onPanel = { [weak self] p in self?.onStripe?(p) }
         viewerPane.onTreeWidth = { [weak self] w in self?.panels.treeWidth = w }
         titleBar.docTabs = viewerPane.header
-        let more = viewerPane.header.more
-        more.action = { [weak self, weak more] in if let more { self?.showMenu(for: .viewer, below: more) } }
+        viewerPane.header.panelMenu = { [weak self] in self?.menu(for: .viewer) ?? NSMenu() }
         railReveal.step = { [weak self] _ in self?.needsLayout = true }
         maxTween.duration = 0.2
         maxTween.step = { [weak self] _ in self?.needsLayout = true }
