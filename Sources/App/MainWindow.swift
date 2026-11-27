@@ -1031,6 +1031,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if v.tabs.isEmpty { viewerForced = nil }
         syncViewer()
         if case .fill = a { root.toggleFill(.panel(.right)) }
+        // The tab waiting beside a session that fills the window: a click brings the split back.
+        if case .select = a, root.filling == .session { root.filling = nil }
     }
 
     /// A web link from a session's terminal or file: an artifact opens beside the session, signed in

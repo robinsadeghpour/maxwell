@@ -14,28 +14,53 @@ final class ViewerHeader: MXView {
     var onKeepToggle: (() -> Void)?
     /// The viewer's panel menu (hide, fill the window), which ⋯ ends with.
     var panelMenu: (() -> NSMenu)?
+    /// The session fills the window: only the tab on show, after the line, and no buttons. A click
+    /// on it brings the split back.
+    var peek = false { didSet { if peek != oldValue { refresh() } } }
     private var tabs = ViewerTabs()
+    private var account: Account?
+    private var folder = (has: false, shown: false)
     static let button: CGFloat = 28
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         [strip, treeButton, reload, more].forEach(addSubview)
-        strip.onAction = { [weak self] in self?.onTab?($0) }
-        strip.menuFor = { [weak self] in self?.menu(for: $0) ?? NSMenu() }
+        strip.onAction = { [weak self] a in
+            guard let self else { return }
+            self.onTab?(self.peek ? self.tabs.active.map(a.on) ?? a : a)
+        }
+        strip.menuFor = { [weak self] i in
+            guard let self else { return NSMenu() }
+            return self.menu(for: self.peek ? self.tabs.active ?? i : i)
+        }
         more.action = { [weak self] in self?.showMore() }
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    var hasTabs: Bool { !tabs.tabs.isEmpty }
+    /// The least room the row needs: the tab on show whole, ⌄ for the others, and the buttons.
+    var leastWidth: CGFloat {
+        strip.leastWidth + CGFloat([reload, treeButton, more].filter { !$0.isHidden }.count) * Self.button + 4
+    }
+
     func show(_ tabs: ViewerTabs, account: Account?, hasFolder: Bool, folderShown: Bool) {
         self.tabs = tabs
-        strip.tabs = Self.stripTabs(tabs, account: account)
-        strip.active = tabs.active
+        self.account = account
+        folder = (hasFolder, folderShown)
+        refresh()
+    }
+
+    private func refresh() {
+        let all = Self.stripTabs(tabs, account: account)
+        if peek, let a = tabs.active { strip.tabs = [all[a]]; strip.active = 0 } else { strip.tabs = all; strip.active = tabs.active }
         strip.isHidden = tabs.tabs.isEmpty
-        reload.isHidden = tabs.item?.artifact == nil
-        treeButton.isHidden = !hasFolder
-        treeButton.isOn = folderShown
-        treeButton.tip.text = folderShown ? "Hide the folder" : "Show the folder"
+        reload.isHidden = peek || tabs.item?.artifact == nil
+        treeButton.isHidden = peek || !folder.has
+        more.isHidden = peek
+        treeButton.isOn = folder.shown
+        treeButton.tip.text = folder.shown ? "Hide the folder" : "Show the folder"
         needsLayout = true
+        superview?.needsLayout = true
     }
 
     override func layout() {

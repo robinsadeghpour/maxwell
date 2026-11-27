@@ -11,16 +11,25 @@ final class TitleBar: MXView, TipSource {
     enum Docs: Equatable {
         /// No viewer on screen: the session tabs have the row.
         case none
-        /// The viewer beside the session: the row splits at the pane line, `x` in the title bar.
+        /// The viewer beside the session: the row splits at the pane line, `x` in the title bar, or
+        /// left of it when the documents need the room (`TitleRow`).
         case beside(at: CGFloat)
         /// The viewer fills the window: the session's own tab (to click back), then its documents.
         case filling
+        /// The session fills the window: its tabs, then the document on show (to click back).
+        case peek
     }
     var tabs: [Tab] = [] { didSet { needsLayout = true; needsDisplay = true } }
     var current: SessionID? { didSet { needsLayout = true; needsDisplay = true } }
-    var docs = Docs.none { didSet { if docs != oldValue { needsLayout = true; needsDisplay = true } } }
-    /// The viewer's tabs and buttons (`ViewerHeader`), placed after the line.
-    var docTabs: NSView? {
+    var docs = Docs.none {
+        didSet {
+            guard docs != oldValue else { return }
+            docTabs?.peek = docs == .peek
+            needsLayout = true; needsDisplay = true
+        }
+    }
+    /// The viewer's tabs and buttons, placed after the line.
+    var docTabs: ViewerHeader? {
         didSet {
             oldValue?.removeFromSuperview()
             if let v = docTabs { addSubview(v) }
@@ -38,14 +47,25 @@ final class TitleBar: MXView, TipSource {
     let leftToggle = IconButton(.sidebarLeft, tip: Tip("Show or hide the left panels", action: "toggle-left"))
     let rightToggle = IconButton(.sidebarRight, tip: Tip("Show or hide the right panels", action: "toggle-right"))
     private var hoverTab: Int?
+    private var hoverList = false
     /// Where search, settings and the right side's button begin.
     private var buttonsStart: CGFloat = 0
     /// Room for the traffic lights; full screen hides them, so the tabs start at the edge.
     var fullScreen = false { didSet { needsDisplay = true; needsLayout = true } }
     private var leftInset: CGFloat { (fullScreen ? 8 : 84) + (leftToggle.isHidden ? 0 : 30) }
-    private static let maxTab: CGFloat = 220, plusWidth: CGFloat = 30
+    private static let plusWidth: CGFloat = 30
     /// Between the viewer's buttons and search, settings and the right side's button.
     private static let gap: CGFloat = 10
+
+    /// The row as laid out: the line, the session tabs on show and where, and the ⌄ for the rest.
+    private struct Plan {
+        var split: CGFloat?
+        var shown: [Tab] = []
+        var rects: [NSRect] = []
+        var list: NSRect?
+        var hidden: [Tab] = []
+    }
+    private var plan = Plan()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -53,18 +73,6 @@ final class TitleBar: MXView, TipSource {
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
     required init?(coder: NSCoder) { fatalError() }
-
-    /// The tabs on show: all of them, or only the current session's while its viewer fills the window.
-    private var shownTabs: [Tab] { docs == .filling ? tabs.filter { $0.id == current } : tabs }
-
-    /// Where the line between the session's tabs and its documents is, if there is one.
-    private var split: CGFloat? {
-        switch docs {
-        case .none: return nil
-        case .beside(let x): return min(x, buttonsStart)
-        case .filling: return leftInset + (shownTabs.isEmpty ? 0 : Self.maxTab)
-        }
-    }
 
     override func layout() {
         super.layout()
@@ -76,65 +84,84 @@ final class TitleBar: MXView, TipSource {
             b.frame = NSRect(x: x, y: y, width: 26, height: Metrics.control)
         }
         buttonsStart = x
-        let rects = tabRects()
+        plan = makePlan()
         plus.isHidden = docs == .filling
-        plus.frame = NSRect(x: (rects.last?.maxX ?? leftInset) + 2, y: y, width: 26, height: Metrics.control)
-        docTabs?.isHidden = split == nil
-        if let s = split { docTabs?.frame = NSRect(x: s + 1, y: 0, width: max(0, buttonsStart - Self.gap - s - 1), height: bounds.height) }
+        plus.frame = NSRect(x: (plan.list ?? plan.rects.last)?.maxX ?? leftInset, y: y, width: 26, height: Metrics.control).offsetBy(dx: 2, dy: 0)
+        docTabs?.isHidden = plan.split == nil
+        if let s = plan.split { docTabs?.frame = NSRect(x: s + 1, y: 0, width: max(0, buttonsStart - Self.gap - s - 1), height: bounds.height) }
+        needsDisplay = true
     }
 
-    private func tabRects() -> [NSRect] {
-        let shown = shownTabs
-        let end = split ?? buttonsStart - 8
-        let avail = end - leftInset - (docs == .filling ? 0 : Self.plusWidth)
-        guard !shown.isEmpty, avail > 0 else { return [] }
-        let w = min(Self.maxTab, avail / CGFloat(shown.count))
-        return shown.indices.map { NSRect(x: leftInset + CGFloat($0) * w, y: 0, width: w, height: bounds.height - 1) }
+    private func makePlan() -> Plan {
+        let end = buttonsStart - Self.gap, least = docTabs?.leastWidth ?? 0
+        let h = bounds.height - 1
+        switch docs {
+        case .filling:
+            let mine = tabs.filter { $0.id == current }
+            return Plan(split: leftInset + (mine.isEmpty ? 0 : TitleRow.sessionMost), shown: mine,
+                        rects: mine.map { _ in NSRect(x: leftInset, y: 0, width: TitleRow.sessionMost, height: h) })
+        case .none, .beside, .peek:
+            var plan = Plan()
+            switch docs {
+            case .beside(let line): plan.split = TitleRow.split(line: line, start: leftInset, end: end, docsLeast: least, reserve: Self.plusWidth)
+            case .peek: plan.split = TitleRow.split(line: end - least, start: leftInset, end: end, docsLeast: least, reserve: Self.plusWidth)
+            default: plan.split = nil
+            }
+            let room = (plan.split ?? buttonsStart - 8) - Self.plusWidth - leftInset
+            let fit = TitleRow.sessions(count: tabs.count, current: tabs.firstIndex { $0.id == current }, room: room)
+            plan.shown = fit.shown.map { tabs[$0] }
+            plan.rects = fit.shown.indices.map { NSRect(x: leftInset + CGFloat($0) * fit.width, y: 0, width: fit.width, height: h) }
+            if fit.overflow {
+                plan.list = NSRect(x: leftInset + CGFloat(fit.shown.count) * fit.width, y: 0, width: TitleRow.list, height: h)
+                plan.hidden = tabs.indices.filter { !fit.shown.contains($0) }.map { tabs[$0] }
+            }
+            return plan
+        }
     }
 
     override func draw(_ r: NSRect) {
         t.hair.setFill()
-        // The documents draw their own bottom line, open under the active tab.
-        let docs = docTabs.flatMap { $0.isHidden ? nil : $0.frame }
-        NSRect(x: 0, y: bounds.height - 1, width: docs?.minX ?? bounds.width, height: 1).fill()
-        if let docs {
-            NSRect(x: docs.maxX, y: bounds.height - 1, width: bounds.width - docs.maxX, height: 1).fill()
-            NSRect(x: docs.minX - 1, y: 0, width: 1, height: bounds.height).fill()
-        }
-        let rects = tabRects(), shown = shownTabs
-        for (i, tab) in shown.enumerated() {
-            let rr = rects[i]
-            let sel = tab.id == current
-            if sel { t.hover.setFill(); rr.fill() }
+        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+        if let s = plan.split { NSRect(x: s, y: 0, width: 1, height: bounds.height).fill() }
+        for (i, tab) in plan.shown.enumerated() {
+            let rr = plan.rects[i]
+            let sel = tab.id == current, hot = hoverTab == i
+            if sel { t.hover.setFill(); rr.fill() } else if hot { t.hover.withAlphaComponent(0.5).setFill(); rr.fill() }
             t.hair2.setFill()
             NSRect(x: rr.minX, y: 0, width: 1, height: rr.height).fill()
-            if i == shown.count - 1 { NSRect(x: rr.maxX - 1, y: 0, width: 1, height: rr.height).fill() }
+            if i == plan.shown.count - 1 { NSRect(x: rr.maxX - 1, y: 0, width: 1, height: rr.height).fill() }
             if let g = tab.group {
                 Glyph.draw(g, at: NSPoint(x: rr.minX + 16, y: rr.midY), color: t.color(for: g))
             } else {
                 Text.draw("❯", in: NSRect(x: rr.minX + 10, y: 0, width: 12, height: rr.height), color: sel ? t.fg : t.fg2, font: Fonts.mono(Metrics.fontSize - 1, .semibold), align: .center)
             }
-            let closeW: CGFloat = hoverTab == i ? 18 : 0
+            let closeW: CGFloat = hot ? 18 : 0
             Text.draw(tab.title, in: NSRect(x: rr.minX + 28, y: 0, width: rr.width - 36 - closeW, height: rr.height),
-                      color: sel ? t.fg : hoverTab == i ? t.fg2 : t.fg3)
-            if hoverTab == i {
-                Text.draw("×", in: NSRect(x: rr.maxX - 20, y: 0, width: 14, height: rr.height), color: t.fg3, align: .center)
-            }
+                      color: sel ? t.fg : hot ? t.fg2 : t.fg3)
+            if hot { Text.draw("×", in: NSRect(x: rr.maxX - 20, y: 0, width: 14, height: rr.height), color: t.fg3, align: .center) }
+        }
+        if let lr = plan.list {
+            if hoverList { t.hover.setFill(); NSBezierPath(roundedRect: lr.insetBy(dx: 2, dy: 6), xRadius: 4, yRadius: 4).fill() }
+            // A tab out of sight that needs you: ⌄ takes its colour.
+            let needs = plan.hidden.contains { $0.group == .needsYou }
+            ViewerTabStrip.drawList(in: lr, color: needs ? t.color(for: .needsYou) : hoverList ? t.fg : t.fg2)
         }
     }
 
     override func mouseMoved(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
-        let i = tabRects().firstIndex { $0.contains(p) }
-        if i != hoverTab { hoverTab = i; needsDisplay = true }
+        let i = plan.rects.firstIndex { $0.contains(p) }
+        let onList = plan.list?.contains(p) ?? false
+        if i != hoverTab || onList != hoverList { hoverTab = i; hoverList = onList; needsDisplay = true }
     }
-    override func mouseExited(with e: NSEvent) { hoverTab = nil; needsDisplay = true }
+    override func mouseExited(with e: NSEvent) { hoverTab = nil; hoverList = false; needsDisplay = true }
 
     /// A tab: the close mark, the state glyph, or the full title (tabs cut long ones short).
     func tip(at p: NSPoint) -> (tip: Tip, rect: NSRect)? {
-        let rects = tabRects()
+        if let lr = plan.list, lr.contains(p) { return (Tip("More tabs").adding("\(plan.hidden.count) out of sight"), lr) }
+        let rects = plan.rects
         guard let i = rects.firstIndex(where: { $0.contains(p) }) else { return nil }
-        let r = rects[i], tab = shownTabs[i]
+        let r = rects[i], tab = plan.shown[i]
         if p.x > r.maxX - 22 {
             let keeps = tab.group == nil ? "The terminal keeps running in the sidebar" : "The session keeps running"
             return (Tip("Close tab", action: tab.id == current ? "close-tab" : nil).adding(keeps), NSRect(x: r.maxX - 22, y: r.minY, width: 22, height: r.height))
@@ -146,14 +173,26 @@ final class TitleBar: MXView, TipSource {
 
     override func mouseDown(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
-        let rects = tabRects()
+        if let lr = plan.list, lr.contains(p) { return showHidden(below: lr) }
+        let rects = plan.rects
         guard let i = rects.firstIndex(where: { $0.contains(p) }) else {
             if e.clickCount == 2 { window?.performZoom(nil) } else { window?.performDrag(with: e) }
             return
         }
-        let id = shownTabs[i].id
+        let id = plan.shown[i].id
         if p.x > rects[i].maxX - 22 { onCloseTab?(id) } else if e.clickCount == 2 { onFill?(id) } else { onSelect?(id) }
     }
+    /// ⌄: the tabs out of sight; picking one shows it.
+    private func showHidden(below lr: NSRect) {
+        let m = NSMenu()
+        for tab in plan.hidden {
+            let item = MenuAction(tab.title) { [weak self] in self?.onSelect?(tab.id) }
+            item.state = tab.id == current ? .on : .off
+            m.addItem(item)
+        }
+        m.popUp(positioning: nil, at: NSPoint(x: lr.minX, y: lr.maxY + 2), in: self)
+    }
+
     override func mouseDragged(with e: NSEvent) {}
     override var mouseDownCanMoveWindow: Bool { false }
 }

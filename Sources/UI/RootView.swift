@@ -351,13 +351,15 @@ final class RootView: MXView {
         window?.invalidateCursorRects(for: self)
     }
 
-    /// The viewer's tabs head it in the title bar: right of the pane line beside the session, or
-    /// the whole row after the session's own tab while it fills the window.
+    /// The viewer's tabs head it in the title bar: right of the pane line beside the session, the
+    /// whole row after the session's own tab while it fills the window, and the tab on show alone
+    /// after the session tabs while the session fills it.
     private func docsPlace(line x: CGFloat, open: Bool) -> TitleBar.Docs {
         guard shown(.right).contains(.viewer) else { return .none }
         switch filling {
         case nil: return open ? .beside(at: x) : .none
         case .panel(.right)?: return .filling
+        case .session?: return viewerPane.header.hasTabs ? .peek : .none
         default: return .none
         }
     }
