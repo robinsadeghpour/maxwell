@@ -3,8 +3,8 @@ import AppKit
 /// What a viewer tab was asked to do: from a click, a drag or its menu.
 enum ViewerTabAction {
     case select(Int), close(Int), keep(Int), move(Int, Int), closeOthers(Int), closeAll, reveal(Int), copyPath(Int), openInBrowser(Int)
-    /// A double-click on a tab: the viewer fills the window, or comes back.
-    case fill
+    /// A double-click on a tab: it stops being the preview, and the viewer fills the window or comes back.
+    case fill(Int)
 }
 
 /// The viewer's tabs, the way VS Code and Cursor draw an editor's: one per open file or artifact,
@@ -256,7 +256,7 @@ final class ViewerTabStrip: MXView, TipSource {
         guard let i = index(at: p) else { return e.clickCount == 2 ? window?.performZoom(nil) ?? () : window?.performDrag(with: e) ?? () }
         let r0 = rects()[i]
         if closeRect(r0).contains(p) { return onAction?(.close(i)) ?? () }
-        if e.clickCount == 2 { return onAction?(.fill) ?? () }
+        if e.clickCount == 2 { return onAction?(.fill(i)) ?? () }
         onAction?(.select(i))
         // Drag to reorder: the tab follows the pointer and the others make room.
         while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
@@ -320,7 +320,7 @@ final class ViewerTabStrip: MXView, TipSource {
         let tab = tabs[i]
         var tip = Tip(tab.detail)
         if tab.unseen { tip = tip.adding("New since you last looked") }
-        if tab.preview { tip = tip.adding("Preview: the session's next file replaces it. ⌥⌘P keeps it") }
+        if tab.preview { tip = tip.adding("Preview: the session's next file replaces it. ⌥⌘P or a double-click keeps it") }
         return (tip, r)
     }
 }

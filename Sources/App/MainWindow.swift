@@ -1023,12 +1023,14 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         case .openInBrowser(let i):
             if let link = at(i)?.artifact, let acc = account(of: id) { openExternally(link.url, account: acc) }
             return
-        case .fill:
-            return root.toggleFill(.panel(.right))
+        case .fill(let i):
+            // You're reading it big: the session's next file mustn't replace it.
+            v.keep(i)
         }
         viewers[id] = v
         if v.tabs.isEmpty { viewerForced = nil }
         syncViewer()
+        if case .fill = a { root.toggleFill(.panel(.right)) }
     }
 
     /// A web link from a session's terminal or file: an artifact opens beside the session, signed in
