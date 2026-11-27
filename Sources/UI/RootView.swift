@@ -217,6 +217,7 @@ final class RootView: MXView {
         status.panels = panels.panels(.bottom, among: present).map {
             StatusBar.PanelToggle(panel: $0, title: title($0), open: shown(.bottom).contains($0))
         }
+        status.filled = filling != nil
         // Filling the window, the sides are out of play until it comes back.
         titleBar.leftToggle.isHidden = filling != nil || panels.panels(.left, among: present).isEmpty
         titleBar.rightToggle.isHidden = filling != nil || panels.panels(.right, among: present).isEmpty

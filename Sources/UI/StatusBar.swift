@@ -23,6 +23,8 @@ final class StatusBar: MXView, TipSource {
     private var actionRect: NSRect?
     /// "v0.1.7 ready · Restart to update", kept on the right until clicked.
     var update: String? { didSet { needsDisplay = true } }
+    /// Something fills the window: the hint says how to get the split back.
+    var filled = false { didSet { if filled != oldValue { needsDisplay = true } } }
     var onUpdate: (() -> Void)?
     private var updateRect: NSRect?
 
@@ -117,7 +119,7 @@ final class StatusBar: MXView, TipSource {
             updateRect = r
             return
         }
-        let hints = "J K move · ⏎ open · ⌘N new · ⌘K actions · ⇧⌘X close safe"
+        let hints = filled ? "⇧⌘↩ back to split" : "J K move · ⏎ open · ⌘N new · ⌘K actions · ⇧⌘X close safe"
         let hw = Text.width(hints, font: font)
         if bounds.width - hw - 10 > x {
             Text.draw(hints, in: NSRect(x: bounds.width - hw - 10, y: 1, width: hw, height: bounds.height - 1), color: t.fg3, font: font)
