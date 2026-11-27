@@ -11,8 +11,7 @@ final class TitleBar: MXView, TipSource {
     enum Docs: Equatable {
         /// No viewer on screen: the session tabs have the row.
         case none
-        /// The viewer beside the session: the row splits at the pane line, `x` in the title bar, or
-        /// left of it when the documents need the room (`TitleRow`).
+        /// The viewer beside the session: the row splits at the pane line, `x` in the title bar.
         case beside(at: CGFloat)
         /// The viewer fills the window: the session's own tab (to click back), then its documents.
         case filling
@@ -111,8 +110,8 @@ final class TitleBar: MXView, TipSource {
         case .none, .beside, .peek:
             var plan = Plan()
             switch docs {
-            case .beside(let line): plan.split = TitleRow.split(line: line, start: leftInset, end: end, docsLeast: least, reserve: Self.plusWidth)
-            case .peek: plan.split = TitleRow.split(line: end - least, start: leftInset, end: end, docsLeast: least, reserve: Self.plusWidth)
+            case .beside(let line): plan.split = line
+            case .peek: plan.split = TitleRow.peekSplit(start: leftInset, end: end, docsLeast: least, reserve: Self.plusWidth)
             default: plan.split = nil
             }
             let room = (plan.split ?? buttonsStart - 8) - Self.plusWidth - leftInset

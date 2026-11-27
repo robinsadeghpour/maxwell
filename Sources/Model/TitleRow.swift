@@ -1,19 +1,20 @@
 import CoreGraphics
 
 /// How the title bar's one row of tabs is shared between the session tabs (left of the line) and
-/// the current session's documents (right of it). The line sits where the viewer begins; when the
-/// documents can't show their tab on show whole there, it moves left, but never so far that the
-/// session tab on show gets narrower than `sessionLeast`. Session tabs that don't fit wait in ⌄.
+/// the current session's documents (right of it). Beside the viewer the line is the pane line: the
+/// documents live within the viewer's width, and a name too long for it is cut in the middle.
+/// Session tabs keep `sessionLeast`; those that don't fit wait in ⌄.
 enum TitleRow {
     static let sessionLeast: CGFloat = 120, sessionMost: CGFloat = 220
     /// The ⌄ that lists the session tabs out of sight.
     static let list: CGFloat = 26
 
-    /// Where the line between the groups goes. `line` is where the viewer begins, `start` where the
-    /// session tabs begin, `end` where the documents' room ends, and `docsLeast` the least they need.
-    /// `reserve` is what follows the session tabs (the + button).
-    static func split(line: CGFloat, start: CGFloat, end: CGFloat, docsLeast: CGFloat, reserve: CGFloat) -> CGFloat {
-        max(start + sessionLeast + reserve, min(line, end - docsLeast))
+    /// Where the line goes while the session fills the window and its document on show waits after
+    /// the session tabs: as far right as the document needs (`docsLeast`), leaving at least one
+    /// session tab and what follows them (`reserve`, the + button) room. `start` is where the session
+    /// tabs begin and `end` where the document's room ends.
+    static func peekSplit(start: CGFloat, end: CGFloat, docsLeast: CGFloat, reserve: CGFloat) -> CGFloat {
+        max(start + sessionLeast + reserve, end - docsLeast)
     }
 
     struct Sessions: Equatable {
