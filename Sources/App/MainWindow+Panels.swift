@@ -16,7 +16,7 @@ extension MainWindowController {
 
     /// A stripe or status bar button: an open panel closes, a closed one opens and takes focus.
     func stripeClicked(_ p: PanelID) {
-        guard root.isShown(p) else { return togglePanel(p) }
+        guard root.isShown(p), !root.fillHides(p) else { return togglePanel(p) }
         root.setHidden(p, true)
         if p == .viewer { viewerForced = nil }
         focusMain()
@@ -24,7 +24,10 @@ extension MainWindowController {
 
     /// ⌥⌘ number, JetBrains style: shows a hidden panel and focuses it; hides a focused one.
     func togglePanel(_ p: PanelID) {
-        if !root.isShown(p) {
+        if root.isShown(p), root.fillHides(p) {
+            // Hidden by what fills the window: everything comes back and it takes the keyboard.
+            focusPanel(p)
+        } else if !root.isShown(p) {
             root.setHidden(p, false)
             if p == .viewer, !root.viewerOpen { viewerForced = true; syncViewer() }
             focusPanel(p)
@@ -40,9 +43,12 @@ extension MainWindowController {
     /// The title bar's side buttons, ⌘B and ⌥⌘B: hide a side, or bring back what it last showed.
     func toggleSide(_ d: Dock) {
         if !root.shown(d).isEmpty {
-            if root.shown(d).contains(.viewer) { viewerForced = nil }
+            // A side the fill hides comes back as it was (toggleArea), and keeps what it shows.
+            let hides = !root.shown(d).contains { root.fillHides($0) }
+            if hides, root.shown(d).contains(.viewer) { viewerForced = nil }
             root.toggleArea(d)
-            return focusMain()
+            if hides { focusMain() }
+            return
         }
         let ps = root.panels.panels(d, among: root.present)
         guard let p = root.lastShown[d].flatMap({ ps.contains($0) ? $0 : nil }) ?? ps.first(where: \.flexible) ?? ps.first else { return }
@@ -54,14 +60,6 @@ extension MainWindowController {
         return fr.isDescendant(of: v)
     }
 
-    func focusPanel(_ p: PanelID) {
-        switch p {
-        case .sessions: focus(1)
-        case .viewer: focus(3)
-        default: if let v = root.content(p) as? PluginPanel { window?.makeFirstResponder(v) }
-        }
-    }
-
     func movePanel(_ p: PanelID, to d: Dock) {
         root.move(p, to: d)
         toast("\(root.title(p)) moved to the \(d.rawValue).")
@@ -69,29 +67,15 @@ extension MainWindowController {
 
     // MARK: filling the window
 
-    /// ⇧⌘↩: the side the focus is in fills the window, or comes back; from the terminal, the right side.
-    func toggleMaximize() {
-        if let m = root.maximized { return root.toggleMaximize(m) }
+    /// ⇧⌘↩: the half the keyboard is in fills the window (the session, the viewer or a plugin's
+    /// panel), or everything comes back.
+    func toggleFill() {
+        if root.filling != nil { root.filling = nil; return }
         let fr = window?.firstResponder as? NSView
-        let d = Dock.allCases.first { d in root.shown(d).contains { p in root.content(p).map { fr?.isDescendant(of: $0) == true } ?? false } }
-        let target = d.flatMap { root.shown($0).contains(where: \.canFill) ? $0 : nil } ?? [Dock.right, .bottom, .left].first { root.shown($0).contains(where: \.canFill) }
-        if let target { root.toggleMaximize(target) }
-    }
-
-    /// The keyboard follows: into the area that fills the window (the terminal behind it is hidden
-    /// and must not take typing), and back to where it was afterwards.
-    func maximizedChanged(_ d: Dock?) {
-        if let d {
-            let fr = window?.firstResponder as? NSView
-            focusBeforeMaximize = fr
-            let inside = root.shown(d).contains { p in root.content(p).map { fr?.isDescendant(of: $0) == true } ?? false }
-            if !inside, let p = root.shown(d).first { focusPanel(p) }
-            if !inside, let fr, fr.isDescendant(of: root.sessionPane) { window?.makeFirstResponder(root.content(root.shown(d).first ?? .viewer)) }
-        } else {
-            if let v = focusBeforeMaximize, v.window != nil { window?.makeFirstResponder(v) } else { focusMain() }
-            focusBeforeMaximize = nil
-        }
-        updateDim()
+        let holding = Dock.allCases.first { d in root.shown(d).contains { p in p.canFill && root.content(p).map { fr?.isDescendant(of: $0) == true } ?? false } }
+        if let d = holding { return root.toggleFill(.panel(d)) }
+        if current != nil { return root.toggleFill(.session) }
+        if let d = [Dock.right, .bottom, .left].first(where: { root.shown($0).contains(where: \.canFill) }) { root.toggleFill(.panel(d)) }
     }
 
     // MARK: plugin panels
@@ -109,6 +93,7 @@ extension MainWindowController {
             }
         }
         root.setPluginPanels(next)
+        keepKeyboardVisible()
         updateBadges()
     }
 
@@ -124,9 +109,11 @@ extension MainWindowController {
     }
 
     /// The stripe's marks: what needs you in each plugin panel, a stopped plugin, and a dot on the
-    /// viewer when a session opened something while another panel was on show.
+    /// viewer when a session opened something while another panel was on show, or on the lone doc
+    /// tab while the session fills the window.
     func updateBadges() {
-        if root.isShown(.viewer) { viewerNews = false }
+        if root.isShown(.viewer), root.filling != .session { viewerNews = false }
+        root.viewerPane.header.peekNews = viewerNews && root.filling == .session
         var b: [PanelID: Stripe.Badge] = [:]
         for (id, v) in root.pluginPanels {
             if v.stopped { b[id] = .warning } else if v.needsYou > 0 { b[id] = .count(v.needsYou) }
@@ -145,7 +132,7 @@ extension MainWindowController {
             list.append(Action(id: "panel-\(p.rawValue)", title: "\(root.title(p)) Panel", menu: "Panels",
                                shortcut: key.flatMap { Shortcut("cmd+alt+\($0)") }) { [weak self] in self?.togglePanel(p) })
         }
-        for p in PanelID.builtIn + plugins {
+        for p in PanelID.builtIn + plugins where p.movable {
             for d in Dock.allCases {
                 list.append(Action(id: "move-\(p.rawValue)-\(d.rawValue)", title: "Move \(root.title(p)) to \(d.title)", menu: "Panels") { [weak self] in self?.movePanel(p, to: d) })
             }

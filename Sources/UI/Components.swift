@@ -236,7 +236,7 @@ final class MXButton: MXView, TipSource {
 
 /// Square icon button for the title bar (plus, palette, gear), drawn as line art.
 final class IconButton: MXView, TipSource {
-    enum Icon { case plus, gear, palette, pin, tree, close, search, more, minimize, maximize, restore, reload, external, expand, collapse, sidebarLeft, sidebarRight }
+    enum Icon { case plus, gear, palette, tree, close, search, more, reload, sidebarLeft, sidebarRight }
     let icon: Icon
     var tip: Tip
     var action: (() -> Void)?
@@ -291,10 +291,6 @@ final class IconButton: MXView, TipSource {
             p.appendRoundedRect(NSRect(x: c.x - 6, y: c.y - 5, width: 12, height: 10), xRadius: 2, yRadius: 2)
             p.move(to: NSPoint(x: c.x - 3.5, y: c.y - 1.5)); p.line(to: NSPoint(x: c.x - 1.5, y: c.y)); p.line(to: NSPoint(x: c.x - 3.5, y: c.y + 1.5))
             p.move(to: NSPoint(x: c.x, y: c.y + 2)); p.line(to: NSPoint(x: c.x + 3, y: c.y + 2))
-        case .pin:
-            p.move(to: NSPoint(x: c.x, y: c.y + 6)); p.line(to: NSPoint(x: c.x, y: c.y + 1))
-            p.appendRoundedRect(NSRect(x: c.x - 3, y: c.y - 6, width: 6, height: 5), xRadius: 1, yRadius: 1)
-            p.move(to: NSPoint(x: c.x - 5, y: c.y + 1)); p.line(to: NSPoint(x: c.x + 5, y: c.y + 1))
         case .tree:
             p.move(to: NSPoint(x: c.x - 5, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y + 4)); p.line(to: NSPoint(x: c.x - 1, y: c.y + 4))
             p.move(to: NSPoint(x: c.x - 5, y: c.y - 1)); p.line(to: NSPoint(x: c.x - 1, y: c.y - 1))
@@ -309,25 +305,14 @@ final class IconButton: MXView, TipSource {
             (hover || isOn ? t.fg : t.fg2).setFill()
             for dx in [-4.5, 0, 4.5] { NSRect(x: c.x + CGFloat(dx) - 1, y: c.y - 1, width: 2, height: 2).fill() }
             return
-        case .minimize:
-            p.move(to: NSPoint(x: c.x - 4.5, y: c.y)); p.line(to: NSPoint(x: c.x + 4.5, y: c.y))
-        case .maximize:
-            p.move(to: NSPoint(x: c.x - 4.5, y: c.y + 2.5)); p.line(to: NSPoint(x: c.x, y: c.y - 2)); p.line(to: NSPoint(x: c.x + 4.5, y: c.y + 2.5))
-        case .restore:
-            p.move(to: NSPoint(x: c.x - 4.5, y: c.y - 2)); p.line(to: NSPoint(x: c.x, y: c.y + 2.5)); p.line(to: NSPoint(x: c.x + 4.5, y: c.y - 2))
         case .reload:
             // An open loop, most of the way round, with the arrowhead at its end (flipped view: y grows down).
             p.move(to: NSPoint(x: c.x + 5 * cos(.pi / 9), y: c.y + 5 * sin(.pi / 9)))
             p.appendArc(withCenter: c, radius: 5, startAngle: 20, endAngle: 290)
             let tip = NSPoint(x: c.x + 1.7, y: c.y - 4.7)
             p.move(to: NSPoint(x: c.x - 0.6, y: c.y - 7.4)); p.line(to: tip); p.line(to: NSPoint(x: c.x - 0.9, y: c.y - 2.6))
-        case .external:
-            p.move(to: NSPoint(x: c.x - 1, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y - 5)); p.line(to: NSPoint(x: c.x - 5, y: c.y + 5))
-            p.line(to: NSPoint(x: c.x + 5, y: c.y + 5)); p.line(to: NSPoint(x: c.x + 5, y: c.y + 1))
-            p.move(to: NSPoint(x: c.x - 1, y: c.y + 1)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5))
-            p.move(to: NSPoint(x: c.x + 1.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 5.5, y: c.y - 1.5))
-        case .expand, .collapse, .sidebarLeft, .sidebarRight:
-            drawPanelIcon(p, at: c)
+        case .sidebarLeft, .sidebarRight:
+            drawSideIcon(p, at: c)
         case .close:
             p.move(to: NSPoint(x: c.x - 4, y: c.y - 4)); p.line(to: NSPoint(x: c.x + 4, y: c.y + 4))
             p.move(to: NSPoint(x: c.x + 4, y: c.y - 4)); p.line(to: NSPoint(x: c.x - 4, y: c.y + 4))
@@ -335,28 +320,15 @@ final class IconButton: MXView, TipSource {
         p.stroke()
     }
 
-    /// The panel icons: fill the window and back, and the title bar's side toggles.
-    private func drawPanelIcon(_ p: NSBezierPath, at c: NSPoint) {
-        switch icon {
-        case .expand, .collapse:
-            // Two corners on a diagonal: pointing out to fill the window, in to come back.
-            let o: CGFloat = icon == .expand ? 5.5 : 1.5, i: CGFloat = icon == .expand ? 2 : 5
-            for s in [CGFloat(-1), 1] {
-                p.move(to: NSPoint(x: c.x + s * i, y: c.y - s * o)); p.line(to: NSPoint(x: c.x + s * o, y: c.y - s * o)); p.line(to: NSPoint(x: c.x + s * o, y: c.y - s * i))
-            }
-            p.move(to: NSPoint(x: c.x - 5.5, y: c.y + 5.5)); p.line(to: NSPoint(x: c.x - 1.5, y: c.y + 1.5))
-            p.move(to: NSPoint(x: c.x + 5.5, y: c.y - 5.5)); p.line(to: NSPoint(x: c.x + 1.5, y: c.y - 1.5))
-        case .sidebarLeft, .sidebarRight:
-            // A window with its side column; the column fills while that side is open.
-            let box = NSRect(x: c.x - 6.5, y: c.y - 5, width: 13, height: 10)
-            p.appendRoundedRect(box, xRadius: 2, yRadius: 2)
-            let x = icon == .sidebarLeft ? box.minX + 4.5 : box.maxX - 4.5
-            p.move(to: NSPoint(x: x, y: box.minY)); p.line(to: NSPoint(x: x, y: box.maxY))
-            if isOn {
-                (hover || isOn ? t.fg : t.fg2).setFill()
-                (icon == .sidebarLeft ? NSRect(x: box.minX, y: box.minY, width: 4.5, height: box.height) : NSRect(x: x, y: box.minY, width: 4.5, height: box.height)).fill()
-            }
-        default: break
+    /// The title bar's side toggles: a window with its side column, filled while that side is open.
+    private func drawSideIcon(_ p: NSBezierPath, at c: NSPoint) {
+        let box = NSRect(x: c.x - 6.5, y: c.y - 5, width: 13, height: 10)
+        p.appendRoundedRect(box, xRadius: 2, yRadius: 2)
+        let x = icon == .sidebarLeft ? box.minX + 4.5 : box.maxX - 4.5
+        p.move(to: NSPoint(x: x, y: box.minY)); p.line(to: NSPoint(x: x, y: box.maxY))
+        if isOn {
+            (hover || isOn ? t.fg : t.fg2).setFill()
+            (icon == .sidebarLeft ? NSRect(x: box.minX, y: box.minY, width: 4.5, height: box.height) : NSRect(x: x, y: box.minY, width: 4.5, height: box.height)).fill()
         }
     }
 }

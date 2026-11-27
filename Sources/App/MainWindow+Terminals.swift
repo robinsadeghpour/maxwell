@@ -152,9 +152,9 @@ extension MainWindowController {
         shells.remove(at: i).view.removeFromSuperview()
         shellNames[id] = nil
         if let key = shellOutputs.removeValue(forKey: id) { try? FileManager.default.removeItem(at: TerminalOutput.file(key, app: Self.appId)) }
-        visited.removeAll { $0 == id }
+        let next = tabRow.close(id)
         saveShells()
-        if current == id { current = shells.last?.id ?? visited.first }
+        if current == id { current = next ?? shells.last?.id }
         if let next = current { open(next) } else { render(store.state); syncViewer() }
     }
 
@@ -170,7 +170,7 @@ extension MainWindowController {
     /// Search finds terminals by name and folder.
     func terminalSearchItems() -> [SearchItem] {
         shellRows().map { row in
-            let recent = visited.firstIndex(of: row.id).map { 16 - $0 * 2 } ?? 0
+            let recent = tabRow.recent.firstIndex(of: row.id).map { 16 - $0 * 2 } ?? 0
             return SearchItem(kind: .terminal, title: row.title, fields: [(row.title, 3, ""), (row.detail, 2, "")],
                               detail: "terminal · \(row.detail)", boost: recent) { [weak self] in self?.open(row.id) }
         }

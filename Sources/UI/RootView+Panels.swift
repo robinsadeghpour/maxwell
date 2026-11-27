@@ -5,12 +5,12 @@ extension RootView {
 
     func menu(for p: PanelID) -> NSMenu {
         let m = NSMenu()
-        for d in Dock.allCases {
+        for d in Dock.allCases where p.movable {
             let i = MenuAction("Move to \(d.title)") { [weak self] in self?.move(p, to: d) }
             i.state = panels.place[p] == d ? .on : .off
             m.addItem(i)
         }
-        m.addItem(.separator())
+        if p.movable { m.addItem(.separator()) }
         let shownNow = isShown(p)
         let hide = MenuAction(shownNow ? "Hide \(title(p))" : "Show \(title(p))") { [weak self] in self?.setHidden(p, shownNow) }
         if let k = p.key {
@@ -25,7 +25,7 @@ extension RootView {
             m.addItem(area)
         }
         if let d = panels.place[p], shownNow, p.canFill {
-            let fill = MenuAction(maximized == d ? "Back to Normal Size" : "Fill the Window") { [weak self] in self?.toggleMaximize(d) }
+            let fill = MenuAction(filling == .panel(d) ? "Back to Normal Size" : "Fill the Window") { [weak self] in self?.toggleFill(.panel(d)) }
             fill.keyEquivalent = "\r"
             fill.keyEquivalentModifierMask = [.command, .shift]
             m.addItem(fill)
@@ -46,6 +46,7 @@ extension RootView {
 
     /// Drag a panel by its header: the area under the pointer lights up; release to move it there.
     func dragPanel(_ p: PanelID, from e: NSEvent) {
+        guard p.movable else { return }
         let start = convert(e.locationInWindow, from: nil)
         var target: Dock?
         var started = false
@@ -93,17 +94,20 @@ extension RootView {
         var l = panels
         if hide { l.hidden.insert(p) } else { l.show(p, among: present) }
         panels = l
-        // A panel shown on another side while one fills the window: back to normal so it can be seen.
-        if let m = maximized, shown(m).isEmpty || (!hide && l.place[p] != m) { maximized = nil }
+        // A panel shown while something else fills the window: back to normal so it can be seen.
+        if !hide, let f = filling, l.place[p] != f.dock { filling = nil }
+        endFillIfEmpty()
     }
 
     func move(_ p: PanelID, to d: Dock) {
-        maximized = nil
+        filling = nil
         panels.move(p, to: d, among: present)
     }
 
     /// Hides every panel of an area, or shows them all again.
     func toggleArea(_ d: Dock) {
+        // Hidden by what fills the window, a side comes back as it was rather than going for good.
+        if shown(d).contains(where: { fillHides($0) }) { filling = nil; return }
         let ps = panels.panels(d, among: present)
         guard !ps.isEmpty else { return }
         let anyShown = ps.contains { !panels.hidden.contains($0) }
@@ -112,22 +116,67 @@ extension RootView {
         // Shown again, a side still shows one list or document: the first in order.
         if !anyShown, d != .bottom, let first = ps.first(where: \.flexible) { l.show(first, among: present) }
         panels = l
-        if anyShown, maximized == d { maximized = nil }
+        // Hidden, an area that filled the window gives it back; shown, it ends whatever else fills it.
+        if filling != nil, anyShown ? filling == .panel(d) : filling != .panel(d) { filling = nil }
     }
 
-    func toggleMaximize(_ d: Dock) { maximized = maximized == d || !shown(d).contains(where: \.canFill) ? nil : d }
+    /// Fills the window with `f`, or goes back to normal when it already does.
+    func toggleFill(_ f: WindowFill) {
+        if filling == f { filling = nil; return }
+        if let d = f.dock, !shown(d).contains(where: \.canFill) { return }
+        filling = f
+    }
+
+    /// The viewer's tabs head it in the title bar: right of the pane line beside the session, the
+    /// whole row after the session's own tab while it fills the window, and the tab on show alone
+    /// after the session tabs while the session fills it.
+    func docsPlace(line x: CGFloat, open: Bool) -> TitleBar.Docs {
+        guard shown(.right).contains(.viewer) else { return .none }
+        switch filling {
+        case nil: return open ? .beside(at: x) : .none
+        case .panel(.right)?: return .filling
+        case .session?: return viewerPane.header.hasTabs ? .peek : .none
+        default: return .none
+        }
+    }
+
+    /// Whether what fills the window hides `p`; nil is the session pane.
+    func fillHides(_ p: PanelID?) -> Bool {
+        switch filling {
+        case nil: return false
+        case .session?: return p != nil
+        case .panel(let d)?: return p.map { panels.place[$0] != d } ?? true
+        }
+    }
+
+    /// An area that filled the window and has nothing left to show gives the window back.
+    func endFillIfEmpty() {
+        if let d = filling?.dock, shown(d).isEmpty { filling = nil }
+    }
 
     /// Esc that nothing else took: back to normal size.
     override func cancelOperation(_ sender: Any?) {
-        if maximized != nil { maximized = nil } else { nextResponder?.tryToPerform(#selector(cancelOperation(_:)), with: sender) }
+        if filling != nil { filling = nil } else { nextResponder?.tryToPerform(#selector(cancelOperation(_:)), with: sender) }
     }
 
-    /// While an area fills the window it is laid over the terminal's place and the other areas. The
-    /// terminal keeps its size, so the session doesn't reflow; it is only hidden until the area is
-    /// back. Returns whether an area fills (or is growing or shrinking).
-    func layoutMaximized(body: NSRect) -> Bool {
-        let active = maximized != nil || maxTween.isRunning
-        sessionPane.isHidden = active
+    /// What fills the window takes `whole`, the body without the rail, and the stripes step aside.
+    /// The session takes it at once (the terminal reflows); the other areas hide. An area grows over
+    /// the terminal and the other areas: the terminal keeps its size, so the session doesn't reflow;
+    /// it is only hidden until the area is back. Returns whether something fills (or is growing or shrinking).
+    func layoutFill(whole body: NSRect) -> Bool {
+        if filling == .session {
+            sessionPane.isHidden = false
+            sessionPane.frame = body
+            sessionDim.frame = body
+            for v in docks.values { v.isHidden = true }
+            for v in splitters.values { v.isHidden = true }
+            leftStripe.isHidden = true
+            rightStripe.isHidden = true
+            return true
+        }
+        let active = filling != nil || maxTween.isRunning
+        // Shrinking back, the session shows under the area at once, so it can take the keyboard back.
+        sessionPane.isHidden = filling != nil
         sessionDim.isHidden = active || sessionDim.isHidden
         guard active, maxTween.value > 0 else { return false }
         let k = maxTween.value, v = docks[growing]!, a = v.frame
@@ -136,6 +185,8 @@ extension RootView {
         v.isHidden = false
         for (d, o) in docks where d != growing { o.isHidden = true }
         for sp in splitters.values { sp.isHidden = true }
+        leftStripe.isHidden = true
+        rightStripe.isHidden = true
         return true
     }
 }

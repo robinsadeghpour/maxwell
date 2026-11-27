@@ -72,6 +72,9 @@ final class ViewerController: NSObject, WKNavigationDelegate {
         ])
     }
 
+    /// The page on show (the rendered file, the PDF, the preview or the artifact), which takes the keyboard.
+    var page: NSView? { body.subviews.first { !$0.isHidden } }
+
     private func show(_ v: NSView) {
         for s in body.subviews where s !== v { s.isHidden = true }
         if v.superview == nil {

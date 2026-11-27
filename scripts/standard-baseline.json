@@ -23,7 +23,7 @@
   "Sources/UI/Theme.swift": 1
  },
  "file-lines": {
-  "Sources/App/MainWindow.swift": 1773,
+  "Sources/App/MainWindow.swift": 1721,
   "Sources/App/Probes.swift": 543,
   "Sources/App/Store.swift": 623,
   "Sources/App/main.swift": 671,
@@ -34,8 +34,8 @@
  },
  "function-lines": {
   "Sources/App/MainWindow.swift::makeActions": 137,
-  "Sources/App/MainWindow.swift::render": 93,
-  "Sources/App/MainWindow.swift::wire": 106,
+  "Sources/App/MainWindow.swift::render": 88,
+  "Sources/App/MainWindow.swift::wire": 94,
   "Sources/App/main.swift::runTestHooks": 388,
   "Sources/Model/Reducer.swift::reduce": 98,
   "Sources/UI/ProjectLogo.swift::extract": 90,

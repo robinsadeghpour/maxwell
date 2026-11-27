@@ -218,14 +218,6 @@ final class SystemPanel: MXView, PanelContent, TipSource {
     static func percent(_ cpu: Double) -> String { String(format: cpu < 10 ? "%.1f%%" : "%.0f%%", cpu) }
 }
 
-extension ViewerPane: PanelContent {
-    /// The tabs take clicks and drags of their own; the empty header after them moves the panel.
-    var gripRect: NSRect {
-        NSRect(x: tabsEnd, y: 0, width: max(0, stripEnd - tabsEnd), height: Metrics.header)
-    }
-    func preferredExtent(along d: Dock) -> CGFloat? { nil }
-}
-
 extension Sidebar: PanelContent {
     var gripRect: NSRect { NSRect(x: 0, y: headerTop, width: max(0, bounds.width - 64), height: Metrics.header) }
     func preferredExtent(along d: Dock) -> CGFloat? { nil }

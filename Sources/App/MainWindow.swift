@@ -3,7 +3,7 @@ import AppKit
 final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWindowDelegate {
     let store: Store
     let root = RootView(frame: NSRect(x: 0, y: 0, width: 1440, height: 900))
-    private var terminals: [SessionID: TerminalView] = [:]
+    var terminals: [SessionID: TerminalView] = [:]
     private(set) var detached = Set<SessionID>()
     /// Voice mode (MainWindow+Voice): the mode, its orb, and its two shortcuts that work from any app.
     let voice = VoiceMode()
@@ -29,12 +29,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var shellOutputs: [String: String] = [:]
     /// Terminal sessions running in one of those terminals: the session's row stands in for the terminal's.
     var hosted: [SessionID: String] = [:]
-    private let terminalHosts = TerminalHosts()
+    let terminalHosts = TerminalHosts()
     /// The terminal a session runs in: its own attached one, or the Maxwell terminal hosting it.
     func terminal(for id: SessionID) -> TerminalView? { terminals[id] ?? hosted[id].flatMap(shell) }
     /// The terminal on screen when it is a plain one (test runs type into it).
     var shownShell: TerminalView? { shell(current) }
-    var visited: [SessionID] = []
+    /// The title bar's session and terminal tabs (MainWindow+Tabs).
+    var tabRow = TabRow()
     var current: SessionID?
     /// The conversation each session's `/resume` answer named and Maxwell already followed (MainWindow+ResumeElsewhere).
     var resumeFollowed: [SessionID: SessionID] = [:]
@@ -81,8 +82,9 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     var loadingLayout = false
     /// A session opened a file or artifact while another panel had the right side.
     var viewerNews = false
-    /// Where the keyboard was before a panel filled the window.
-    weak var focusBeforeMaximize: NSView?
+    /// Where the keyboard was before something filled the window.
+    weak var focusBeforeFill: NSView?
+    var pendingKeyboard: (target: KeyboardTarget, from: NSResponder?)?
 
     init(store: Store) {
         self.store = store
@@ -116,15 +118,15 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         w.delegate = self
         loadPanelLayout()
         root.onWidthsChanged = { [weak self] in self?.savePanelLayout() }
-        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.updateDim(); self?.updateBadges(); self?.systemDetail.dismiss() }
-        root.onSettled = { [weak self] in self?.updateDim() }
+        root.onLayoutChanged = { [weak self] in self?.savePanelLayout(); self?.keepKeyboardVisible(); self?.updateBadges(); self?.systemDetail.dismiss() }
+        root.onSettled = { [weak self] in self?.applyPendingKeyboard(); self?.updateDim() }
         root.onStripe = { [weak self] p in self?.stripeClicked(p) }
         ProjectLogos.shared.onChange = { [weak self] in
             guard let self else { return }
             self.root.rail.needsDisplay = true; self.root.sidebar.mark.needsDisplay = true
             if self.settings.window?.isVisible == true { self.settings.view.update(self.settingsModel) }
         }
-        w.onFocusChange = { [weak self] in self?.updateDim() }
+        w.onFocusChange = { [weak self, weak w] in self?.root.noteKeyboard(w?.firstResponder); self?.updateDim() }
         wire()
         restoreShells()
         TerminalHarness.start(self)
@@ -182,21 +184,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.rail.onPin = { [weak self] name, pin, at in self?.pin(name, pin, at: at) }
         root.rail.onConfig = { [weak self] k, v in self?.onConfigEdit?(k, v) }
         root.sidebar.tabs.onSelect = { [weak self] in self?.setScope($0) }
-        root.titleBar.onSelect = { [weak self] in self?.open($0) }
-        root.titleBar.onCloseTab = { [weak self] in self?.forget($0) }
-        root.titleBar.plus.action = { [weak self] in self?.showNewSession() }
-        root.titleBar.palette.action = { [weak self] in self?.showSearch() }
-        root.titleBar.gear.action = { [weak self] in self?.showSettings() }
-        root.titleBar.leftToggle.action = { [weak self] in self?.toggleSide(.left) }
-        root.titleBar.rightToggle.action = { [weak self] in self?.toggleSide(.right) }
-        root.onMaximized = { [weak self] in self?.maximizedChanged($0) }
+        wireTitleBar()
+        root.onFilling = { [weak self] in self?.fillingChanged($0) }
         root.sessionPane.delegate = self
-        root.viewerPane.pin.action = { [weak self] in self?.togglePin() }
-        root.viewerPane.treeButton.action = { [weak self] in self?.toggleTree() }
         // Browsing the tree previews, as in VS Code's explorer; a double-click or ⏎ keeps the tab.
         root.viewerPane.onTreeSelect = { [weak self] url, keep in self?.show(.file(url), for: self?.current, keep: keep) }
-        root.viewerPane.onTab = { [weak self] in self?.tabAction($0) }
-        root.viewerPane.onKeepToggle = { [weak self] in self?.togglePin() }
         root.viewerPane.onArtifactTitle = { [weak self] link, title in
             guard let self, let id = self.current else { return }
             self.viewers[id, default: ViewerTabs()].setTitle(title, for: link)
@@ -206,8 +198,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.viewerPane.viewer.onFileLink = { [weak self] url in self?.show(.file(url), for: self?.current, keep: false) }
         store.onChange = { [weak self] in self?.render($0); self?.voice.sessionsChanged(); self?.releaseVoiceTerminals() }
         store.onViewerItem = { [weak self] id, item, reload in self?.itemSeen(id, item, reload: reload) }
-        root.viewerPane.reload.action = { [weak self] in self?.reloadArtifact() }
-        root.viewerPane.external.action = { [weak self] in self?.openInBrowser() }
         root.viewerPane.viewer.artifact.onOpenExternal = { [weak self] url, a in self?.openExternally(url, account: a) }
         root.viewerPane.viewer.artifact.onArtifactLink = { [weak self] l in self?.show(.artifact(l, title: nil), for: self?.current, keep: false) }
         root.viewerPane.viewer.onLink = { [weak self] url in
@@ -319,12 +309,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.current = current
         root.status.counts = PhaseGroup.allCases.map { g in (g, all.first { $0.0 == g }?.1.count ?? 0) }
         root.status.warning = unverifiedWarning(state)
-        let terminalTabs = Dictionary(uniqueKeysWithValues: shellRows().map { ($0.id, $0.title) })
-        root.titleBar.tabs = visited.compactMap { id in
-            if let title = terminalTabs[id] { return TitleBar.Tab(id: id, title: title, group: nil) }
-            return state.sessions[id].map { TitleBar.Tab(id: id, title: $0.title, group: state.group($0, now: now, rules: rules) ?? .idle) }
-        }
-        root.titleBar.current = current
+        renderTabs(state, now: now)
         let s = current.flatMap { state.sessions[$0] ?? state.closed[$0]?.session }
         root.sessionPane.show(s, group: s.flatMap { state.group($0, now: now, rules: rules) },
                               blockers: s.map { state.checks($0, now: now, rules: rules).filter { $0.outcome != .pass }.map { "\($0.title): \($0.detail)" } } ?? [],
@@ -517,7 +502,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let fr = w.firstResponder as? NSView
         let inViewer = fr.map { $0.isDescendant(of: root.viewerPane) } ?? false
         let inSession = fr.map { $0.isDescendant(of: root.sessionPane) } ?? false
-        root.sessionDim.isHidden = inSession || current == nil || root.maximized != nil
+        root.sessionDim.isHidden = inSession || current == nil || root.filling != nil
         root.viewerDim.isHidden = inViewer || !root.isShown(.viewer)
     }
 
@@ -581,22 +566,24 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: sessions
 
-    func open(_ id: SessionID) {
-        root.maximized = nil  // another session: show it, not a panel over it
+    /// `keepingFill`: reattaching (a move, Resume) leaves what fills the window, and the keyboard with it.
+    func open(_ id: SessionID, keepingFill: Bool = false) {
+        // Another session, or this one from under a panel: it shows. Filling the window, it stays big.
+        if !keepingFill, root.filling != .session || id != current { root.filling = nil }
         if let t = shell(id) {
-            current = id
             remember(id)
+            current = id
             render(store.state)
             syncViewer()
-            window?.makeFirstResponder(t)
+            if !root.fillHides(nil) { giveKeyboard(.view(t)) }
             return
         }
         guard let s = store.state.sessions[id] else { return }
+        remember(id)
         current = id
         // Opening a session from another project switches the rail to it, so its row is in the list.
         let p = store.state.project(s, in: projects)
         if let sc = scope, sc != p { scope = p; UserDefaults.standard.set(p, forKey: "Maxwell.project") }
-        remember(id)
         // A session Claude Code stopped while idle starts again only when you ask (Resume, ⌘R),
         // so moving through the list doesn't wake every session it passes.
         let resume = resuming.remove(id) != nil
@@ -611,7 +598,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewerForced = nil
         render(store.state)
         showViewer(for: id)
-        if let t = terminal(for: id), !detached.contains(id) { window?.makeFirstResponder(t) }
+        if let t = terminal(for: id), !detached.contains(id), !root.fillHides(nil) { giveKeyboard(.view(t)) }
     }
 
     private func attach(_ s: Session, short: String, account a: Account) {
@@ -623,7 +610,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let id = s.id
         t.onExit = { [weak self] in
             self?.detached.insert(id)
-            if let self { self.render(self.store.state) }
+            if let self { self.render(self.store.state); self.keepKeyboardVisible() }
         }
         t.onOpenURL = { [weak self] url, cwd in self?.openURL(url, cwd: cwd, session: id) }
         // A plain click takes artifact links and files that exist; anything else goes to Claude Code.
@@ -647,33 +634,11 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if !due.isEmpty { mark("let go of \(due.count) terminal\(due.count == 1 ? "" : "s") off screen") }
     }
 
-    /// `claude` started in a Maxwell terminal: its row takes the terminal's place, and the pane
-    /// follows. When it exits, the terminal's row comes back and the pane goes back to it.
-    private func followHostedTerminals(_ state: AppState) {
-        let before = hosted
-        hosted = terminalHosts.hosts(Array(state.sessions.values), terminalIds: shells.map(\.id))
-        guard let c = current else { return }
-        if shell(c) != nil, let sid = hosted.first(where: { $0.value == c })?.key {
-            current = sid
-            visited.removeAll { $0 == sid }
-            visited.insert(sid, at: 0)
-        } else if hosted[c] == nil, let shellId = before[c], shell(shellId) != nil {
-            current = shellId
-        }
-    }
-
-    /// The tabs: what you opened last, newest first.
-    func remember(_ id: SessionID) {
-        visited.removeAll { $0 == id }
-        visited.insert(id, at: 0)
-        if visited.count > 8 { visited.removeLast() }
-    }
-
     func reattach(_ id: SessionID) {
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
         detached.remove(id)
         resuming.insert(id)
-        open(id)
+        open(id, keepingFill: true)
     }
 
     /// A session that now runs elsewhere (another account): its open terminal is attached to the old
@@ -686,16 +651,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
     /// Lets go of a session's terminal before its process stops (a move): the pane shows its last reply instead of the shell.
     func releaseTerminal(_ id: SessionID) {
         if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
-    }
-
-    /// Closing a tab frees its terminal; the session keeps running. A plain terminal keeps running
-    /// too, in its sidebar row.
-    func forget(_ id: SessionID) {
-        if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
-        visited.removeAll { $0 == id }
-        if current == id { current = visited.first }
-        render(store.state)
-        syncViewer()
     }
 
     func step(_ d: Int) {
@@ -988,7 +943,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let v = current.flatMap { viewers[$0] } ?? ViewerTabs()
         root.viewerPane.show(v, account: current.flatMap(account(of:)), reload: reload)
         root.setViewer(open: viewerForced ?? (v.item != nil), animated: window?.isVisible == true)
-        updateDim()
+        keepKeyboardVisible()
         updateBadges()
     }
 
@@ -1035,7 +990,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewers[id] = v
         if id == current {
             if moved { viewerForced = nil }
-            if !root.isShown(.viewer) { viewerNews = true }
+            if !root.isShown(.viewer) || root.filling == .session { viewerNews = true }
             syncViewer()
         }
     }
@@ -1049,12 +1004,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         guard id == current else { return }
         viewerForced = nil
         syncViewer()
-        // You opened it: it shows, even over Slack or with the right side hidden.
+        // You opened it: it shows, even over Slack, with the right side hidden or the session filling the window.
         if !root.isShown(.viewer) { root.setHidden(.viewer, false); updateBadges() }
+        if root.filling == .session { root.filling = nil }
     }
 
     /// A click, drag or menu choice on a viewer tab.
-    private func tabAction(_ a: ViewerTabAction) {
+    func tabAction(_ a: ViewerTabAction) {
         guard let id = current, var v = viewers[id] else { return }
         let at = { (i: Int) in v.tabs.indices.contains(i) ? v.tabs[i] : nil }
         switch a {
@@ -1075,10 +1031,16 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         case .openInBrowser(let i):
             if let link = at(i)?.artifact, let acc = account(of: id) { openExternally(link.url, account: acc) }
             return
+        case .fill(let i):
+            // You're reading it big: the session's next file mustn't replace it.
+            v.keep(i)
         }
         viewers[id] = v
         if v.tabs.isEmpty { viewerForced = nil }
         syncViewer()
+        if case .fill = a { root.toggleFill(.panel(.right)) }
+        // The tab waiting beside a session that fills the window: a click brings the split back.
+        if case .select = a, root.filling == .session { root.filling = nil }
     }
 
     /// A web link from a session's terminal or file: an artifact opens beside the session, signed in
@@ -1193,7 +1155,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: overlays, focus, toast
 
-    func toast(_ s: String) { root.status.show(toast: s) }
+    func toast(_ s: String, failed: Bool = false) { root.status.show(toast: s, failed: failed) }
 
     private var pluginSignature = ""
     private var pluginRun: [PluginID: PluginStatus.Run] = [:]
@@ -1233,7 +1195,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
                 let acct = state.account(s.accountId)?.name ?? s.accountId
                 let project = state.project(s, in: projects)
                 let files = Transcripts.path(s, account: state.account(s.accountId)).map { TouchedFiles.shared.files($0) } ?? []
-                let recent = visited.firstIndex(of: s.id).map { 16 - $0 * 2 } ?? 0
+                let recent = tabRow.recent.firstIndex(of: s.id).map { 16 - $0 * 2 } ?? 0
                 let boost = (g == .needsYou ? 30 : g == .yourTurn ? 20 : g == .working ? 4 : 0) + recent
                 items.append(SearchItem(kind: .session, title: s.title, fields: [
                     (s.title, 3, ""), (project, 2, ""), (s.branch ?? s.doneCheck?.branch ?? "", 2, "branch"), (acct, 1, ""),
@@ -1522,19 +1484,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if systemDetail.superview != nil { systemDetail.removeFromSuperview() }
     }
 
-    func focusMain() {
-        if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
-        else { window?.makeFirstResponder(root.sidebar.list) }
-    }
-
-    func focus(_ pane: Int) {
-        switch pane {
-        case 1: window?.makeFirstResponder(root.sidebar.list)
-        case 2: focusMain()
-        default: if root.viewerPane.viewer.current != nil || root.viewerPane.viewer.currentArtifact != nil { window?.makeFirstResponder(root.viewerPane.viewer.container.subviews.first { !$0.isHidden }) }
-        }
-    }
-
     /// Ghostty config from the theme tokens. In dark themes the terminal draws no background of
     /// its own, so the glass shows through. Light themes get an opaque paper sheet: Ghostty's
     /// minimum-contrast measures against the terminal's own background, and only then turns
@@ -1703,8 +1652,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "focus-terminal", title: "Focus Terminal", menu: "Panels", shortcut: Shortcut("cmd+alt+2")) { [weak self] in self?.focus(2) },
             Action(id: "toggle-left", title: "Show or Hide Left Panels", menu: "Panels", shortcut: Shortcut("cmd+b")) { [weak self] in self?.toggleSide(.left) },
             Action(id: "toggle-right", title: "Show or Hide Right Panels", menu: "Panels", shortcut: Shortcut("cmd+alt+b")) { [weak self] in self?.toggleSide(.right) },
-            Action(id: "maximize-panel", title: "Fill the Window with the Panel", menu: "Panels", shortcut: Shortcut("cmd+shift+return"),
-                   isChecked: { [weak self] in self?.root.maximized != nil }) { [weak self] in self?.toggleMaximize() },
+            Action(id: "maximize-panel", title: "Fill the Window", menu: "Panels", shortcut: Shortcut("cmd+shift+return"),
+                   isChecked: { [weak self] in self?.root.filling != nil }) { [weak self] in self?.toggleFill() },
             Action(id: "toggle-bottom", title: "Show or Hide Bottom Panel", menu: "Panels", shortcut: Shortcut("cmd+alt+j")) { [weak self] in self?.root.toggleArea(.bottom) },
             Action(id: "reset-panels", title: "Reset Panel Layout", menu: "Panels") { [weak self] in self?.root.panels = PanelLayout() },
             Action(id: "project-all", title: "All Projects: What Needs You", menu: "Projects", shortcut: Shortcut("cmd+0")) { [weak self] in self?.selectProject(0) },
@@ -1712,8 +1661,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "next-viewer-tab", title: "Next Viewer Tab", menu: "View", shortcut: Shortcut("cmd+alt+right")) { [weak self] in self?.stepViewerTab(1) },
             Action(id: "prev-viewer-tab", title: "Previous Viewer Tab", menu: "View", shortcut: Shortcut("cmd+alt+left")) { [weak self] in self?.stepViewerTab(-1) },
             Action(id: "viewer-tabs", title: "All Viewer Tabs…", menu: "View") { [weak self] in
-                guard let self, !self.root.viewerPane.strip.isHidden else { return }
-                self.root.viewerPane.strip.showList()
+                guard let self, !self.root.viewerPane.header.strip.isHidden else { return }
+                self.root.viewerPane.header.strip.showList()
             },
             Action(id: "pin", title: "Keep Viewer Tab Open", menu: "View", shortcut: Shortcut("cmd+alt+p"), isEnabled: hasCurrent) { [weak self] in self?.togglePin() },
             Action(id: "reload-artifact", title: "Reload Artifact", menu: "View", shortcut: Shortcut("cmd+alt+r"), isEnabled: hasArtifact) { [weak self] in self?.reloadArtifact() },

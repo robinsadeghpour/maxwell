@@ -62,7 +62,7 @@ extension MainWindowController {
         }) { [weak self] moved, failed in
             guard let self else { return }
             self.render(self.store.state)
-            self.toast(Self.outcome(moved: moved, failed: failed, skipped: skipped, account: account, from: { self.store.state.account($0)?.name ?? $0 }))
+            self.toast(Self.outcome(moved: moved, failed: failed, skipped: skipped, account: account, from: { self.store.state.account($0)?.name ?? $0 }), failed: !failed.isEmpty)
         }
     }
 

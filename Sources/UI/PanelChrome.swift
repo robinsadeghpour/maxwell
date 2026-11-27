@@ -1,48 +1,30 @@
 import AppKit
 
 
-/// The buttons on a panel's header: ⋯ options, ⤢ fill the window (⇧⌘↩, or double-click the
-/// header), and × to hide the panel.
+/// The ⋯ on a panel's header: move, hide, and fill the window (⇧⌘↩, or double-click the header).
 final class PanelControls: MXView {
     let panel: PanelID
     weak var root: RootView?
-    /// The panel's name, for the tips.
-    var title = "" { didSet { if title != oldValue { rebuild() } } }
-    var maximized = false { didSet { if maximized != oldValue { rebuild() } } }
-    private var buttons: [IconButton] = []
+    /// The panel's name, for the tip.
+    var title = "" { didSet { if title != oldValue { more.tip = Tip("Move or hide \(title)") } } }
+    private let more = IconButton(.more, tip: Tip("Move or hide"))
 
     init(panel: PanelID) {
         self.panel = panel
         super.init(frame: .zero)
-        rebuild()
+        more.action = { [weak self] in
+            guard let self else { return }
+            self.root?.showMenu(for: self.panel, below: self.more)
+        }
+        addSubview(more)
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    var preferredWidth: CGFloat { CGFloat(buttons.count) * 22 }
-
-    private func rebuild() {
-        buttons.forEach { $0.removeFromSuperview() }
-        let p = panel
-        buttons = [
-            IconButton(.more, tip: Tip("Move or hide \(title)")) { [weak self] in
-                guard let self, let b = self.buttons.first else { return }
-                self.root?.showMenu(for: p, below: b)
-            },
-        ]
-        if p.canFill { buttons.append(
-            IconButton(maximized ? .collapse : .expand, tip: Tip(maximized ? "Back to normal size" : "Fill the window", action: "maximize-panel")) { [weak self] in
-                guard let root = self?.root, let d = root.panels.place[p] else { return }
-                root.toggleMaximize(d)
-            }) }
-        buttons.append(
-            IconButton(.minimize, tip: Tip("Hide \(title)", action: "panel-\(p.rawValue)")) { [weak self] in self?.root?.setHidden(p, true) })
-        buttons.forEach(addSubview)
-        needsLayout = true
-    }
+    var preferredWidth: CGFloat { 22 }
 
     override func layout() {
         super.layout()
-        for (i, b) in buttons.enumerated() { b.frame = NSRect(x: CGFloat(i) * 22, y: 0, width: 22, height: bounds.height) }
+        more.frame = bounds
     }
 }
 
@@ -55,7 +37,7 @@ final class PanelGrip: NSView, TipSource {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
     override func mouseDown(with e: NSEvent) {
-        if e.clickCount == 2, panel.canFill, let root, let d = root.panels.place[panel] { return root.toggleMaximize(d) }
+        if e.clickCount == 2, panel.canFill, let root, let d = root.panels.place[panel] { return root.toggleFill(.panel(d)) }
         root?.dragPanel(panel, from: e)
     }
     override func rightMouseDown(with e: NSEvent) { root?.showMenu(for: panel, event: e) }

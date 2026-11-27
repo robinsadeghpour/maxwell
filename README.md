@@ -57,7 +57,7 @@ Maxwell takes each group from Claude Code's own record first: what the process s
 
 - **Projects stay separate.** A rail on the left, like the macOS Dock, switches between projects. Pinned projects always stay; the others appear while a session there is open. Each project shows its own logo, redrawn in Maxwell's style.
 - **The real session, in place.** The middle pane is the actual Claude session, attached in a Ghostty terminal. Closing Maxwell doesn't stop it.
-- **Files open beside the session, in tabs.** When a session writes or mentions a Markdown file, it opens on the right, rendered, in a preview tab that its next file replaces, like VS Code's. Click any file path in the session to give it a tab of its own; double-click a tab to keep it. Each tab keeps your place, a dot marks a tab with something new, ⌥⌘← → step through them, and they come back after a restart.
+- **Files open beside the session, in tabs.** When a session writes or mentions a Markdown file, it opens on the right, rendered, in a preview tab that its next file replaces, like VS Code's. Its tabs sit in the title bar over the viewer, right of the session tabs. Click any file path in the session to give it a tab of its own; ⌥⌘P keeps a preview tab, and a double-click on a tab keeps it and fills the window with the viewer. Each tab keeps your place, a dot marks a tab with something new, ⌥⌘← → step through them, and they come back after a restart.
 - **Artifacts too, in the right account.** When a session publishes a claude.ai artifact, it opens on the right, signed in to that session's account; a republish reloads it in place. Each account signs in once, on claude.ai's own page, and keeps its own login. Click an artifact link in the terminal to open it the same way, or ⇧⌘O for the account's browser profile or container.
 - **Cloud sessions too.** Sessions running on Anthropic's cloud machines sit in the same groups, marked cloud, with their claude.ai page in the pane. ⌥⌘N starts one, ⌥⌘↑ sends a session there (it commits, pushes and writes a brief first), ⌥⌘↓ brings one back into a fresh worktree. See [Cloud sessions](https://runmaxwell.com/docs/cloud).
 - **Answer out loud.** In voice mode (⌃⌥M, off until you turn it on) Maxwell says which session needs you and what it asks; your spoken reply is typed into it word for word. Hearing happens on your Mac.
@@ -103,13 +103,13 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘V | Paste text, copied files (as paths) or a screenshot (as an image) |
 | ⌘Z | Undo the last close |
 | ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |
-| ⇧⌘↩ | The panel you're in fills the window (or double-click its header); again, or Esc, to come back. Artifacts get big without leaving Maxwell |
+| ⇧⌘↩ | What you're in fills the window: the session, the viewer or a plugin panel (or double-click a session's or document's tab); again to come back (Esc too, for the viewer or a plugin panel). Artifacts get big without leaving Maxwell |
 | ⇧⌘T | Show or hide the session's folder beside the viewer's page; drag its edge to size it |
-| ⌥⌘P | Pin the current file or artifact |
+| ⌥⌘P | Keep the current file or artifact open (a double-click on its tab does too) |
 | ⌥⌘R, ⇧⌘O | Reload the artifact, open it in the account's browser |
 | ⇧⌘I | Show or hide Idle |
 | ⇧⌘L | Switch light and dark (View › Appearance: Light, Dark, Follow System) |
-| ⇧⌘O | Open the session's Linear ticket |
+| ⌘K › Open Ticket in Linear | Open the session's Linear ticket (⇧⌘O belongs to Open in Browser) |
 | ⌘, | Settings: General, Appearance, Accounts, Projects, Plugins, Keys, Advanced (⌘1–7 inside) |
 
 Every key can be changed with a `keybind` line in the config.

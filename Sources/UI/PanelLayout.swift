@@ -20,6 +20,8 @@ struct PanelID: RawRepresentable, Hashable, Codable {
     var key: Int? { [Self.sessions: 1, .viewer: 3, .usage: 4, .system: 5][self] }
     /// Lists and documents take what room there is; widgets take what they need.
     var flexible: Bool { self != .usage && self != .system }
+    /// The viewer is the right-hand half of the window, beside the session: it stays on the right.
+    var movable: Bool { self != .viewer }
     /// Documents and plugin lists fill the window; the session list and the widgets don't need to.
     var canFill: Bool { flexible && self != .sessions }
     /// Maxwell's own panels' names; a plugin panel's comes from its manifest.
@@ -29,6 +31,17 @@ struct PanelID: RawRepresentable, Hashable, Codable {
 enum Dock: String, CaseIterable, Codable {
     case left, right, bottom
     var title: String { rawValue.capitalized }
+}
+
+/// What fills the window (⇧⌘↩, or a double-click on a tab): one gesture for the session and the
+/// tool windows, like Ghostty's zoom and JetBrains' Maximize Tool Window. Kept in memory only.
+enum WindowFill: Equatable {
+    /// The session's terminal takes the whole body and every panel steps aside; the terminal reflows.
+    case session
+    /// The area showing a document or a plugin's list lies over the rest; the terminal keeps its size.
+    case panel(Dock)
+
+    var dock: Dock? { if case .panel(let d) = self { return d }; return nil }
 }
 
 /// Where every panel sits, which are hidden, and how big each area is.
@@ -60,6 +73,7 @@ struct PanelLayout: Codable, Equatable {
     }
 
     mutating func move(_ p: PanelID, to d: Dock, among present: Set<PanelID>) {
+        guard p.movable else { return }
         place[p] = d
         order.removeAll { $0 == p }
         order.append(p)
@@ -91,6 +105,8 @@ struct PanelLayout: Codable, Equatable {
     static func decode(_ d: Data) -> PanelLayout? {
         guard var l = try? JSONDecoder().decode(PanelLayout.self, from: d) else { return nil }
         for p in PanelID.builtIn where l.place[p] == nil { l.place[p] = PanelLayout().place[p]; l.order.append(p) }
+        // A layout saved while the viewer could still be moved gets it back on the right.
+        l.place[.viewer] = .right
         return l
     }
     func save(screen: String) {

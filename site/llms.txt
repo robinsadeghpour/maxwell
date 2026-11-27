@@ -18,7 +18,7 @@
 
 ## Workspace
 
-- [Panels and layout](https://www.runmaxwell.com/docs/panels): Sessions, viewer, usage, system and plugins are panels. Each can sit left, right or bottom, and collapse to a stripe.
+- [Panels and layout](https://www.runmaxwell.com/docs/panels): Sessions, usage, system and plugins are panels that sit left, right or bottom. The viewer stays on the right, beside its session.
 - [Files and artifacts](https://www.runmaxwell.com/docs/viewer): Files and claude.ai artifacts a session writes open on the right, beside the session that made them.
 - [Accounts and usage](https://www.runmaxwell.com/docs/accounts): Maxwell reads every Claude Code account on your Mac and shows how much room each one has left.
 - [Themes and appearance](https://www.runmaxwell.com/docs/appearance): Themes come in a light and dark pair and follow macOS. Graphite, Silver and Paper ship with Maxwell.
@@ -39,6 +39,7 @@
 
 ## Changelog
 
+- [One row of tabs, and one way to go big](https://www.runmaxwell.com/changelog/2026-11-27-one-row-of-tabs) (2026-11-27, v0.1.84)
 - [Limited sessions continue on another account, conversation and all](https://www.runmaxwell.com/changelog/2026-11-27-continue-on-another-account) (2026-11-27, v0.1.82 – 0.1.83)
 - [A file tree that looks like your editor's](https://www.runmaxwell.com/changelog/2026-11-26-file-tree-look) (2026-11-26, v0.1.81)
 - [Panel names on the window's edge again](https://www.runmaxwell.com/changelog/2026-11-26-edge-labels) (2026-11-26, v0.1.80)

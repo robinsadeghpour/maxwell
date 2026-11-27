@@ -17,17 +17,22 @@ final class StatusBar: MXView, TipSource {
     /// Where each count was drawn, for its tooltip.
     private var countRects: [(PhaseGroup, Int, NSRect)] = []
     private(set) var toast: String?
+    private var toastFailed = false
     private var toastTimer: Timer?
     /// A toast can carry one action ("Undo"), clickable while the toast shows.
     private(set) var toastAction: (title: String, run: () -> Void)?
     private var actionRect: NSRect?
     /// "v0.1.7 ready · Restart to update", kept on the right until clicked.
     var update: String? { didSet { needsDisplay = true } }
+    /// Something fills the window: the hint says how to get the split back.
+    var filled = false { didSet { if filled != oldValue { needsDisplay = true } } }
     var onUpdate: (() -> Void)?
     private var updateRect: NSRect?
 
-    func show(toast: String, action: (title: String, run: () -> Void)? = nil, seconds: TimeInterval = 6) {
+    /// `failed`: what was asked didn't happen, so it reads in the needs-you colour instead of green.
+    func show(toast: String, action: (title: String, run: () -> Void)? = nil, seconds: TimeInterval = 6, failed: Bool = false) {
         self.toast = toast
+        toastFailed = failed
         toastAction = action
         needsDisplay = true
         toastTimer?.invalidate()
@@ -94,7 +99,7 @@ final class StatusBar: MXView, TipSource {
         if let toast {
             let room = max(0, bounds.width - x - 360)
             let aw = toastAction.map { Text.width($0.title, font: Fonts.mono(Metrics.fontSize - 1, .semibold)) + 16 } ?? 0
-            x += Text.draw(toast, in: NSRect(x: x, y: 1, width: max(0, room - aw), height: bounds.height - 1), color: t.safe, font: font) + 8
+            x += Text.draw(toast, in: NSRect(x: x, y: 1, width: max(0, room - aw), height: bounds.height - 1), color: toastFailed ? t.on : t.safe, font: font) + 8
             if let a = toastAction {
                 let r = NSRect(x: x, y: 3, width: aw, height: bounds.height - 6)
                 t.hover.setFill(); NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4).fill()
@@ -117,7 +122,7 @@ final class StatusBar: MXView, TipSource {
             updateRect = r
             return
         }
-        let hints = "J K move · ⏎ open · ⌘N new · ⌘K actions · ⇧⌘X close safe"
+        let hints = filled ? "⇧⌘↩ back to split" : "J K move · ⏎ open · ⌘N new · ⌘K actions · ⇧⌘X close safe"
         let hw = Text.width(hints, font: font)
         if bounds.width - hw - 10 > x {
             Text.draw(hints, in: NSRect(x: bounds.width - hw - 10, y: 1, width: hw, height: bounds.height - 1), color: t.fg3, font: font)

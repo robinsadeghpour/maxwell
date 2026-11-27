@@ -217,11 +217,14 @@ project-logo = Acme ~/projects/acme/apps/web/app/icon.png</code></pre>
 
   panels: {
     title: "Panels and layout",
-    lede: "Sessions, viewer, usage, system and plugins are panels. Each can sit left, right or bottom, and collapse to a stripe.",
+    lede: "Sessions, usage, system and plugins are panels that sit left, right or bottom. The viewer stays on the right, beside its session.",
     figure: fig.panels(),
     body: `
 <h2>Move a panel</h2>
-<p>Drag a panel's header to another side. A panel's × collapses that panel alone to a thin stripe, and it opens again with one click. Panels remember their place on each screen, like tool windows in JetBrains IDEs.</p>
+<p>Drag a panel's header to another side, or pick a side from its ${k("⋯")} menu, which also hides it. A side with two or more panels shows a stripe of their names; click one to show or hide it. Panels remember their place on each screen, like tool windows in JetBrains IDEs. The viewer always sits on the right, with its tabs in the title bar.</p>
+<h2>Fill the window</h2>
+<p>${k("⇧ ⌘ ↩")} fills the window with what you're in: the session, the viewer or a plugin panel such as Linear. Double-click a session's tab to fill the window with the session, or a document's tab for the viewer. A plugin panel also fills from its ${k("⋯")} menu or a double-click on its header. ${k("⇧ ⌘ ↩")} again brings the split back, and so does clicking another session's tab. ${k("Esc")} also ends a fill of the viewer or a plugin panel; in the terminal, Esc belongs to Claude. While one half fills the window, the other keeps its tab on show in the title bar: click it to go back. The status bar says ${k("⇧ ⌘ ↩")} back to split.</p>
+<p>A key that goes to something the fill hides, like ${k("⌥ ⌘ 2")} for the terminal while the viewer fills the window, brings the split back first.</p>
 <h2>Toggle sides</h2>
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌘ B")}</td><td>Left panels</td></tr>
@@ -232,6 +235,8 @@ project-logo = Acme ~/projects/acme/apps/web/app/icon.png</code></pre>
 <p>Prefer ${k("⌘ J")} for the bottom panel, VS Code style? Rebind it:</p>
 <pre><code>keybind = cmd+j=toggle-bottom
 keybind = cmd+shift+j=next-needs-you</code></pre>
+<h2>Session tabs</h2>
+<p>The title bar has a tab for each session or terminal you opened, up to eight. A tab stays where it opened: a new one goes right after the tab on show, and going back to one never moves it. When the row is full, the tab you visited longest ago makes room. Close the tab on show and the one you visited before it comes back. In a narrow window, tabs that don't fit wait in ${k("⌄")} after the last one; it turns orange when one of them needs you.</p>
 <h2>The middle pane</h2>
 <p>The middle is always the attached Claude session, in a Ghostty terminal. ${k("⌘ −")} and ${k("⌘ =")} change the terminal's text size without touching the rest of the window.</p>`,
   },
@@ -244,13 +249,13 @@ keybind = cmd+shift+j=next-needs-you</code></pre>
 <h2>Markdown files</h2>
 <p>When a session writes or mentions a Markdown file, it opens in the viewer, rendered. Click any file path in a session's terminal to open it there too: the pointer turns into a hand and the path is underlined when Maxwell can find the file. Relative paths are looked up from the session's folder. In a terminal you opened yourself, ${k("⌘")}-click a path.</p>
 <h2>Tabs</h2>
-<p>The viewer keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Double-click the tab, or press ${k("⌥ ⌘ P")}, to keep it. While you're reading a tab you kept, the session's next file waits in a preview tab behind it.</p>
+<p>The viewer keeps each session's files and artifacts in tabs, the way VS Code and Cursor do. They sit in the title bar, right of the line where the viewer begins, followed by reload for an artifact, the folder and ${k("⋯")}. When they don't all fit, the others get narrower first, then wait in ${k("⌄")}. In a narrow window the folder and reload buttons move into ${k("⋯")}, the tabs may use empty title bar to the left, and only then is a long name shortened in the middle. A file the session opens goes into the preview tab, shown in italics, and its next file replaces it. Press ${k("⌥ ⌘ P")}, double-click the tab, or choose Keep Open from its menu or ${k("⋯")} to keep it. While you're reading a tab you kept, the session's next file waits in a preview tab behind it.</p>
 <p>A path you click gets a tab of its own. Files you click in the folder tree open in the preview tab. Click × or middle-click to close a tab, or press ${k("⌘ W")} while you're in the viewer. Drag tabs to reorder them. Right-click a tab for Close Others, Close All, Reveal in Finder and Copy Path.</p>
 <p>Each tab keeps your place: go back to it and it's scrolled where you left it. A tab that gets something new while you're on another one shows a purple dot. When the tabs don't fit, ${k("⌄")} at the end of the strip lists them all, and turns purple when a tab out of sight has something new. ${k("⌥ ⌘ ←")} and ${k("⌥ ⌘ →")} step through the tabs. Tabs come back when Maxwell restarts.</p>
 <h2>The folder</h2>
 <p>${k("⇧ ⌘ T")} shows the session's folder beside the page, and stays until you hide it. Drag its edge to size it; double-click the edge for the default width. Click a file to preview it, double-click it or press ${k("↩")} to give it a tab of its own, and click a folder to open or close it. Files a session writes appear as they land, files git ignores are dimmed, and the file on show is selected.</p>
 <h2>Full size</h2>
-<p>Press ${k("⇧ ⌘ ↩")}, click ⤢ in the viewer's header or double-click the header, and the viewer fills the window: a wide artifact, a long plan, without leaving Maxwell. The same again, or ${k("Esc")}, brings it back. The session keeps running behind it, at its own size. Any panel can do this, Linear and Slack included.</p>
+<p>Double-click a tab, or press ${k("⇧ ⌘ ↩")} while you're in the viewer, and it fills the window: a wide artifact, a long plan, without leaving Maxwell. The tab you double-clicked is kept, so the session's next file can't replace it. The same again, ${k("Esc")}, or a click on the session's tab brings it back. The session keeps running behind it, at its own size. The session itself can fill the window the same way, from its tab or with ${k("⇧ ⌘ ↩")} in the terminal.</p>
 <p>TSV and CSV files show as a table.</p>
 <h2>Artifacts</h2>
 <p>When a session publishes a claude.ai artifact, it opens in the viewer signed in as that session's account. Publishing it again reloads its tab in place. Click an artifact link in the terminal to open it the same way.</p>
@@ -327,7 +332,7 @@ motion = on                 <span class="c"># off: no slides or fades</span></co
 <p>First by branch: <code>robin/acme-56-billing-totals</code> is ACME-56. Linear's own branch format works, or any branch segment that starts with one of your team keys. When the branch says nothing, the plugin reads the transcript and links the ticket the session clearly worked on.</p>
 <h2>What it shows</h2>
 <ul>
-<li><strong>Row badge</strong>, like <code>ACME-56 · In Progress</code>. Green when done, amber when a move is suggested. Click opens the ticket, and so does ${k("⇧ ⌘ O")}.</li>
+<li><strong>Row badge</strong>, like <code>ACME-56 · In Progress</code>. Green when done, amber when a move is suggested. Click opens the ticket, and so does <strong>Open Ticket in Linear</strong> in ${k("⌘ K")}.</li>
 <li><strong>Safe to close</strong> gets "Linear ticket done". It passes when the ticket is Done, Canceled or Duplicate.</li>
 <li><strong>Linear panel</strong>: suggested moves first, then your tickets by status. Each line says how its sessions stand.</li>
 </ul>
@@ -437,13 +442,13 @@ linear.writes = live     <span class="c"># dry-run logs moves instead of sending
 <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
 <tr><td>${k("⌘ B")}, ${k("⌥ ⌘ B")}, ${k("⌥ ⌘ J")}</td><td>Toggle left, right, bottom panels</td></tr>
 <tr><td>${k("⌥ ⌘ 6")} – ${k("⌥ ⌘ 9")}</td><td>Plugin panels, in their order on the stripe (every one is in the Panels menu and ⌘K)</td></tr>
-<tr><td>${k("⇧ ⌘ ↩")}</td><td>The panel you're in fills the window, or comes back (also Esc, or double-click its header)</td></tr>
+<tr><td>${k("⇧ ⌘ ↩")}</td><td>What you're in fills the window: the session, the viewer or a plugin panel; again to come back (also a double-click on a session's or document's tab). Esc also ends a fill of the viewer or a plugin panel</td></tr>
 <tr><td>${k("⇧ ⌘ T")}</td><td>Show or hide the session's folder beside the viewer's page</td></tr>
 <tr><td>${k("⌥ ⌘ P")}</td><td>Keep the viewer tab open</td></tr>
 <tr><td>${k("⌥ ⌘ ←")} ${k("⌥ ⌘ →")}</td><td>Previous or next viewer tab</td></tr>
 <tr><td>${k("⌘ W")}</td><td>Close the viewer tab, when the viewer has focus</td></tr>
 <tr><td>${k("⌥ ⌘ R")}</td><td>Reload the artifact</td></tr>
-<tr><td>${k("⇧ ⌘ O")}</td><td>Open the artifact in the account's browser, or the session's Linear ticket</td></tr>
+<tr><td>${k("⇧ ⌘ O")}</td><td>Open the artifact in the account's browser</td></tr>
 <tr><td>${k("Esc")}</td><td>Close search, the palette or a panel</td></tr>
 </tbody></table>
 <h2>App</h2>

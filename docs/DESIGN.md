@@ -2,6 +2,13 @@
 
 Only what Robin has said or picked. Each entry has his words and the reason. Newest first.
 
+## 26 Nov 2026: one row of tabs, one way to go big
+
+- **Docs are tabs like sessions and terminals, and "big" is one gesture.** "why not treat full screen etc all as the same as the windows/tabs of terminals and sessions … thats also what jetbrains does right"
+  So: he picked variant B, two editor groups under one title row, with its defaults. The title bar splits at the line where the viewer begins: session and terminal tabs on the left, the session's documents and the viewer's buttons on the right, and the viewer loses its own tab row. ⇧⌘↩, or a double-click on any tab, fills the window with that half (the session, the viewer, or a plugin panel); again, or Esc, brings the split back, like zoom in Ghostty.
+- **Tabs stay where they are.** The title bar no longer moves the session you visit to the front: a new tab opens next to the one on show, as in JetBrains and VS Code.
+- **The viewer is the right-hand group.** It can't move to the left or the bottom any more.
+
 ## 25 Nov 2026: tool windows, the file tree, and making things big
 
 - **The side stripes go.** "I hate the plugins and viewer tabs on the right side, also usage system and session on the left always visible are ugly waste space there."
@@ -10,7 +17,7 @@ Only what Robin has said or picked. Each entry has his words and the reason. New
 - **The file tree has to work like Cursor, VS Code or JetBrains.** "The filetree is super duper bad … it randomly opens if I open widen the window … dont think its linear grade UI UX."
   So: the tree is a column you switch on or off and drag to size. The window's width never changes it.
 - **Artifacts get big inside Maxwell.** "I hate that I cant open artifacts wider or open in big without opening the browser and leaving maxwell … jetbrains didnt work that way."
-  So: any panel fills the window (⇧⌘↩, its ⤢ button, or a double-click on its header), like JetBrains' Maximize Tool Window.
+  So: any panel fills the window (⇧⌘↩, its ⤢ button, or a double-click on its header), like JetBrains' Maximize Tool Window. On 26 Nov this became one fill for the session and the panels, without the ⤢ button (above).
 
 ## 13 Nov 2026, late night: picked the Slack-style rail (variant A), with changes
 

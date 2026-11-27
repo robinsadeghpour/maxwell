@@ -36,7 +36,7 @@ final class RootView: MXView {
         pluginPanels = new
         var l = panels
         for id in new.keys.sorted(by: { $0.rawValue < $1.rawValue }) { l.adopt(id) }
-        if let m = maximized, shown(m).isEmpty { maximized = nil }
+        endFillIfEmpty()
         if l != panels { panels = l } else { sync(animated: window != nil) }
     }
     /// The list or document each side showed last, for bringing the side back.
@@ -51,8 +51,8 @@ final class RootView: MXView {
     private let textTint = CALayer()
     static let textFloor: CGFloat = 0.72
     private(set) var docks: [Dock: DockView] = [:]
-    private let leftStripe = Stripe(side: .left)
-    private let rightStripe = Stripe(side: .right)
+    let leftStripe = Stripe(side: .left)
+    let rightStripe = Stripe(side: .right)
     let drop = DropPreview(frame: .zero)
     private let railLine = Fill { $0.hair }
     private var reveal: [Dock: Tween] = [:]
@@ -82,6 +82,15 @@ final class RootView: MXView {
     static let railEdge: CGFloat = 10
     private let railHandle = RailHandle(frame: .zero)
     private var lastPointer = NSPoint(x: 999, y: 0)
+
+    /// The part of the window that last had the keyboard: where it goes back when AppKit takes it
+    /// from a view that hid (MainWindow+Keyboard).
+    private(set) var keyboardHome: KeyboardHome?
+    func noteKeyboard(_ r: NSResponder?) {
+        guard let v = r as? NSView else { return }
+        if v.isDescendant(of: sessionPane) { keyboardHome = v is TerminalView ? .terminal : .sessionPane; return }
+        if let p = present.first(where: { content($0).map(v.isDescendant) ?? false }) { keyboardHome = .panel(p) }
+    }
 
     /// Whether the viewer has something to show (a file, or ⌘\ forced it open).
     private(set) var viewerOpen = false
@@ -119,6 +128,8 @@ final class RootView: MXView {
         }
         status.onPanel = { [weak self] p in self?.onStripe?(p) }
         viewerPane.onTreeWidth = { [weak self] w in self?.panels.treeWidth = w }
+        titleBar.docTabs = viewerPane.header
+        viewerPane.header.panelMenu = { [weak self] in self?.menu(for: .viewer) ?? NSMenu() }
         railReveal.step = { [weak self] _ in self?.needsLayout = true }
         maxTween.duration = 0.2
         maxTween.step = { [weak self] _ in self?.needsLayout = true }
@@ -167,11 +178,11 @@ final class RootView: MXView {
     func setViewer(open: Bool, animated: Bool = true) {
         guard open != viewerOpen else { return }
         viewerOpen = open
-        if let m = maximized, shown(m).isEmpty { maximized = nil }
+        endFillIfEmpty()
         sync(animated: animated)
     }
 
-    /// Each panel's header grip and its ⋯ ⤢ × buttons, made the first time the panel shows.
+    /// Each panel's header grip and its ⋯ button, made the first time the panel shows.
     private func chrome(_ p: PanelID) -> (PanelGrip, PanelControls) {
         if let g = grips[p], let c = controls[p] { return (g, c) }
         let g = PanelGrip(panel: p), c = PanelControls(panel: p)
@@ -187,9 +198,11 @@ final class RootView: MXView {
             let want = shown(d)
             for p in want {
                 guard let v = content(p) else { continue }
+                if v.superview !== dock { dock.addSubview(v) }
+                // The viewer's tabs and ⋯ are in the title bar.
+                guard p != .viewer else { continue }
                 let (g, c) = chrome(p)
                 c.title = title(p)
-                if v.superview !== dock { dock.addSubview(v) }
                 if g.superview !== dock { dock.addSubview(g) }
                 if c.superview !== dock { dock.addSubview(c) }
             }
@@ -213,8 +226,10 @@ final class RootView: MXView {
         status.panels = panels.panels(.bottom, among: present).map {
             StatusBar.PanelToggle(panel: $0, title: title($0), open: shown(.bottom).contains($0))
         }
-        titleBar.leftToggle.isHidden = panels.panels(.left, among: present).isEmpty
-        titleBar.rightToggle.isHidden = panels.panels(.right, among: present).isEmpty
+        status.filled = filling != nil
+        // Filling the window, the sides are out of play until it comes back.
+        titleBar.leftToggle.isHidden = filling != nil || panels.panels(.left, among: present).isEmpty
+        titleBar.rightToggle.isHidden = filling != nil || panels.panels(.right, among: present).isEmpty
         titleBar.leftToggle.isOn = !shown(.left).isEmpty
         titleBar.rightToggle.isOn = !shown(.right).isEmpty
         titleBar.needsLayout = true
@@ -310,7 +325,6 @@ final class RootView: MXView {
             v.grips = grips
             v.controls = controls
             v.split = panels.split?[d]
-            v.maximized = maximized == d
             v.isHidden = v.frame.width <= 0 || v.frame.height <= 0
             v.needsLayout = true
             v.needsDisplay = true
@@ -334,12 +348,14 @@ final class RootView: MXView {
         sr.frame = NSRect(x: x1 - rwid - hit / 2, y: top, width: hit + 1, height: bodyH)
         sb.frame = NSRect(x: cx0, y: bottom - bh - hit / 2, width: cx1 - cx0, height: hit + 1)
 
-        let filled = layoutMaximized(body: NSRect(x: x0, y: top, width: x1 - x0, height: bodyH))
+        let railEnd: CGFloat = railMode == .shown ? rw + 1 : 0
+        let filled = layoutFill(whole: NSRect(x: railEnd, y: top, width: w - railEnd, height: bodyH))
         drawsLines = filled ? [] : (lw > 0 ? [NSRect(x: x0 + lw - 1, y: top, width: 1, height: bodyH)] : [])
             + (rwid > 0 ? [NSRect(x: x1 - rwid, y: top, width: 1, height: bodyH)] : [])
             + (bh > 0 ? [NSRect(x: cx0, y: bottom - bh, width: cx1 - cx0, height: 1)] : [])
         drawsLines += [leftStripe.isHidden ? nil : NSRect(x: leftStripe.frame.maxX, y: top, width: 1, height: bodyH),
                        rightStripe.isHidden ? nil : NSRect(x: rightStripe.frame.minX - 1, y: top, width: 1, height: bodyH)].compactMap { $0 }
+        titleBar.docs = docsPlace(line: x1 - rwid, open: rwid > 0)
         planeRect = NSRect(x: 0, y: top, width: railMode == .shown ? rw + 1 : 0, height: bodyH)
         needsDisplay = true
         window?.invalidateCursorRects(for: self)
@@ -456,18 +472,18 @@ final class RootView: MXView {
 
     // MARK: filling the window
 
-    /// The area that fills the window, JetBrains' Maximize Tool Window. Kept in memory only: a
-    /// relaunch opens at normal size.
-    var maximized: Dock? {
+    /// What fills the window, if anything. A relaunch opens at normal size.
+    var filling: WindowFill? {
         didSet {
-            guard maximized != oldValue else { return }
-            if let m = maximized { growing = m }
-            maxTween.set(maximized == nil ? 0 : 1, animated: window != nil)
+            guard filling != oldValue else { return }
+            if let d = filling?.dock { growing = d }
+            // An area grows over the rest and shrinks back; the session takes its room at once.
+            maxTween.set(filling?.dock == nil ? 0 : 1, animated: window != nil && filling != .session && oldValue != .session)
             sync(animated: false)
-            onMaximized?(maximized)
+            onFilling?(filling)
         }
     }
-    var onMaximized: ((Dock?) -> Void)?
+    var onFilling: ((WindowFill?) -> Void)?
     let maxTween = Tween(0)
     /// The area growing to fill the window, or shrinking back.
     var growing = Dock.right

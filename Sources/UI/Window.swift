@@ -3,6 +3,12 @@ import AppKit
 /// Maxwell's windows. Tells the controller when keyboard focus moves between panes.
 final class MXWindow: NSWindow {
     var onFocusChange: (() -> Void)?
+    /// Sees each press and release before any view; returns true when it took it (`TitleBar.guardClick`).
+    var onClick: ((NSEvent) -> Bool)?
+    override func sendEvent(_ e: NSEvent) {
+        if e.type == .leftMouseDown || e.type == .leftMouseUp, onClick?(e) == true { return }
+        super.sendEvent(e)
+    }
     override func makeFirstResponder(_ r: NSResponder?) -> Bool {
         let ok = super.makeFirstResponder(r)
         onFocusChange?()
