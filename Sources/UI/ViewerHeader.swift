@@ -17,6 +17,8 @@ final class ViewerHeader: MXView {
     /// The session fills the window: only the tab on show, after the line, and no buttons. A click
     /// on it brings the split back.
     var peek = false { didSet { if peek != oldValue { refresh() } } }
+    /// The session opened or replaced a file while it filled the window: the lone tab's new-dot.
+    var peekNews = false { didSet { if peekNews != oldValue { refresh() } } }
     private var tabs = ViewerTabs()
     private var account: Account?
     private var folder = (has: false, shown: false)
@@ -52,8 +54,16 @@ final class ViewerHeader: MXView {
 
     private func refresh() {
         let all = Self.stripTabs(tabs, account: account)
-        if peek, let a = tabs.active { strip.tabs = [all[a]]; strip.active = 0 } else { strip.tabs = all; strip.active = tabs.active }
+        if peek, let a = tabs.active {
+            var lone = all[a]
+            lone.unseen = lone.unseen || peekNews
+            strip.tabs = [lone]; strip.active = 0
+        } else {
+            strip.tabs = all; strip.active = tabs.active
+        }
+        strip.closes = !peek
         strip.isHidden = tabs.tabs.isEmpty
+        more.tip.text = tabs.item?.artifact != nil ? "Keep, open in browser, hide or fill the window" : "Keep, hide or fill the window"
         reload.isHidden = peek || tabs.item?.artifact == nil
         treeButton.isHidden = peek || !folder.has
         more.isHidden = peek
@@ -72,6 +82,18 @@ final class ViewerHeader: MXView {
             b.frame = NSRect(x: x, y: y, width: Self.button, height: Metrics.control)
         }
         strip.frame = NSRect(x: 0, y: 0, width: max(0, x - 4), height: bounds.height)
+    }
+
+    /// What a click at `p` lands on, for the title bar's double-click guard: a document tab (by its
+    /// index in the session's tabs), a button, or nothing.
+    func clickTarget(at p: NSPoint) -> TitleBar.ClickTarget? {
+        if [reload, treeButton, more].contains(where: { !$0.isHidden && $0.frame.contains(p) }) { return .control }
+        guard !strip.isHidden, strip.frame.contains(p) else { return nil }
+        switch strip.hit(at: convert(p, to: strip)) {
+        case .tab(let i)?: return .doc(peek ? tabs.active ?? i : i)
+        case .control?: return .control
+        case nil: return nil
+        }
     }
 
     /// The empty end of the row moves the window, as the rest of the title bar does.

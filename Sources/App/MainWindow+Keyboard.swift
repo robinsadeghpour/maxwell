@@ -85,5 +85,6 @@ extension MainWindowController {
             if !inside { focusPanel(root.shown(d).first(where: \.canFill) ?? .viewer) }
         }
         updateDim()
+        updateBadges()
     }
 }

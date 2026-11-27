@@ -983,7 +983,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         viewers[id] = v
         if id == current {
             if moved { viewerForced = nil }
-            if !root.isShown(.viewer) { viewerNews = true }
+            if !root.isShown(.viewer) || root.filling == .session { viewerNews = true }
             syncViewer()
         }
     }

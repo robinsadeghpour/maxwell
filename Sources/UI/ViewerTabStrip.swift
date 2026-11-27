@@ -33,6 +33,9 @@ final class ViewerTabStrip: MXView, TipSource {
     var tabs: [Tab] = [] { didSet { if tabs != oldValue { needsDisplay = true; scrollToActive() } } }
     var active: Int? { didSet { if active != oldValue { scrollToActive(); needsDisplay = true } } }
     var onAction: ((ViewerTabAction) -> Void)?
+    /// Tabs have ×; off for the lone tab beside a session that fills the window, which only brings
+    /// the split back (its new-dot shows where × would be).
+    var closes = true { didSet { if closes != oldValue { needsDisplay = true } } }
     /// Builds the right-click menu for a tab (the pane knows whether it is a file or an artifact).
     var menuFor: ((Int) -> NSMenu)?
     private var hover: Int?
@@ -187,7 +190,7 @@ final class ViewerTabStrip: MXView, TipSource {
             let textEnd = compact && !sel && !hot ? rr.maxX - (tab.unseen ? 20 : 8) : rr.maxX - Self.closeW - 10
             drawTitle(tab.title, in: NSRect(x: textX, y: 0, width: textEnd - textX, height: rr.height), color: ink, font: font(tab))
             let c = closeRect(rr)
-            if sel || hot {
+            if closes, sel || hot {
                 if hot, hoverClose { t.hover.setFill(); NSBezierPath(roundedRect: c, xRadius: 3, yRadius: 3).fill() }
                 let p = NSBezierPath(); p.lineWidth = 1.2; p.lineCapStyle = .round
                 let m = NSPoint(x: c.midX, y: c.midY)
@@ -219,6 +222,14 @@ final class ViewerTabStrip: MXView, TipSource {
 
     // MARK: mouse
 
+    /// What a click at `p` lands on: a tab's name, or a control (its ×, the ⌄ list).
+    enum Hit: Equatable { case tab(Int), control }
+    func hit(at p: NSPoint) -> Hit? {
+        if overflows, listRect.contains(p) { return .control }
+        guard let i = index(at: p) else { return nil }
+        return closes && closeRect(rects()[i]).contains(p) ? .control : .tab(i)
+    }
+
     private func index(at p: NSPoint) -> Int? {
         guard p.x < tabRoom else { return nil }
         return rects().firstIndex { $0.contains(p) && (!overflows || $0.maxX <= tabRoom + 0.5) }
@@ -227,7 +238,7 @@ final class ViewerTabStrip: MXView, TipSource {
     override func mouseMoved(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
         let i = index(at: p)
-        let onClose = i.map { closeRect(rects()[$0]).contains(p) } ?? false
+        let onClose = closes && (i.map { closeRect(rects()[$0]).contains(p) } ?? false)
         let onList = overflows && listRect.contains(p)
         if i != hover || onClose != hoverClose || onList != hoverList { hover = i; hoverClose = onClose; hoverList = onList; needsDisplay = true }
     }
@@ -240,8 +251,7 @@ final class ViewerTabStrip: MXView, TipSource {
         // The empty end of the row moves the window, as the rest of the title bar does.
         guard let i = index(at: p) else { return e.clickCount == 2 ? window?.performZoom(nil) ?? () : window?.performDrag(with: e) ?? () }
         let r0 = rects()[i]
-        if closeRect(r0).contains(p) { return onAction?(.close(i)) ?? () }
-        if e.clickCount == 2 { return onAction?(.fill(i)) ?? () }
+        if closes, closeRect(r0).contains(p) { return onAction?(.close(i)) ?? () }
         onAction?(.select(i))
         // Drag to reorder: the tab follows the pointer and the others make room.
         while let next = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
@@ -264,7 +274,7 @@ final class ViewerTabStrip: MXView, TipSource {
     }
 
     override func otherMouseDown(with e: NSEvent) {
-        guard e.buttonNumber == 2, let i = index(at: convert(e.locationInWindow, from: nil)) else { return super.otherMouseDown(with: e) }
+        guard closes, e.buttonNumber == 2, let i = index(at: convert(e.locationInWindow, from: nil)) else { return super.otherMouseDown(with: e) }
         onAction?(.close(i))
     }
 
@@ -301,7 +311,7 @@ final class ViewerTabStrip: MXView, TipSource {
         }
         guard let i = index(at: p) else { return nil }
         let r = rects()[i], c = closeRect(r)
-        if c.contains(p) { return (Tip("Close").adding("Middle-click a tab closes it too, ⌘W in the viewer closes the one on show"), c) }
+        if closes, c.contains(p) { return (Tip("Close").adding("Middle-click a tab closes it too, ⌘W in the viewer closes the one on show"), c) }
         let tab = tabs[i]
         var tip = Tip(tab.detail)
         if tab.unseen { tip = tip.adding("New since you last looked") }

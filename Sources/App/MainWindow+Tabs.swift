@@ -5,6 +5,7 @@ import AppKit
 extension MainWindowController {
     func wireTitleBar() {
         let bar = root.titleBar
+        (window as? MXWindow)?.onClick = { [weak bar] in bar?.guardClick($0) ?? false }
         bar.onSelect = { [weak self] in self?.open($0) }
         bar.onFill = { [weak self] _ in self?.root.toggleFill(.session) }
         bar.onCloseTab = { [weak self] in self?.forget($0) }

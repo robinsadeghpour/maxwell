@@ -36,6 +36,14 @@ final class TitleBar: MXView, TipSource {
             needsLayout = true
         }
     }
+    /// What a click lands on in the row.
+    enum ClickTarget: Equatable { case session(SessionID), doc(Int), control }
+    /// The first click of a possible double-click and what it was on. A first click can move the
+    /// row under the pointer (the split coming back, a tab growing, a tab closing), so the second
+    /// click goes to what the first one was on, never to what moved there.
+    private var firstClick: (target: ClickTarget, at: NSPoint, time: TimeInterval)?
+    /// A press the guard took: its release goes nowhere either, or a button would fire on it.
+    private var tookPress = false
     var onSelect: ((SessionID) -> Void)?
     /// A double-click on a tab: the session fills the window, or comes back.
     var onFill: ((SessionID) -> Void)?
@@ -171,6 +179,42 @@ final class TitleBar: MXView, TipSource {
         return (Tip(tab.title).adding(fill), NSRect(x: r.minX + 26, y: r.minY, width: r.width - 48, height: r.height))
     }
 
+    private func clickTarget(at p: NSPoint) -> ClickTarget? {
+        if let lr = plan.list, lr.contains(p) { return .control }
+        if let i = plan.rects.firstIndex(where: { $0.contains(p) }) { return p.x > plan.rects[i].maxX - 22 ? .control : .session(plan.shown[i].id) }
+        if let d = docTabs, !d.isHidden, d.frame.contains(p) { return d.clickTarget(at: convert(p, to: d)) }
+        if [leftToggle, plus, palette, gear, rightToggle].contains(where: { !$0.isHidden && $0.frame.contains(p) }) { return .control }
+        return nil
+    }
+
+    /// Sees every press and release in the window before any view does (`MXWindow.onClick`). Notes
+    /// what a first click lands on, and takes the clicks that follow it within the double-click
+    /// time: AppKit sends those to the view that got the first click, at the same window point,
+    /// even when that point now shows something else. Returns whether it took the event.
+    func guardClick(_ e: NSEvent) -> Bool {
+        if e.type == .leftMouseUp { defer { tookPress = false }; return tookPress }
+        tookPress = guardPress(e)
+        return tookPress
+    }
+
+    private func guardPress(_ e: NSEvent) -> Bool {
+        let p = convert(e.locationInWindow, from: nil)
+        guard e.clickCount >= 2 else {
+            firstClick = bounds.contains(p) ? clickTarget(at: p).map { ($0, e.locationInWindow, e.timestamp) } : nil
+            return false
+        }
+        guard let f = firstClick, e.timestamp - f.time <= NSEvent.doubleClickInterval * Double(e.clickCount - 1),
+              hypot(e.locationInWindow.x - f.at.x, e.locationInWindow.y - f.at.y) < 6 else { return false }
+        // A double-click on a tab fills the window with its half; a button already had its click.
+        guard e.clickCount == 2 else { return true }
+        switch f.target {
+        case .session(let id): onFill?(id)
+        case .doc(let i): docTabs?.onTab?(.fill(i))
+        case .control: break
+        }
+        return true
+    }
+
     override func mouseDown(with e: NSEvent) {
         let p = convert(e.locationInWindow, from: nil)
         if let lr = plan.list, lr.contains(p) { return showHidden(below: lr) }
@@ -180,17 +224,29 @@ final class TitleBar: MXView, TipSource {
             return
         }
         let id = plan.shown[i].id
-        if p.x > rects[i].maxX - 22 { onCloseTab?(id) } else if e.clickCount == 2 { onFill?(id) } else { onSelect?(id) }
+        if p.x > rects[i].maxX - 22 { onCloseTab?(id) } else { onSelect?(id) }
     }
     /// ⌄: the tabs out of sight; picking one shows it.
     private func showHidden(below lr: NSRect) {
         let m = NSMenu()
         for tab in plan.hidden {
             let item = MenuAction(tab.title) { [weak self] in self?.onSelect?(tab.id) }
-            item.state = tab.id == current ? .on : .off
+            item.image = Self.glyphImage(tab, theme: t)
             m.addItem(item)
         }
         m.popUp(positioning: nil, at: NSPoint(x: lr.minX, y: lr.maxY + 2), in: self)
+    }
+
+    /// A tab's state glyph in its colour (a terminal's prompt mark), for the ⌄ menu.
+    private static func glyphImage(_ tab: Tab, theme t: Theme) -> NSImage {
+        NSImage(size: NSSize(width: 14, height: 14), flipped: true) { r in
+            if let g = tab.group {
+                Glyph.draw(g, at: NSPoint(x: r.midX, y: r.midY), color: t.color(for: g))
+            } else {
+                Text.draw("❯", in: r, color: t.fg2, font: Fonts.mono(Metrics.fontSize - 1, .semibold), align: .center)
+            }
+            return true
+        }
     }
 
     override func mouseDragged(with e: NSEvent) {}

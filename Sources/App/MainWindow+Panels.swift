@@ -108,9 +108,11 @@ extension MainWindowController {
     }
 
     /// The stripe's marks: what needs you in each plugin panel, a stopped plugin, and a dot on the
-    /// viewer when a session opened something while another panel was on show.
+    /// viewer when a session opened something while another panel was on show, or on the lone doc
+    /// tab while the session fills the window.
     func updateBadges() {
-        if root.isShown(.viewer) { viewerNews = false }
+        if root.isShown(.viewer), root.filling != .session { viewerNews = false }
+        root.viewerPane.header.peekNews = viewerNews && root.filling == .session
         var b: [PanelID: Stripe.Badge] = [:]
         for (id, v) in root.pluginPanels {
             if v.stopped { b[id] = .warning } else if v.needsYou > 0 { b[id] = .count(v.needsYou) }

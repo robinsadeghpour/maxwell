@@ -105,7 +105,7 @@ Run `Maxwell state` to audit every session and see which check holds each one ba
 | ⌘B, ⌥⌘B, ⌥⌘J | Toggle left, right, bottom panels |
 | ⇧⌘↩ | What you're in fills the window: the session, the viewer or a plugin panel (or double-click a session's or document's tab); again to come back (Esc too, for the viewer or a plugin panel). Artifacts get big without leaving Maxwell |
 | ⇧⌘T | Show or hide the session's folder beside the viewer's page; drag its edge to size it |
-| ⌥⌘P | Pin the current file or artifact |
+| ⌥⌘P | Keep the current file or artifact open (a double-click on its tab does too) |
 | ⌥⌘R, ⇧⌘O | Reload the artifact, open it in the account's browser |
 | ⇧⌘I | Show or hide Idle |
 | ⇧⌘L | Switch light and dark (View › Appearance: Light, Dark, Follow System) |

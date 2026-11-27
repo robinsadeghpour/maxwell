@@ -13,8 +13,8 @@ import Carbon
 ///   letter, with cmd+, ctrl+, alt+, shift+ in front.
 /// - `dump <label>`: logs `terminal harness: <label>` with the terminal's row, folder, whether it
 ///   has the keyboard, and the lines on screen.
-/// - `click doc`, `dblclick doc`: a click or a double-click on the first document tab in the title
-///   bar (a double-click fills the window with the viewer, or brings it back).
+/// - `click <what>`, `dblclick <what>`: a click or a double-click on `doc` (the first document tab
+///   in the title bar), `session` (the first session tab) or `folder` (the viewer's folder button).
 /// - `where <label>`: logs which part of the window has the keyboard, whether it is on screen, and
 ///   what fills the window.
 enum TerminalHarness {
@@ -62,18 +62,24 @@ enum TerminalHarness {
 
     /// Queued, not sent: the tab follows the mouse until the button comes up, waiting for that event.
     private static func click(_ what: String, times: Int, _ main: MainWindowController) {
-        let strip = main.root.viewerPane.header.strip
-        guard what == "doc", let w = main.window, !strip.isHidden, strip.window != nil, !(strip.superview?.isHidden ?? true) else {
-            return mark("terminal harness: no \(what) tab to double-click")
+        let root = main.root, strip = root.viewerPane.header.strip
+        // Where each target is: the first document tab, the first session tab, the folder button.
+        let spots: [String: (NSView, NSPoint)] = [
+            "doc": (strip, NSPoint(x: 30, y: strip.bounds.midY)),
+            "session": (root.titleBar, NSPoint(x: root.titleBar.fullScreen ? 60 : 150, y: root.titleBar.bounds.midY)),
+            "folder": (root.viewerPane.header.treeButton, NSPoint(x: 14, y: 11)),
+        ]
+        guard let (v, at) = spots[what], let w = main.window, v.window != nil, !v.isHiddenOrHasHiddenAncestor else {
+            return mark("terminal harness: no \(what) to click")
         }
-        let p = strip.convert(NSPoint(x: 30, y: strip.bounds.midY), to: nil)
+        let p = v.convert(at, to: nil)
         for count in 1...times {
             for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
                 if let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                               windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: count, pressure: 1) { NSApp.postEvent(e, atStart: false) }
             }
         }
-        mark("terminal harness: \(times == 2 ? "double-clicked" : "clicked") the \(what) tab")
+        mark("terminal harness: \(times == 2 ? "double-clicked" : "clicked") the \(what)")
     }
 
     private static func type(_ ch: Character, _ main: MainWindowController) {
