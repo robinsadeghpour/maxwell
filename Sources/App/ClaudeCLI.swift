@@ -235,10 +235,13 @@ enum ClaudeCLI {
 
     /// `claude --bg --resume <id>`: the same conversation, under the same id, as a background
     /// session. Claude starts a copy instead while it still sees the old process; that is reported.
-    static func resumeBackground(account: Account, cwd: String, sessionId: String, name: String?, skipPermissions: Bool) -> Swift.Result<(short: String, copy: Bool), StartError> {
+    static func resumeBackground(account: Account, cwd: String, sessionId: String, name: String?, skipPermissions: Bool,
+                                 model: String? = nil, prompt: String? = nil) -> Swift.Result<(short: String, copy: Bool), StartError> {
         var args = ["--bg", "--resume", sessionId]
         if let name { args += ["--name", name] }
+        if let model { args += ["--model", model] }
         if skipPermissions { args.append("--dangerously-skip-permissions") }
+        if let prompt { args.append(prompt) }
         let r = run(claudePath, args, cwd: cwd, env: env(for: account), timeout: 30)
         let text = r.out + r.err
         if text.contains("Workspace not trusted") { return .failure(.untrusted(cwd)) }

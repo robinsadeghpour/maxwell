@@ -84,11 +84,10 @@ func reduce(into s: inout AppState, _ event: Event) {
         s.named[id] = title.text.isEmpty ? nil : title
 
     case .started(let id, let acct, let name, let cwd, let shortId, let at):
-        s.startedByMaxwell.insert(id)
-        var session = s.sessions[id] ?? Session(id: id, name: name, accountId: acct, cwd: cwd, at: at, origin: .maxwell,
-                                                reach: .background(shortId: shortId))
-        session.origin = .maxwell
-        s.sessions[id] = session
+        reduceStarted(id, acct, name: name, cwd: cwd, shortId: shortId, at: at, into: &s)
+
+    case .moving(let id, let to):
+        s.sessions[id]?.movingTo = to
 
     case .annotated(let plugin, let id, let note):
         if let note, !note.isEmpty || note.actions != nil { s.notes[id, default: [:]][plugin] = note }
@@ -109,6 +108,30 @@ func reduce(into s: inout AppState, _ event: Event) {
 }
 
 /// One hook: the session it names, then the phase it implies (see `applyHook`).
+/// Maxwell started a background session, or continued a known one on another account.
+private func reduceStarted(_ id: SessionID, _ acct: AccountID, name: String, cwd: String, shortId: String, at: Date, into s: inout AppState) {
+    s.startedByMaxwell.insert(id)
+    var session = s.sessions[id] ?? Session(id: id, name: name, accountId: acct, cwd: cwd, at: at, origin: .maxwell,
+                                            reach: .background(shortId: shortId))
+    session.origin = .maxwell
+    // A known session started again (continued on another account): it runs there now, and
+    // reads and writes that account's transcript, not the one a hook named before.
+    if session.accountId != acct {
+        session.transcriptPath = nil
+        // It was sent "continue" there: its turn runs until the new account's hooks say otherwise.
+        session.phase = .working
+        session.phaseSource = "continued on \(acct)"
+        session.turnAt = at
+        session.prompted = true
+        session.stopFailure = nil
+    }
+    session.accountId = acct
+    session.reach = .background(shortId: shortId)
+    session.parkedAt = nil
+    session.movingTo = nil
+    s.sessions[id] = session
+}
+
 /// Maxwell just started a cloud session: it shows as Working until the first listing has it.
 private func reduceCloudStart(_ id: SessionID, _ acct: AccountID, title: String, cwd: String, at: Date, into s: inout AppState) {
     guard s.sessions[id] == nil else { return }
@@ -197,7 +220,7 @@ private func reduce(agents snap: AgentsSnapshot, into s: inout AppState) {
     }
     // A session of this account that is no longer listed has exited, unless it was a background
     // session waiting on you: Claude Code stops those when idle and keeps the conversation.
-    for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended && !sess.isCloud {
+    for (id, sess) in s.sessions where sess.accountId == snap.accountId && !listed.contains(id) && sess.phase != .ended && !sess.isCloud && sess.movingTo == nil {
         if sess.parkable {
             if sess.parkedAt == nil { s.sessions[id]?.parkedAt = snap.at }
             continue
@@ -218,6 +241,8 @@ private func reduce(hook h: Hook, into s: inout AppState) {
         id: h.sessionId, name: String(h.sessionId.prefix(8)), accountId: acct, cwd: h.cwd ?? "", at: h.at,
         origin: s.startedByMaxwell.contains(h.sessionId) ? .maxwell : .external, reach: .elsewhere(pid: nil))
     if session.phase == .ended { guard case .sessionStart = h.kind else { return } }
+    // The old account's process ending on the way to another account isn't the session ending.
+    if session.movingTo != nil, case .sessionEnd = h.kind { return }
     session.lastEventAt = max(session.lastEventAt, h.at)
     session.hookSeenAt = max(session.hookSeenAt ?? h.at, h.at)
     // A hook comes from a running process: whatever stopped it, it runs again.

@@ -9,6 +9,7 @@ struct Row: Equatable {
     var closedAt: Date?        // Recently closed rows
     var suggestion: String?    // "→ Acme?": the project its transcript points at
     var badges: [RowBadge] = []   // from plugins, e.g. "ACME-56 · In Review"
+    var movingTo: String?      // the account it is continuing on, while that runs
 }
 
 /// A plain terminal Maxwell runs, listed above the sessions.
@@ -57,6 +58,10 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     var onCloseAllSafe: (() -> Void)?
     /// Stops the idle sessions Maxwell can stop (background ones); Undo reopens them.
     var onStopIdle: (([SessionID]) -> Void)?
+    /// The Limited header's button: every limited session continues on `limitedTarget`.
+    var onContinueAllLimited: (([SessionID]) -> Void)?
+    /// The account with the most room, by name; nil hides the Limited header's button.
+    var limitedTarget: String?
     var onReopen: ((SessionID) -> Void)?
     var onNotSafe: ((SessionID) -> Void)?
     /// Right-click on a session row.
@@ -71,6 +76,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
     private(set) var expanded = Set<SessionID>()
     private let closeAll = MXButton("close all", hint: "⇧⌘X", small: true)
     private let stopIdle = MXButton("stop all", small: true)
+    private let continueAll = MXButton("continue all", small: true)
     private let newShell = MXButton("new", hint: "⌥⌘T", small: true)
     private var spinAngle: CGFloat = 0
     private var timer: Timer?
@@ -87,6 +93,9 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         stopIdle.action = { [weak self] in guard let self else { return }; self.onStopIdle?(self.stoppableIdle) }
         stopIdle.isHidden = true
         addSubview(stopIdle)
+        continueAll.action = { [weak self] in guard let self else { return }; self.onContinueAllLimited?(self.continuableLimited) }
+        continueAll.isHidden = true
+        addSubview(continueAll)
         newShell.action = { [weak self] in self?.onNewShell?() }
         newShell.isHidden = true
         newShell.tip = Tip("Open another terminal")
@@ -220,6 +229,19 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         }
     }
 
+    /// Limited sessions in this list that run in a terminal: they can't continue elsewhere from Maxwell.
+    var limitedInTerminal: Int {
+        (groups.first { $0.0 == .limited }?.1 ?? []).filter { if case .elsewhere = $0.session.reach { return true }; return false }.count
+    }
+
+    /// Limited sessions in this list that can continue on another account: background ones, not already on their way.
+    var continuableLimited: [SessionID] {
+        (groups.first { $0.0 == .limited }?.1 ?? []).compactMap { r in
+            if case .background = r.session.reach, r.movingTo == nil { return r.session.id }
+            return nil
+        }
+    }
+
     private func layoutCloseAll() {
         let rects = rowRects()
         func place(_ b: MXButton, on g: PhaseGroup, when ok: Bool = true) {
@@ -243,6 +265,13 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
             ? "Stop every idle session. Conversations are kept; Undo or Recently closed reopens them."
             : "Stop the \(n) idle sessions running in the background. The other \(idleCount - n) run in a terminal; end those there.")
         place(stopIdle, on: .idle, when: n > 0)
+        let movable = continuableLimited
+        if let to = limitedTarget {
+            continueAll.title = "continue all on \(to)"
+            continueAll.tip = Tip("Continue \(movable.count == 1 ? "the limited session" : "all \(movable.count) limited sessions") on \(to)")
+                .adding("Same sessions, whole conversations. Each stops here and picks up on \(to).")
+        }
+        place(continueAll, on: .limited, when: limitedTarget != nil && !movable.isEmpty)
     }
 
     override func resizeSubviews(withOldSize s: NSSize) { super.resizeSubviews(withOldSize: s); layoutCloseAll() }
@@ -409,7 +438,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         let line1 = compact ? r : NSRect(x: r.minX, y: r.minY + 3, width: r.width, height: 18)
         Glyph.draw(g, at: NSPoint(x: box.minX + 14, y: line1.midY), color: t.color(for: g), angle: spinAngle)
         let right = box.maxX - 10
-        let age = rowDetail(s, now: now, closedAt: row.closedAt)
+        let age = rowDetail(row, now: now)
         let ageW = max(24, Text.width(age, font: small))
         Text.draw(age, in: NSRect(x: right - ageW, y: line1.minY, width: ageW, height: line1.height), color: t.fg3, font: small, align: .right)
         let titleX = box.minX + 28
@@ -447,7 +476,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         var right: CGFloat, midY: CGFloat
         if let c = chipRects(row, in: r) { right = c.chip.minX - 4 } else { right = box.maxX - 10 }
         if compact {
-            if chipRects(row, in: r) == nil { right -= max(24, Text.width(rowDetail(row.session, now: Date(), closedAt: row.closedAt), font: small)) + 6 }
+            if chipRects(row, in: r) == nil { right -= max(24, Text.width(rowDetail(row, now: Date()), font: small)) + 6 }
             midY = r.midY
         } else { midY = r.minY + 27.5 }
         var out: [(NSRect, RowBadge)] = []
@@ -488,7 +517,7 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         let w = Text.width(Self.chipText(p), font: small) + 12
         var right = box.maxX - 10, midY = r.minY + 27.5   // the detail line drawRow draws
         if compact {
-            right -= max(24, Text.width(rowDetail(row.session, now: Date(), closedAt: row.closedAt), font: small)) + 6
+            right -= max(24, Text.width(rowDetail(row, now: Date()), font: small)) + 6
             midY = r.midY
         }
         let close = NSRect(x: right - 12, y: midY - 7.5, width: 12, height: 15)
@@ -521,20 +550,23 @@ final class SessionList: MXView, NSDraggingSource, TipSource {
         let line1 = compact ? r : NSRect(x: r.minX, y: r.minY + 3, width: r.width, height: 18)
         if p.x < box.minX + 26 { return (row.group.tip, NSRect(x: box.minX + 4, y: line1.minY, width: 20, height: line1.height)) }
         let now = Date(), small = Fonts.mono(Metrics.fontSize - 2)
-        let ageW = max(24, Text.width(rowDetail(row.session, now: now, closedAt: row.closedAt), font: small))
+        let ageW = max(24, Text.width(rowDetail(row, now: now), font: small))
         let age = NSRect(x: box.maxX - 10 - ageW, y: line1.minY, width: ageW, height: line1.height)
         guard age.insetBy(dx: -2, dy: 0).contains(p) else { return nil }
         let text: String
         if let closedAt = row.closedAt { text = "Closed \(Format.ago(closedAt, now: now))" }
+        else if let to = row.movingTo { text = "Continuing on \(to) with its whole conversation" }
         else if case .limited(let d?) = row.session.phase { text = d > now ? "The limit resets \(Format.when(d, now: now))" : "The limit has reset" }
         else { text = "Last activity \(Format.ago(row.session.lastEventAt, now: now))" }
         return (Tip(text), age)
     }
 
     /// Right column: age, or when a limit resets, or when Maxwell closed it.
-    private func rowDetail(_ s: Session, now: Date, closedAt: Date? = nil) -> String {
-        if let closedAt { return "closed " + Format.age(closedAt, now: now) }
-        if case .limited(let d?) = s.phase { return d > now ? "↻" + Format.clock.string(from: d) : "ready" }
+    private func rowDetail(_ row: Row, now: Date) -> String {
+        let s = row.session
+        if let closedAt = row.closedAt { return "closed " + Format.age(closedAt, now: now) }
+        if let to = row.movingTo { return "→ \(to)…" }
+        if case .limited(let d?) = s.phase { return d > now ? "↻" + Format.reset(d, now: now) : "ready" }
         return Format.age(s.lastEventAt, now: now)
     }
 

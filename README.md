@@ -49,7 +49,7 @@ The name comes from Maxwell's demon, the thought-experiment creature that sits a
 | **Needs you** | A permission prompt or question is open, or the turn ended on something only you can give: its status line says Needs you, or Claude Code marks it blocked. You get a notification. |
 | **Your turn** | The turn is over and nothing runs. Read it, reply or close it. |
 | **Working** | A turn or subagent is running, or the reply is in and background work it started is still running. Leave it alone. |
-| **Limited** | It hit a usage limit. Resume when the window resets, or move it to the account with the most room. |
+| **Limited** | It hit a usage limit. Resume when the window resets, or continue it on the account with the most room, with its whole conversation. |
 | **Safe to close** | Every check passed. Expand the row to see each one. |
 | **Idle** | Stopped and quiet for a day. Folded away. |
 

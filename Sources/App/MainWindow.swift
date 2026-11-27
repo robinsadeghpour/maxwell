@@ -150,6 +150,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         root.sidebar.list.onNewShell = { [weak self] in self?.openShell() }
         root.sidebar.list.onCloseAllSafe = { [weak self] in self?.closeAllSafe() }
         root.sidebar.list.onStopIdle = { [weak self] ids in self?.stopIdle(ids) }
+        root.sidebar.list.onContinueAllLimited = { [weak self] ids in self?.continueAllLimited(ids) }
         root.sessionPane.onHideSetup = { [weak self] in self?.hideSetup() }
         root.sessionPane.onOverview(next: { [weak self] in self?.nextNeedsYou() }, new: { [weak self] in self?.showNewSession() })
         NotificationCenter.default.addObserver(forName: ClaudeWeb.changed, object: nil, queue: .main) { [weak self] _ in self?.refreshSetup() }
@@ -294,7 +295,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         func row(_ s: Session, _ g: PhaseGroup) -> Row {
             Row(session: s, group: g, detail: (state.mark(s) == nil ? "" : "marked · ") + detail(s, state: state),
                 checks: g == .safeToClose ? state.checks(s, now: now, rules: rules) : [], closedAt: g == .recentlyClosed ? state.closed[s.id]?.at : nil,
-                suggestion: g == .recentlyClosed ? nil : state.suggestion(s, in: projects), badges: badges(s, state: state))
+                suggestion: g == .recentlyClosed ? nil : state.suggestion(s, in: projects), badges: badges(s, state: state),
+                movingTo: s.movingTo.flatMap { state.account($0)?.name })
         }
         let isPinned = { (s: Session) in state.pins.contains(s.id) && s.phase != .ended }
         let rows = shown.map { g, list in (g, list.filter { !isPinned($0) }.map { row($0, g) }) }.filter { !$0.1.isEmpty }
@@ -307,6 +309,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         var perAccount: [AccountID: Int] = [:]
         for s in state.sessions.values where s.phase != .ended { perAccount[s.accountId, default: 0] += 1 }
         root.sidebar.list.shells = shellRows()
+        root.sidebar.list.limitedTarget = roomiestForLimited()?.name
         root.sidebar.update(scope: scope ?? "All projects", pinned: pinnedRows, groups: rows)
         root.sidebar.mark.roots = every.first { $0.name == scope }?.roots ?? []
         root.sidebar.mark.monogram = scope.map { String($0.prefix(2)) } ?? ""
@@ -405,6 +408,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         m.addItem(MenuAction(pinned ? "Unpin" : "Pin to Top") { [weak self] in self?.pinSession(s.id, !pinned) })
         m.addItem(markMenu(s, in: state))
         if current != home { m.addItem(MenuAction("Move back to \(home)") { [weak self] in self?.store.moveProject(s.id, to: nil) }) }
+        if let accounts = continueMenu(s) { m.addItem(accounts) }
         m.addItem(.separator())
         if let shellId = hosted[s.id] {
             m.addItem(MenuAction("Close Terminal") { [weak self] in self?.requestCloseShell(shellId) })
@@ -596,7 +600,8 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         // A session Claude Code stopped while idle starts again only when you ask (Resume, ⌘R),
         // so moving through the list doesn't wake every session it passes.
         let resume = resuming.remove(id) != nil
-        if case .background(let short) = s.reach, terminals[id] == nil, s.parkedAt == nil || resume, let a = store.state.account(s.accountId) {
+        // On its way to another account it has no process to attach to until it starts there.
+        if case .background(let short) = s.reach, terminals[id] == nil, s.movingTo == nil, s.parkedAt == nil || resume, let a = store.state.account(s.accountId) {
             if s.parkedAt != nil || s.phase == .ended, !s.cwd.isEmpty, !FileManager.default.fileExists(atPath: s.cwd) {
                 continueFromGoneFolder(s, account: a)
             } else {
@@ -671,6 +676,18 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         open(id)
     }
 
+    /// A session that now runs elsewhere (another account): its open terminal is attached to the old
+    /// process. The open one attaches again; any other attaches on its next open.
+    func reattachIfShown(_ id: SessionID) {
+        if current == id { return reattach(id) }
+        releaseTerminal(id)
+    }
+
+    /// Lets go of a session's terminal before its process stops (a move): the pane shows its last reply instead of the shell.
+    func releaseTerminal(_ id: SessionID) {
+        if let t = terminals.removeValue(forKey: id) { t.removeFromSuperview() }
+    }
+
     /// Closing a tab frees its terminal; the session keeps running. A plain terminal keeps running
     /// too, in its sidebar row.
     func forget(_ id: SessionID) {
@@ -697,7 +714,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     func roomiest(for id: SessionID) -> Account? {
         guard let s = store.state.sessions[id] else { return nil }
-        return store.state.roomiest(now: Date(), excluding: s.accountId)
+        return store.state.roomiestToContinue(now: Date(), excluding: s.accountId)
     }
 
     func scheduledResume(_ id: SessionID) -> Date? { store.scheduledResumes[id] }
@@ -780,17 +797,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         } else {
             if current != id { open(id) }
             press()
-        }
-    }
-
-    func move(_ id: SessionID) {
-        guard let s = store.state.sessions[id], let target = roomiest(for: id) else { return toast("No account has room right now.") }
-        toast("Starting on \(target.name)…")
-        store.move(s, to: target) { [weak self] r in
-            switch r {
-            case .success(let newId): self?.toast("Moved to \(target.name) with a handover prompt."); self?.open(newId)
-            case .failure(let e): self?.toast("Move failed: \(e)")
-            }
         }
     }
 
@@ -1634,7 +1640,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         }
         let limited: () -> Bool = { [weak self] in
             guard let self, let id = self.current, case .limited = self.store.state.sessions[id]?.phase else { return false }
-            return true
+            return self.store.state.sessions[id]?.movingTo == nil
         }
         var list: [Action] = [
             Action(id: "new-session", title: "New Session…", menu: "Session", shortcut: Shortcut("cmd+n")) { [weak self] in self?.showNewSession() },
@@ -1658,9 +1664,13 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             Action(id: "resume", title: "Resume When the Limit Resets", menu: "Session", shortcut: Shortcut("cmd+shift+r"), isEnabled: limited) { [weak self] in
                 if let id = self?.current { self?.resume(id) }
             },
-            Action(id: "move", title: "Move to the Account With Most Room", menu: "Session", shortcut: Shortcut("cmd+shift+m"), isEnabled: limited) { [weak self] in
+            Action(id: "move", title: "Continue on Another Account", menu: "Session", shortcut: Shortcut("cmd+shift+m"), isEnabled: limited) { [weak self] in
                 if let id = self?.current { self?.move(id) }
             },
+            Action(id: "continue-all-limited", title: "Continue All Limited on Another Account", menu: "Session", isEnabled: { [weak self] in
+                guard let self else { return false }
+                return !self.root.sidebar.list.continuableLimited.isEmpty
+            }) { [weak self] in guard let self else { return }; self.continueAllLimited(self.root.sidebar.list.continuableLimited) },
             Action(id: "show-agents", title: "Show Agents", menu: "Session", shortcut: Shortcut("cmd+shift+g"), isEnabled: { [weak self] in
                 guard let self, let id = self.current, let s = self.store.state.sessions[id], case .background = s.reach else { return false }
                 return !(s.runningTasks?.agents.isEmpty ?? true)

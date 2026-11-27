@@ -196,13 +196,16 @@ extension PhoneBridge {
 
     private func move(_ s: Session, account: String?, _ reply: @escaping (PhoneReply) -> Void) {
         let st = store.state
-        guard let target = account.flatMap(st.account) ?? st.roomiest(now: Date(), excluding: s.accountId) else {
+        guard let target = account.flatMap(st.account) ?? st.roomiestToContinue(now: Date(), excluding: s.accountId) else {
             return reply(.failed(code: "no-room", message: "No account has room right now."))
         }
-        store.move(s, to: target) { r in
-            switch r {
-            case .success(let id): reply(.ok(["session": id]))
-            case .failure(let e): reply(.failed(code: "failed", message: "Move failed: \(e)"))
+        let home = st.account(s.accountId)?.name ?? s.accountId
+        store.continueOn(s, account: target) { outcome in
+            switch outcome {
+            case .moved: reply(.ok(["session": s.id]))
+            case .failed(let why, let there):
+                reply(.failed(code: "failed", message: "Couldn't continue “\(s.title)” on \(target.name): \(why). "
+                              + (there ? "It's still on \(home)." : "It's stopped on \(home): open it to resume it there.")))
             }
         }
     }
