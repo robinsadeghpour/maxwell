@@ -566,8 +566,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
 
     // MARK: sessions
 
-    /// `keepingFill`: the session's terminal changed under it (reattached after a move); what fills
-    /// the window stays, and the terminal takes the keyboard only when it is on screen.
+    /// `keepingFill`: reattaching (a move, Resume) leaves what fills the window, and the keyboard with it.
     func open(_ id: SessionID, keepingFill: Bool = false) {
         // Another session, or this one from under a panel: it shows. Filling the window, it stays big.
         if !keepingFill, root.filling != .session || id != current { root.filling = nil }
