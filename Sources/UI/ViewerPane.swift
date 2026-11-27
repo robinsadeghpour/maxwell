@@ -58,6 +58,9 @@ final class ViewerPane: MXView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Empty, the viewer still takes the keyboard (⌥⌘3), so ⇧⌘↩ and Esc act on it.
+    override var acceptsFirstResponder: Bool { true }
+
     /// `reload`: the session published the artifact on show again.
     func show(_ tabs: ViewerTabs, account: Account?, reload: Bool = false) {
         let item = tabs.item

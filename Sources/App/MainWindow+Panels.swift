@@ -16,7 +16,7 @@ extension MainWindowController {
 
     /// A stripe or status bar button: an open panel closes, a closed one opens and takes focus.
     func stripeClicked(_ p: PanelID) {
-        guard root.isShown(p) else { return togglePanel(p) }
+        guard root.isShown(p), !root.fillHides(p) else { return togglePanel(p) }
         root.setHidden(p, true)
         if p == .viewer { viewerForced = nil }
         focusMain()
@@ -24,7 +24,11 @@ extension MainWindowController {
 
     /// ⌥⌘ number, JetBrains style: shows a hidden panel and focuses it; hides a focused one.
     func togglePanel(_ p: PanelID) {
-        if !root.isShown(p) {
+        if root.isShown(p), root.fillHides(p) {
+            // Hidden by what fills the window: everything comes back and it takes the keyboard.
+            root.filling = nil
+            focusPanel(p)
+        } else if !root.isShown(p) {
             root.setHidden(p, false)
             if p == .viewer, !root.viewerOpen { viewerForced = true; syncViewer() }
             focusPanel(p)
@@ -40,9 +44,12 @@ extension MainWindowController {
     /// The title bar's side buttons, ⌘B and ⌥⌘B: hide a side, or bring back what it last showed.
     func toggleSide(_ d: Dock) {
         if !root.shown(d).isEmpty {
-            if root.shown(d).contains(.viewer) { viewerForced = nil }
+            // A side the fill hides comes back as it was (toggleArea), and keeps what it shows.
+            let hides = !root.shown(d).contains { root.fillHides($0) }
+            if hides, root.shown(d).contains(.viewer) { viewerForced = nil }
             root.toggleArea(d)
-            return focusMain()
+            if hides { focusMain() }
+            return
         }
         let ps = root.panels.panels(d, among: root.present)
         guard let p = root.lastShown[d].flatMap({ ps.contains($0) ? $0 : nil }) ?? ps.first(where: \.flexible) ?? ps.first else { return }
@@ -54,7 +61,32 @@ extension MainWindowController {
         return fr.isDescendant(of: v)
     }
 
+    /// The keyboard to the session's terminal (the session list when there is none). While a panel
+    /// fills the window the terminal is hidden, so the keyboard stays in that panel.
+    func focusMain() {
+        if root.fillHides(nil), let p = root.filling?.dock.flatMap({ root.shown($0).first(where: \.canFill) }) { return focusPanel(p) }
+        if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
+        else { window?.makeFirstResponder(root.sidebar.list) }
+    }
+
+    /// ⌥⌘1, ⌥⌘2, ⌥⌘3: the session list, the terminal, the viewer. Aimed at something the fill
+    /// hides, it ends the fill first, so the keyboard never lands in a hidden view.
+    func focus(_ pane: Int) {
+        let target: PanelID? = pane == 1 ? .sessions : pane == 2 ? nil : .viewer
+        if root.fillHides(target) { root.filling = nil }
+        switch pane {
+        case 1: window?.makeFirstResponder(root.sidebar.list)
+        case 2: focusMain()
+        default:
+            let page = root.viewerPane.viewer.container.subviews.first { !$0.isHidden }
+            let hasPage = root.viewerPane.viewer.current != nil || root.viewerPane.viewer.currentArtifact != nil
+            // An empty viewer takes the keyboard itself, so ⇧⌘↩ and Esc then act on it.
+            window?.makeFirstResponder(hasPage ? page : root.viewerPane)
+        }
+    }
+
     func focusPanel(_ p: PanelID) {
+        if root.fillHides(p) { root.filling = nil }
         switch p {
         case .sessions: focus(1)
         case .viewer: focus(3)

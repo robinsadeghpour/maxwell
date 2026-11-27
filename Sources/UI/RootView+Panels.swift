@@ -106,6 +106,8 @@ extension RootView {
 
     /// Hides every panel of an area, or shows them all again.
     func toggleArea(_ d: Dock) {
+        // Hidden by what fills the window, a side comes back as it was rather than going for good.
+        if shown(d).contains(where: { fillHides($0) }) { filling = nil; return }
         let ps = panels.panels(d, among: present)
         guard !ps.isEmpty else { return }
         let anyShown = ps.contains { !panels.hidden.contains($0) }
@@ -114,7 +116,7 @@ extension RootView {
         // Shown again, a side still shows one list or document: the first in order.
         if !anyShown, d != .bottom, let first = ps.first(where: \.flexible) { l.show(first, among: present) }
         panels = l
-        // Hidden, an area that filled the window gives it back; shown, an area ends whatever else fills it.
+        // Hidden, an area that filled the window gives it back; shown, it ends whatever else fills it.
         if filling != nil, anyShown ? filling == .panel(d) : filling != .panel(d) { filling = nil }
     }
 
@@ -123,6 +125,15 @@ extension RootView {
         if filling == f { filling = nil; return }
         if let d = f.dock, !shown(d).contains(where: \.canFill) { return }
         filling = f
+    }
+
+    /// Whether what fills the window hides `p`; nil is the session pane.
+    func fillHides(_ p: PanelID?) -> Bool {
+        switch filling {
+        case nil: return false
+        case .session?: return p != nil
+        case .panel(let d)?: return p.map { panels.place[$0] != d } ?? true
+        }
     }
 
     /// An area that filled the window and has nothing left to show gives the window back.
@@ -135,15 +146,15 @@ extension RootView {
         if filling != nil { filling = nil } else { nextResponder?.tryToPerform(#selector(cancelOperation(_:)), with: sender) }
     }
 
-    /// The session filling the window takes `whole`, the body without the rail; the areas and the
-    /// stripes step aside. An area filling the window is laid over the terminal's place and the
-    /// other areas (`body`): the terminal keeps its size, so the session doesn't reflow; it is only
-    /// hidden until the area is back. Returns whether something fills (or is growing or shrinking).
-    func layoutFill(body: NSRect, whole: NSRect) -> Bool {
+    /// What fills the window takes `whole`, the body without the rail, and the stripes step aside.
+    /// The session takes it at once (the terminal reflows); the other areas hide. An area grows over
+    /// the terminal and the other areas: the terminal keeps its size, so the session doesn't reflow;
+    /// it is only hidden until the area is back. Returns whether something fills (or is growing or shrinking).
+    func layoutFill(whole body: NSRect) -> Bool {
         if filling == .session {
             sessionPane.isHidden = false
-            sessionPane.frame = whole
-            sessionDim.frame = whole
+            sessionPane.frame = body
+            sessionDim.frame = body
             for v in docks.values { v.isHidden = true }
             for v in splitters.values { v.isHidden = true }
             leftStripe.isHidden = true
@@ -161,6 +172,8 @@ extension RootView {
         v.isHidden = false
         for (d, o) in docks where d != growing { o.isHidden = true }
         for sp in splitters.values { sp.isHidden = true }
+        leftStripe.isHidden = true
+        rightStripe.isHidden = true
         return true
     }
 }

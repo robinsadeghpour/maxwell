@@ -15,6 +15,8 @@ import Carbon
 ///   has the keyboard, and the lines on screen.
 /// - `dblclick doc`: a double-click on the first document tab in the title bar (fills the window
 ///   with the viewer, or brings it back).
+/// - `where <label>`: logs which part of the window has the keyboard, whether it is on screen, and
+///   what fills the window.
 enum TerminalHarness {
     static func start(_ main: MainWindowController) {
         guard quietTest, let spec = ProcessInfo.processInfo.environment["MAXWELL_TERMINAL_STEPS"] else { return }
@@ -34,6 +36,7 @@ enum TerminalHarness {
         case "key": for k in rest.split(separator: " ") { press(String(k), main) }
         case "dump": dump(rest, main)
         case "dblclick": doubleClick(rest, main)
+        case "where": whereKeyboard(rest, main)
         default: mark("terminal harness: unknown step \(step)")
         }
     }
@@ -46,6 +49,14 @@ enum TerminalHarness {
             .map { $0.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression) }
         while shown.last?.isEmpty == true { shown.removeLast() }
         mark("terminal harness: \(label): row \(row?.title ?? "-") · \(row?.detail ?? "-") · \(focused ? "has" : "lost") keyboard\n" + shown.map { "  | " + $0 }.joined(separator: "\n"))
+    }
+
+    private static func whereKeyboard(_ label: String, _ main: MainWindowController) {
+        let fr = main.window?.firstResponder as? NSView, root = main.root
+        let parts: [(String, NSView)] = [("viewer", root.viewerPane), ("terminal", root.sessionPane), ("session list", root.sidebar)]
+        let part = fr.flatMap { v in parts.first { v.isDescendant(of: $0.1) }?.0 } ?? fr.map { "\(Swift.type(of: $0))" } ?? "nowhere"
+        let onScreen = fr.map { !$0.isHiddenOrHasHiddenAncestor && $0.window != nil } ?? false
+        mark("terminal harness: \(label): keyboard in \(part), \(onScreen ? "on screen" : "hidden"), fill \(root.filling.map { "\($0)" } ?? "none")")
     }
 
     /// Queued, not sent: the tab follows the mouse until the button comes up, waiting for that event.

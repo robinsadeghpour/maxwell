@@ -1472,19 +1472,6 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         if systemDetail.superview != nil { systemDetail.removeFromSuperview() }
     }
 
-    func focusMain() {
-        if let id = current, let t = terminal(for: id) ?? shell(id), !detached.contains(id) { window?.makeFirstResponder(t) }
-        else { window?.makeFirstResponder(root.sidebar.list) }
-    }
-
-    func focus(_ pane: Int) {
-        switch pane {
-        case 1: window?.makeFirstResponder(root.sidebar.list)
-        case 2: focusMain()
-        default: if root.viewerPane.viewer.current != nil || root.viewerPane.viewer.currentArtifact != nil { window?.makeFirstResponder(root.viewerPane.viewer.container.subviews.first { !$0.isHidden }) }
-        }
-    }
-
     /// Ghostty config from the theme tokens. In dark themes the terminal draws no background of
     /// its own, so the glass shows through. Light themes get an opaque paper sheet: Ghostty's
     /// minimum-contrast measures against the terminal's own background, and only then turns

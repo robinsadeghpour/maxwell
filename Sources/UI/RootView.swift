@@ -339,8 +339,8 @@ final class RootView: MXView {
         sr.frame = NSRect(x: x1 - rwid - hit / 2, y: top, width: hit + 1, height: bodyH)
         sb.frame = NSRect(x: cx0, y: bottom - bh - hit / 2, width: cx1 - cx0, height: hit + 1)
 
-        let filled = layoutFill(body: NSRect(x: x0, y: top, width: x1 - x0, height: bodyH),
-                                whole: NSRect(x: railMode == .shown ? rw + 1 : 0, y: top, width: w - (railMode == .shown ? rw + 1 : 0), height: bodyH))
+        let railEnd: CGFloat = railMode == .shown ? rw + 1 : 0
+        let filled = layoutFill(whole: NSRect(x: railEnd, y: top, width: w - railEnd, height: bodyH))
         drawsLines = filled ? [] : (lw > 0 ? [NSRect(x: x0 + lw - 1, y: top, width: 1, height: bodyH)] : [])
             + (rwid > 0 ? [NSRect(x: x1 - rwid, y: top, width: 1, height: bodyH)] : [])
             + (bh > 0 ? [NSRect(x: cx0, y: bottom - bh, width: cx1 - cx0, height: 1)] : [])
