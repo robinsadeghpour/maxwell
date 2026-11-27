@@ -48,21 +48,32 @@ extension MainWindowController {
         case .panel(.viewer):
             let hasPage = root.viewerPane.viewer.current != nil || root.viewerPane.viewer.currentArtifact != nil
             // An empty viewer takes the keyboard itself, so ⇧⌘↩ and Esc then act on it.
-            return hasPage ? root.viewerPane.viewer.container.subviews.first { !$0.isHidden } : root.viewerPane
+            return hasPage ? root.viewerPane.viewer.page ?? root.viewerPane : root.viewerPane
         case .panel(let p): return root.content(p) as? PluginPanel
         }
     }
 
-    /// A panel that hid or emptied while it had the keyboard (the last doc closed, a side hidden,
-    /// a plugin switched off) hands it to the terminal: AppKit leaves it with the window, where
-    /// typing goes nowhere. Called after anything that can hide or empty a panel.
+    /// AppKit takes the keyboard from a view that hides and leaves it with the window, where typing
+    /// goes nowhere: the viewer swapping its page for a PDF or an artifact, the last doc closed, a
+    /// side hidden, a terminal ended. It goes back where `KeyboardHome.afterLosing` says: the panel
+    /// it was in while that is still on screen, otherwise the terminal, the session pane or the
+    /// session list. Called after anything that can hide or empty a view.
     func keepKeyboardVisible() {
         defer { updateDim() }
         guard let w = window, pendingKeyboard == nil else { return }
         root.layoutSubtreeIfNeeded()
         let fr = w.firstResponder
         let lost = fr == nil || fr === w || (fr as? NSView).map { $0.isHiddenOrHasHiddenAncestor || $0.window == nil } ?? false
-        if lost { focusMain() }
+        guard lost else { return }
+        let attached = current.map { id in !detached.contains(id) && (terminal(for: id) ?? shell(id)) != nil } ?? false
+        let home = KeyboardHome.afterLosing(root.keyboardHome, panelOnScreen: { [root] in root.isShown($0) && !root.fillHides($0) },
+                                            hasTerminal: attached, hasSession: current != nil)
+        switch home {
+        case .panel(let p): focusPanel(p)
+        case .terminal: giveKeyboard(.terminal)
+        case .sessionPane: giveKeyboard(.view(root.sessionPane))
+        case .sessionList: giveKeyboard(.panel(.sessions))
+        }
     }
 
     /// Back to the session's terminal (the session list when there is none), as after an overlay

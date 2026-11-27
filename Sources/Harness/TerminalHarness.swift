@@ -57,7 +57,8 @@ enum TerminalHarness {
         let parts: [(String, NSView)] = [("viewer", root.viewerPane), ("terminal", root.sessionPane), ("session list", root.sidebar)]
         let part = fr.flatMap { v in parts.first { v.isDescendant(of: $0.1) }?.0 } ?? fr.map { "\(Swift.type(of: $0))" } ?? "nowhere"
         let onScreen = fr.map { !$0.isHiddenOrHasHiddenAncestor && $0.window != nil } ?? false
-        mark("terminal harness: \(label): keyboard in \(part), \(onScreen ? "on screen" : "hidden"), fill \(root.filling.map { "\($0)" } ?? "none")")
+        let kind = fr.map { "\(Swift.type(of: $0))" } ?? "-"
+        mark("terminal harness: \(label): keyboard in \(part) (\(kind)), \(onScreen ? "on screen" : "hidden"), fill \(root.filling.map { "\($0)" } ?? "none")")
     }
 
     private static func click(_ what: String, times: Int, _ main: MainWindowController) {

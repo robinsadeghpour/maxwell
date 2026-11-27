@@ -186,6 +186,10 @@ final class SessionPane: MXView {
         needsLayout = true
     }
 
+    /// Without a terminal (it ended, or isn't attached) the pane takes the keyboard itself, so typing
+    /// doesn't land in the session list; with one, a click on the header leaves it in the terminal.
+    override var acceptsFirstResponder: Bool { terminal == nil }
+
     /// Every visited terminal stays a subview; only the selected one is visible and rendering.
     private func select(_ terminal: TerminalView?) {
         if let terminal, terminal.superview !== content { content.addSubview(terminal) }

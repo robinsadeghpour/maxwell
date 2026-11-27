@@ -126,7 +126,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
             self.root.rail.needsDisplay = true; self.root.sidebar.mark.needsDisplay = true
             if self.settings.window?.isVisible == true { self.settings.view.update(self.settingsModel) }
         }
-        w.onFocusChange = { [weak self] in self?.updateDim() }
+        w.onFocusChange = { [weak self, weak w] in self?.root.noteKeyboard(w?.firstResponder); self?.updateDim() }
         wire()
         restoreShells()
         TerminalHarness.start(self)
@@ -610,7 +610,7 @@ final class MainWindowController: NSWindowController, SessionPaneDelegate, NSWin
         let id = s.id
         t.onExit = { [weak self] in
             self?.detached.insert(id)
-            if let self { self.render(self.store.state) }
+            if let self { self.render(self.store.state); self.keepKeyboardVisible() }
         }
         t.onOpenURL = { [weak self] url, cwd in self?.openURL(url, cwd: cwd, session: id) }
         // A plain click takes artifact links and files that exist; anything else goes to Claude Code.

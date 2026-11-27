@@ -83,6 +83,15 @@ final class RootView: MXView {
     private let railHandle = RailHandle(frame: .zero)
     private var lastPointer = NSPoint(x: 999, y: 0)
 
+    /// The part of the window that last had the keyboard: where it goes back when AppKit takes it
+    /// from a view that hid (MainWindow+Keyboard).
+    private(set) var keyboardHome: KeyboardHome?
+    func noteKeyboard(_ r: NSResponder?) {
+        guard let v = r as? NSView else { return }
+        if v.isDescendant(of: sessionPane) { keyboardHome = v is TerminalView ? .terminal : .sessionPane; return }
+        if let p = present.first(where: { content($0).map(v.isDescendant) ?? false }) { keyboardHome = .panel(p) }
+    }
+
     /// Whether the viewer has something to show (a file, or ⌘\ forced it open).
     private(set) var viewerOpen = false
 
@@ -350,19 +359,6 @@ final class RootView: MXView {
         planeRect = NSRect(x: 0, y: top, width: railMode == .shown ? rw + 1 : 0, height: bodyH)
         needsDisplay = true
         window?.invalidateCursorRects(for: self)
-    }
-
-    /// The viewer's tabs head it in the title bar: right of the pane line beside the session, the
-    /// whole row after the session's own tab while it fills the window, and the tab on show alone
-    /// after the session tabs while the session fills it.
-    private func docsPlace(line x: CGFloat, open: Bool) -> TitleBar.Docs {
-        guard shown(.right).contains(.viewer) else { return .none }
-        switch filling {
-        case nil: return open ? .beside(at: x) : .none
-        case .panel(.right)?: return .filling
-        case .session?: return viewerPane.header.hasTabs ? .peek : .none
-        default: return .none
-        }
     }
 
     private var drawsLines: [NSRect] = []

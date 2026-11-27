@@ -30,7 +30,11 @@ enum ViewerTabAction {
 /// (`TabWidths.layout`).
 final class ViewerTabStrip: MXView, TipSource {
     enum Kind: Equatable { case markdown, code, pdf, image, other, artifact }
-    struct Tab: Equatable { var title: String; var detail: String; var preview: Bool; var unseen: Bool; var kind: Kind }
+    struct Tab: Equatable {
+        var title: String; var detail: String; var preview: Bool; var unseen: Bool; var kind: Kind
+        /// What is new, for the tip; nil says only that something is.
+        var news: String? = nil
+    }
     var tabs: [Tab] = [] { didSet { if tabs != oldValue { needsDisplay = true } } }
     var active: Int? { didSet { if active != oldValue { needsDisplay = true } } }
     var onAction: ((ViewerTabAction) -> Void)?
@@ -286,7 +290,7 @@ final class ViewerTabStrip: MXView, TipSource {
         if closes, c.contains(p) { return (Tip("Close").adding("Middle-click a tab closes it too, ⌘W in the viewer closes the one on show"), c) }
         let tab = tabs[i]
         var tip = Tip(tab.detail)
-        if tab.unseen { tip = tip.adding("New since you last looked") }
+        if tab.unseen { tip = tip.adding(tab.news ?? "New since you last looked") }
         if tab.preview { tip = tip.adding("Preview: the session's next file replaces it. ⌥⌘P or a double-click keeps it") }
         return (tip, r)
     }

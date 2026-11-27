@@ -65,7 +65,7 @@ final class ViewerHeader: MXView {
             lone.unseen = lone.unseen || peekNews
             // The dot says something is new; the tip says which file.
             let news = tabs.tabs.indices.filter { $0 != a && tabs.isUnseen($0) }.map { all[$0].title }
-            if peekNews, !news.isEmpty { lone.detail += "\nNew: " + news.joined(separator: ", ") }
+            if peekNews, !news.isEmpty { lone.news = "New: " + news.joined(separator: ", ") }
             strip.tabs = [lone]; strip.active = 0
         } else {
             strip.tabs = all; strip.active = tabs.active
