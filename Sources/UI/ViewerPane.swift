@@ -141,13 +141,12 @@ extension ViewerPane: PanelContent {
     func preferredExtent(along d: Dock) -> CGFloat? { nil }
 }
 
-/// The folder's name over its column.
+/// The folder's name over its column, as it is on disk, level with the session's header beside it.
 final class TreeHeader: MXView {
-    static let height: CGFloat = 24
+    static let height = Metrics.header
     var title = "" { didSet { if title != oldValue { needsDisplay = true } } }
     override func draw(_ r: NSRect) {
         t.plane.setFill(); bounds.fill()
-        // The label style of every panel header ("SLACK 2", "USAGE").
-        Text.draw(title.uppercased(), in: NSRect(x: 12, y: 0, width: bounds.width - 24, height: bounds.height), color: t.fg2, font: Fonts.mono(Metrics.fontSize - 2.5, .medium))
+        Text.draw(title, in: NSRect(x: 12, y: 0, width: bounds.width - 24, height: bounds.height), color: t.fg2, font: .systemFont(ofSize: 12, weight: .semibold))
     }
 }
